@@ -47,7 +47,7 @@ node /path/to/forja/bin/forja.mjs runner --goal "Add a contacts page with a form
 
 ## The crew
 
-Ten roles with plain names. The five **core** roles take part in every run. The five **on-demand** roles stay idle until a deterministic trigger fires (full table in `docs/ARCHITECTURE.md` §2b).
+Ten roles with plain names. The five **core** roles take part in every run. The five **on-demand** roles stay idle until a deterministic trigger fires (full table in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §2b).
 
 | Role | Kind | What it does |
 |---|---|---|
@@ -97,7 +97,7 @@ forja runner --goal "…"
 | `.claude/agents/`, `.claude/skills/` | the crew definitions and their shared methods, the same ones `bootstrap` installs elsewhere |
 | `test/`, `tools/check.mjs` | the test suite, event fixtures and repo invariants |
 | `examples/sample-project/` | a small app built end to end by Forja runs, with its plan, reports and decisions |
-| `docs/` | `ARCHITECTURE.md` (the design, source of truth), `design/DESIGN.md` (the UI contract), `FORJA-POC-LOG.md` (the build log: every decision, rejection and incident) |
+| `docs/` | [ARCHITECTURE.md](docs/ARCHITECTURE.md) (the design, source of truth; English summary on top), [design/DESIGN.md](docs/design/DESIGN.md) (the UI contract), [FORJA-POC-LOG.md](docs/FORJA-POC-LOG.md) (the build log: every decision, rejection and incident) |
 
 Most design documents, UI labels and logs are in **Portuguese**, the working language of the project; code, comments and role names are in English. "Sponsor" throughout the docs is the role of the human who owns the goal.
 
