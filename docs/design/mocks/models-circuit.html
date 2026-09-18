@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forja · Modelos e ligações — B Circuit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Direction B — Circuit. Agents are chips on a schematic; calls travel as
+     current along right-angle traces, like a board diagram, not a social graph. */
+  :root {
+    --bg: #EFF1EE; --surface: #FBFCFA; --ink: #1B211E; --muted: #5D665F; --rule: #DCE0DA;
+    --main: #008C7E; --sub: #9B3FB5; --backend: #A6740B; --guide: #2F6FB0;
+    --sans: 'Figtree', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--sans);
+    background-image: radial-gradient(circle, #D7DCD5 1px, transparent 1px); background-size: 22px 22px; }
+  header { display: flex; align-items: baseline; gap: var(--s4); padding: var(--s5) var(--s6) var(--s4); }
+  header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  header .meta { font: 12px var(--mono); color: var(--muted); }
+  header .badge { margin-left: auto; font: 11px var(--mono); color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 3px 10px; background: var(--surface); }
+
+  .board { margin: 0 var(--s6) var(--s5); background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; position: relative; overflow: hidden; }
+  .board svg { width: 100%; height: 620px; display: block; }
+
+  .chip rect.body { fill: var(--surface); stroke-width: 2; }
+  .chip .desig { font: 700 11px var(--mono); letter-spacing: .04em; }
+  .chip .name { font: 600 15px var(--sans); }
+  .chip .stat { font: 11px var(--mono); fill: var(--muted); }
+  .pin { stroke-width: 2; }
+  .trace { fill: none; stroke: var(--rule); stroke-width: 2; }
+  .via { r: 3; }
+
+  .stamp { position: absolute; right: var(--s4); bottom: var(--s4); background: var(--surface); border: 1.5px solid var(--ink); font: 11px var(--mono); }
+  .stamp table { border-collapse: collapse; }
+  .stamp td { padding: 4px 10px; border: 1px solid var(--rule); white-space: nowrap; }
+  .stamp td.k { color: var(--muted); }
+
+  .console { margin: 0 var(--s6) var(--s6); background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  .console .bar { background: var(--ink); color: var(--surface); font: 11px var(--mono); padding: var(--s2) var(--s4); letter-spacing: .04em; }
+  .console .lines { padding: var(--s3) var(--s4); font: 12px/1.7 var(--mono); max-height: 180px; overflow-y: auto; }
+  .console .lines .s { color: var(--main); }
+  .console .lines .e { color: var(--muted); }
+  .console .lines .ty { display: inline-block; width: 150px; }
+  .console .lines .dur { color: var(--muted); }
+  .console .lines b { font-weight: 600; }
+
+  @media (max-width: 760px) {
+    header { flex-wrap: wrap; padding: var(--s4); }
+    header .badge { margin-left: 0; }
+    .board, .console { margin: 0 var(--s4) var(--s4); }
+    .board svg { height: 460px; }
+    .stamp { font-size: 9px; }
+    .chip .name { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Modelos e ligações</h1>
+  <div class="meta">sessão 6fcc4d98 · forja · 08:37:35–08:46:17</div>
+  <div class="badge">9 handoffs</div>
+</header>
+
+<div class="board">
+  <svg viewBox="0 0 1040 640" preserveAspectRatio="xMidYMid meet">
+    <!-- traces -->
+    <path id="t-reviewer" class="trace" style="stroke:color-mix(in srgb, var(--sub) 45%, var(--rule))" d="M 340 280 H 520 V 115 H 680" />
+    <path id="t-backend" class="trace" style="stroke:color-mix(in srgb, var(--backend) 45%, var(--rule))" d="M 340 315 H 600 V 325 H 760" />
+    <path id="t-guide" class="trace" style="stroke:color-mix(in srgb, var(--guide) 45%, var(--rule))" d="M 230 370 V 470 H 510 V 520" />
+    <circle class="via" cx="520" cy="280" fill="var(--rule)"></circle>
+    <circle class="via" cx="600" cy="315" fill="var(--rule)"></circle>
+    <circle class="via" cx="230" cy="470" fill="var(--rule)"></circle>
+    <circle class="via" cx="510" cy="470" fill="var(--rule)"></circle>
+
+    <!-- hub chip: main session -->
+    <g class="chip" transform="translate(120,260)">
+      <rect class="body" width="220" height="110" rx="6" style="stroke:var(--ink)"></rect>
+      <line class="pin" x1="220" y1="20" x2="240" y2="20" style="stroke:var(--sub)"></line>
+      <line class="pin" x1="220" y1="55" x2="240" y2="55" style="stroke:var(--backend)"></line>
+      <line class="pin" x1="110" y1="110" x2="110" y2="130" style="stroke:var(--guide)"></line>
+      <text class="desig" x="16" y="24">U1</text>
+      <text class="name" x="16" y="48">main session</text>
+      <text class="stat" x="16" y="70">9 calls dispatched</text>
+      <text class="stat" x="16" y="86">6fcc4d98</text>
+    </g>
+
+    <!-- U2 reviewer -->
+    <g class="chip" transform="translate(680,70)">
+      <rect class="body" width="240" height="90" rx="6" style="stroke:var(--sub)"></rect>
+      <line class="pin" x1="-20" y1="45" x2="0" y2="45" style="stroke:var(--sub)"></line>
+      <text class="desig" x="16" y="22" fill="var(--sub)">U2</text>
+      <text class="name" x="16" y="44">reviewer</text>
+      <text class="stat" x="16" y="64">6 calls · 74.9s total</text>
+    </g>
+
+    <!-- U3 backend -->
+    <g class="chip" transform="translate(760,280)">
+      <rect class="body" width="220" height="90" rx="6" style="stroke:var(--backend)"></rect>
+      <line class="pin" x1="-20" y1="45" x2="0" y2="45" style="stroke:var(--backend)"></line>
+      <text class="desig" x="16" y="22" fill="var(--backend)">U3</text>
+      <text class="name" x="16" y="44">backend</text>
+      <text class="stat" x="16" y="64">1 call · 12.3s total</text>
+    </g>
+
+    <!-- U4 claude-code-guide -->
+    <g class="chip" transform="translate(380,520)">
+      <rect class="body" width="260" height="90" rx="6" style="stroke:var(--guide)"></rect>
+      <line class="pin" x1="130" y1="-20" x2="130" y2="0" style="stroke:var(--guide)"></line>
+      <text class="desig" x="16" y="22" fill="var(--guide)">U4</text>
+      <text class="name" x="16" y="44">claude-code-guide</text>
+      <text class="stat" x="16" y="64">1 call · 82.7s total</text>
+    </g>
+
+    <!-- current pulses: small squares run the traces on Start, hollow squares return on Stop.
+         x/y only centers the square on the path point (animateMotion adds the path's
+         absolute coordinate on top); opacity keeps each pulse invisible except during
+         its own motion window, so it never flashes at the SVG origin. -->
+    <rect class="pf" width="9" height="9" x="-4.5" y="-4.5" fill="var(--sub)" style="filter:drop-shadow(0 0 5px var(--sub));opacity:0">
+      <animateMotion dur="3.4s" begin="0.2s;r1.end+2.4s" fill="freeze" id="f1" rotate="auto"><mpath href="#t-reviewer"/></animateMotion>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.03;0.97;1" dur="3.4s" begin="0.2s;r1.end+2.4s" fill="freeze"/>
+    </rect>
+    <rect class="pr" width="7" height="7" x="-3.5" y="-3.5" fill="none" stroke="var(--sub)" stroke-width="2" style="opacity:0">
+      <animateMotion dur="3.4s" begin="f1.end+0.2s" fill="freeze" id="r1" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#t-reviewer"/></animateMotion>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.03;0.97;1" dur="3.4s" begin="f1.end+0.2s" fill="freeze"/>
+    </rect>
+
+    <rect class="pf" width="9" height="9" x="-4.5" y="-4.5" fill="var(--backend)" style="filter:drop-shadow(0 0 5px var(--backend));opacity:0">
+      <animateMotion dur="2.8s" begin="1.5s;r2.end+3.6s" fill="freeze" id="f2" rotate="auto"><mpath href="#t-backend"/></animateMotion>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.03;0.97;1" dur="2.8s" begin="1.5s;r2.end+3.6s" fill="freeze"/>
+    </rect>
+    <rect class="pr" width="7" height="7" x="-3.5" y="-3.5" fill="none" stroke="var(--backend)" stroke-width="2" style="opacity:0">
+      <animateMotion dur="2.8s" begin="f2.end+0.2s" fill="freeze" id="r2" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#t-backend"/></animateMotion>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.03;0.97;1" dur="2.8s" begin="f2.end+0.2s" fill="freeze"/>
+    </rect>
+
+    <rect class="pf" width="9" height="9" x="-4.5" y="-4.5" fill="var(--guide)" style="filter:drop-shadow(0 0 5px var(--guide));opacity:0">
+      <animateMotion dur="3.0s" begin="2.4s;r3.end+4.3s" fill="freeze" id="f3" rotate="auto"><mpath href="#t-guide"/></animateMotion>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.03;0.97;1" dur="3.0s" begin="2.4s;r3.end+4.3s" fill="freeze"/>
+    </rect>
+    <rect class="pr" width="7" height="7" x="-3.5" y="-3.5" fill="none" stroke="var(--guide)" stroke-width="2" style="opacity:0">
+      <animateMotion dur="3.0s" begin="f3.end+0.2s" fill="freeze" id="r3" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#t-guide"/></animateMotion>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.03;0.97;1" dur="3.0s" begin="f3.end+0.2s" fill="freeze"/>
+    </rect>
+  </svg>
+  <div class="stamp">
+    <table>
+      <tr><td class="k">PROJECT</td><td>FORJA</td></tr>
+      <tr><td class="k">SESSION</td><td>6FCC4D98</td></tr>
+      <tr><td class="k">SHEET</td><td>1/1</td></tr>
+      <tr><td class="k">CALLS</td><td>9</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="console">
+  <div class="bar">/ handoff log — real, from data/events.jsonl</div>
+  <div class="lines">
+    <div><span class="e">08:37:35</span> <span class="s">START</span> <span class="ty">reviewer</span><b>a0729febf0c930824</b></div>
+    <div><span class="e">08:37:41</span> <span class="e">STOP&nbsp;</span> <span class="ty">reviewer</span><b>a0729febf0c930824</b> <span class="dur">6577ms</span></div>
+    <div><span class="e">08:38:21</span> <span class="s">START</span> <span class="ty">backend</span><b>a1095075630b92e60</b></div>
+    <div><span class="e">08:38:23</span> <span class="s">START</span> <span class="ty">reviewer</span><b>a14d5a1e2a4750d0d</b></div>
+    <div><span class="e">08:38:33</span> <span class="e">STOP&nbsp;</span> <span class="ty">backend</span><b>a1095075630b92e60</b> <span class="dur">12269ms</span></div>
+    <div><span class="e">08:38:37</span> <span class="e">STOP&nbsp;</span> <span class="ty">reviewer</span><b>a14d5a1e2a4750d0d</b> <span class="dur">14295ms</span></div>
+    <div><span class="e">08:43:13</span> <span class="s">START</span> <span class="ty">claude-code-guide</span><b>a76fbb2e0c4ab5e92</b></div>
+    <div><span class="e">08:44:36</span> <span class="e">STOP&nbsp;</span> <span class="ty">claude-code-guide</span><b>a76fbb2e0c4ab5e92</b> <span class="dur">82733ms</span></div>
+  </div>
+</div>
+</body>
+</html>

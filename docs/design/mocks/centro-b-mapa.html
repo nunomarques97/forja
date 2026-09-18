@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Centro de controlo — direção B: Mapa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* =========================================================================
+   DIREÇÃO B — «MAPA»
+   Lógica de layout: um único mapa, sem painéis. Cada projeto é uma ILHA no
+   mesmo plano; arrasta-se, aproxima-se e afasta-se, e há um botão para
+   enquadrar tudo. Elemento-assinatura: o ANEL DA ILHA — dez riscos à volta
+   de cada projeto, um por membro da equipa, na cor do sinal: mesmo de longe,
+   com os nomes pequenos demais para ler, vê-se quanto verde, amarelo e
+   vermelho tem cada projeto.
+   Tipos: Space Grotesk (títulos/estados) + IBM Plex Sans (texto).
+   Paleta: grafite frio (o mapa é chão, os projetos é que têm cor).
+   MOCK — não é código de produção.
+   ========================================================================= */
+:root{
+  --bg:#0A0C0E; --chao:#0E1114; --surface:#141A1E; --surface-2:#1C242A; --line:#2A343C;
+  --ink:#EAF0F4; --dim:#9AA8B2;
+  --vivo:#45D48A; --espera:#F0B23F; --parado:#FF4F3E; --neutro:#8A8078;
+  --escuro:#0A0C0E; --ticket:#F1E7D8;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --disp:'Space Grotesk',system-ui,sans-serif;
+  --body:'IBM Plex Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);
+          -webkit-font-smoothing:antialiased;overflow:hidden}
+.b-vivo{--c:var(--vivo)} .b-espera{--c:var(--espera)} .b-parado{--c:var(--parado)} .b-neutro{--c:var(--neutro)}
+
+/* ---------- faixa de topo, fina e flutuante ---------- */
+.fita{position:fixed;inset:0 0 auto 0;height:60px;display:flex;align-items:center;gap:var(--s4);
+      padding:0 var(--s5);background:linear-gradient(var(--bg),rgba(10,12,14,.82) 70%,transparent);z-index:3}
+.marca{font:700 20px/1 var(--disp);letter-spacing:.14em}
+.frase{font:500 16px/1 var(--body);color:var(--ink)}
+.frase b{font:700 16px/1 var(--disp)}
+.frase .v{color:var(--vivo)} .frase .p{color:var(--parado)} .frase .n{color:var(--dim)}
+.direita{margin-left:auto;display:flex;align-items:center;gap:var(--s3)}
+.relogio{font:500 14px/1 var(--body);color:var(--dim)}
+.alerta{background:var(--ticket);color:var(--escuro);border-radius:6px;padding:9px 13px;font:700 14px/1 var(--disp)}
+
+/* ---------- o mapa ---------- */
+.mapa{position:fixed;inset:0;background:
+      radial-gradient(1200px 700px at 30% 40%, #10161A 0%, var(--chao) 60%, var(--bg) 100%);
+      background-color:var(--chao)}
+.mapa::before{content:"";position:absolute;inset:0;opacity:.5;
+  background-image:radial-gradient(circle at 1px 1px, #1B242B 1px, transparent 0);background-size:38px 38px}
+.mapa svg{position:absolute;inset:0;width:100%;height:100%}
+
+/* ---------- rótulos das ilhas (HTML por cima do SVG) ---------- */
+.ilhaTxt{position:absolute;transform:translateX(-50%);text-align:center;width:340px}
+.nome{font:700 30px/1 var(--disp);letter-spacing:.01em}
+.estado{display:inline-block;margin-top:7px;background:var(--c);color:var(--escuro);
+        font:700 14px/1 var(--disp);letter-spacing:.1em;text-transform:uppercase;padding:7px 11px 6px;border-radius:5px}
+.ilhaTxt.b-neutro .estado{background:transparent;color:var(--neutro);border:1px solid var(--neutro)}
+.sub{color:var(--dim);font-size:13.5px;margin-top:8px}
+.linhaviva{margin-top:7px;font:500 16px/1.3 var(--body);color:var(--ink)}
+.contas{margin-top:9px;display:flex;gap:var(--s3);justify-content:center;font-size:13px;color:var(--dim)}
+.contas span{display:flex;align-items:center;gap:6px}
+.contas i{width:9px;height:9px;border-radius:50%;background:var(--c);display:block}
+.accao{margin-top:var(--s3);background:var(--ticket);color:var(--escuro);border-radius:8px;padding:10px 12px;
+       display:inline-flex;gap:var(--s3);align-items:center;font-size:14px}
+.accao button{background:var(--escuro);color:var(--ticket);border:0;border-radius:5px;padding:10px 12px;
+              font:700 13px/1 var(--disp);letter-spacing:.06em;text-transform:uppercase;min-height:40px;cursor:pointer}
+
+/* ---------- carril dos projetos (esquerda) ---------- */
+.carril{position:fixed;left:var(--s4);top:76px;width:216px;z-index:3;display:flex;flex-direction:column;gap:var(--s2)}
+.carril h3{font:500 11px/1 var(--body);letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin:0 0 2px 4px}
+.chip{display:flex;align-items:center;gap:var(--s2);background:var(--surface);border:1px solid var(--line);
+      border-left:3px solid var(--c);border-radius:8px;padding:10px var(--s3);cursor:pointer;min-height:44px}
+.chip.on{background:var(--surface-2);border-color:var(--c)}
+.chip b{font:700 15px/1.1 var(--disp)}
+.chip small{display:block;color:var(--dim);font-size:12.5px;margin-top:3px}
+.chip i{width:11px;height:11px;border-radius:50%;background:var(--c);flex:none}
+
+/* ---------- comandos do mapa (canto inferior direito) ---------- */
+.comandos{position:fixed;right:var(--s4);bottom:var(--s4);z-index:3;display:flex;gap:var(--s2);align-items:flex-end}
+.grupo{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.grupo button{background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--ink);
+              width:46px;height:44px;font:500 19px/1 var(--body);cursor:pointer}
+.grupo button:last-child{border-bottom:0}
+.largo{background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--ink);
+       padding:12px 15px;font:700 13px/1 var(--disp);letter-spacing:.07em;text-transform:uppercase;cursor:pointer;min-height:44px}
+
+/* ---------- legenda ---------- */
+.legenda{position:fixed;left:var(--s4);bottom:var(--s4);z-index:3;background:var(--surface);border:1px solid var(--line);
+         border-radius:8px;padding:var(--s3) var(--s4);font-size:13px;color:var(--dim);max-width:430px}
+.legenda div{display:flex;align-items:center;gap:8px;padding:3px 0}
+.legenda i{width:12px;height:12px;border-radius:50%;background:var(--c);flex:none}
+.legenda i.anel{background:transparent;border:2px solid var(--c)}
+.legenda p{margin:7px 0 0;color:var(--dim)}
+
+/* ---------- painel de detalhe ---------- */
+.detalhe{position:fixed;top:0;right:0;bottom:0;width:380px;background:var(--surface);border-left:1px solid var(--line);
+         padding:var(--s5);overflow:auto;z-index:4}
+.detalhe h2{font:700 24px/1 var(--disp);margin:0}
+.detalhe dl{margin:var(--s4) 0 0} .detalhe dt{font-size:12.5px;color:var(--dim);margin-top:var(--s4)}
+.detalhe dd{margin:3px 0 0;font-size:15px}
+
+/* ---------- telemóvel ---------- */
+@media (max-width:720px){
+  .fita{height:auto;flex-wrap:wrap;gap:6px var(--s3);padding:var(--s3) var(--s4)}
+  .marca{font-size:17px} .frase{font-size:15px;width:100%;order:3}
+  .carril{position:fixed;left:0;right:0;top:auto;bottom:70px;width:auto;flex-direction:row;overflow:auto;
+          padding:0 var(--s3);gap:var(--s2)}
+  .carril h3{display:none} .chip{flex:none;min-width:168px}
+  .ilhaTxt{width:300px} .nome{font-size:24px}
+  .legenda{display:none}
+  .comandos{right:var(--s3);bottom:var(--s3);gap:6px}
+  .grupo{flex-direction:row} .grupo button{border-bottom:0;border-right:1px solid var(--line)}
+  .largo{padding:12px}
+  .detalhe{display:none}
+}
+@media (prefers-reduced-motion: no-preference){
+  .halo{animation:pulso 2.4s ease-in-out infinite}
+  @keyframes pulso{0%,100%{opacity:.4}50%{opacity:.95}}
+}
+</style>
+</head>
+<body>
+<div class="mapa"><svg id="mapa" preserveAspectRatio="xMidYMid meet"></svg></div>
+<div id="rotulos"></div>
+<div id="cromo"></div>
+<script type="module">
+import { CENAS, PAPEIS, POS, LIGACOES, DETALHE, porKey, esc } from './centro-dados.js';
+
+const q = new URLSearchParams(location.search);
+const cena = CENAS[q.get('cena') === 'parado' ? 'parado' : 'agora'];
+const movel = matchMedia('(max-width:720px)').matches;
+const comDetalhe = q.get('detalhe') === '1';
+
+// ---- posições das ilhas no plano do mapa (viewBox fixo; a "câmara" é o viewBox)
+const W = movel ? 390 : 1440, H = movel ? 844 : 1000;
+const layoutDesktop = [ { cx: 440, cy: 390, R: 196 }, { cx: 1020, cy: 390, R: 196 }, { cx: 700, cy: 790, R: 74 } ];
+const layoutMovel   = [ { cx: 195, cy: 258, R: 150 } ];  // no telemóvel o mapa mostra UMA ilha de cada vez
+const layout = movel ? layoutMovel : layoutDesktop;
+
+const banda = (p, k) => p.equipa[k]?.banda || 'neutro';
+
+// ---- uma ilha: anel de dez riscos + constelação lá dentro -------------------
+function ilha(p, i) {
+  const L = layout[i]; if (!L) return '';
+  const { cx, cy, R } = L;
+  const arco = (a0, a1, r) => {
+    const rad = a => (a - 90) * Math.PI / 180;
+    const x0 = cx + r * Math.cos(rad(a0)), y0 = cy + r * Math.sin(rad(a0));
+    const x1 = cx + r * Math.cos(rad(a1)), y1 = cy + r * Math.sin(rad(a1));
+    return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${r} ${r} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+  };
+  // anel: um risco por papel, na ordem do elenco (núcleo grosso, a pedido fino)
+  const anel = PAPEIS.map((pa, n) => {
+    const b = banda(p, pa.key);
+    const a0 = n * 36 + 2.4, a1 = (n + 1) * 36 - 2.4;
+    const w = pa.nucleo ? 13 : 7;
+    const op = b === 'neutro' ? .5 : 1;
+    return `<path d="${arco(a0, a1, R)}" stroke="var(--${b})" stroke-width="${w}" fill="none" opacity="${op}" stroke-linecap="butt"/>`;
+  }).join('');
+  const halosAnel = PAPEIS.filter(pa => banda(p, pa.key) === 'vivo').map((pa) => {
+    const n = PAPEIS.indexOf(pa);
+    return `<path class="halo" d="${arco(n * 36 + 2.4, (n + 1) * 36 - 2.4, R)}" stroke="var(--vivo)" stroke-width="26" fill="none" opacity=".22"/>`;
+  }).join('');
+
+  // constelação lá dentro
+  const box = R * 1.32, x0 = cx - box / 2, y0 = cy - box / 2;
+  const px = k => x0 + POS[k].x * box, py = k => y0 + POS[k].y * box;
+  const esc0 = R / 176;
+  const rad = k => (POS[k].r === 1 ? 21 : POS[k].r > .6 ? 15 : 11) * esc0;
+  const ativo = new Set();
+  if (p.espera) ativo.add(`lead|${p.espera}`);
+  if (p.entregaRecente) ativo.add(`${p.entregaRecente.a}|${p.entregaRecente.b}`);
+  const eAtiva = l => ativo.has(`${l.a}|${l.b}`) || ativo.has(`${l.b}|${l.a}`);
+  const linhas = LIGACOES.map(l => {
+    const ax = px(l.a), ay = py(l.a), bx = px(l.b), by = py(l.b);
+    const dx = bx - ax, dy = by - ay, d = Math.hypot(dx, dy) || 1;
+    const r1 = rad(l.a) + 3, r2 = rad(l.b) + 3;
+    const A = [ax + dx / d * r1, ay + dy / d * r1], B = [bx - dx / d * r2, by - dy / d * r2];
+    if (eAtiva(l)) {
+      // a ligação acesa toma o pior dos dois estados (ver direção A)
+      const par = [banda(p, l.a), banda(p, l.b)];
+      const cor = `var(--${par.includes('parado') ? 'parado' : par.includes('vivo') ? 'vivo' : 'espera'})`;
+      const pts = [.35, .52, .69].map(t => `<circle cx="${A[0] + (B[0] - A[0]) * t}" cy="${A[1] + (B[1] - A[1]) * t}" r="${3 * esc0}" fill="${cor}"/>`).join('');
+      return `<line x1="${A[0]}" y1="${A[1]}" x2="${B[0]}" y2="${B[1]}" stroke="${cor}" stroke-width="${2.2 * esc0}"/>${pts}`;
+    }
+    return `<line x1="${A[0]}" y1="${A[1]}" x2="${B[0]}" y2="${B[1]}" stroke="#2A343C" stroke-width="1"${l.tipo === 'fluxo' ? ' stroke-dasharray="4 5"' : ''} opacity=".8"/>`;
+  }).join('');
+
+  const nos = PAPEIS.map(pa => {
+    const b = banda(p, pa.key), r = rad(pa.key), x = px(pa.key), y = py(pa.key);
+    let corpo = '';
+    if (b === 'vivo') corpo = `<circle class="halo" cx="${x}" cy="${y}" r="${r + 10 * esc0}" fill="var(--vivo)" opacity=".2"/><circle cx="${x}" cy="${y}" r="${r}" fill="var(--vivo)"/>`;
+    else if (b === 'espera') corpo = `<circle cx="${x}" cy="${y}" r="${r}" fill="var(--espera)" fill-opacity=".18" stroke="var(--espera)" stroke-width="${2.6 * esc0}"/>`;
+    else if (b === 'parado') corpo = `<circle cx="${x}" cy="${y}" r="${r}" fill="var(--parado)" fill-opacity=".24" stroke="var(--parado)" stroke-width="${2.6 * esc0}"/>`
+      + `<path d="M${x - r * .5} ${y - r * .5}l${r} ${r}M${x + r * .5} ${y - r * .5}l${-r} ${r}" stroke="var(--parado)" stroke-width="${2.2 * esc0}"/>`;
+    else corpo = `<circle cx="${x}" cy="${y}" r="${r}" fill="#1A2126" stroke="var(--neutro)" stroke-width="1.2" stroke-opacity=".65"/>`;
+    const cor = b === 'vivo' ? 'var(--escuro)' : b === 'neutro' ? 'var(--neutro)' : `var(--${b})`;
+    const mono = b === 'parado' ? '' : `<text x="${x}" y="${y + 4 * esc0}" text-anchor="middle" fill="${cor}" style="font:700 ${13 * esc0}px 'Space Grotesk',sans-serif">${pa.mono}</text>`;
+    // ao ZOOM de enquadrar, só quem está aceso ganha nome: o resto lê-se pelo anel
+    // o nome sai para fora da ilha (para cima na metade de cima, para baixo na
+    // de baixo), para nunca cair em cima de um vizinho
+    const ly = POS[pa.key].y < .45 ? y - r - 9 : y + r + 15;
+    // no zoom de "ver tudo" só ganha nome quem explica o estado do projeto:
+    // quem o Lead está à espera, e quem está parado. Os outros nomes chegam
+    // com a aproximação ou com o toque — é essa a troca do mapa.
+    const nome = (pa.key === p.espera || b === 'parado') && R > 120
+      ? `<text x="${x}" y="${ly}" text-anchor="middle" fill="var(--ink)" style="font:500 11.5px 'IBM Plex Sans',sans-serif">${esc(pa.nome)}</text>` : '';
+    return corpo + mono + nome;
+  }).join('');
+
+  const fundo = `<circle cx="${cx}" cy="${cy}" r="${R - 9}" fill="#0F1418" stroke="var(--line)" stroke-opacity=".8"/>`;
+  return `<g>${halosAnel}${fundo}${anel}${linhas}${nos}</g>`;
+}
+
+document.getElementById('mapa').setAttribute('viewBox', `0 0 ${W} ${H}`);
+const ilhas = movel ? cena.slice(0, 1) : cena;   // o carril continua a mostrar todos os projetos
+document.getElementById('mapa').innerHTML = ilhas.map(ilha).join('');
+
+// ---- rótulos das ilhas ------------------------------------------------------
+const rotulos = ilhas.map((p, i) => {
+  const L = layout[i]; if (!L) return '';
+  const esq = L.cx / W * 100, topo = (L.cy + L.R + 18) / H * 100;
+  const c = p.contagem;
+  return `<div class="ilhaTxt b-${p.estado}" style="left:${esq}%;top:${topo}%">
+    <div class="nome">${esc(p.projeto)}</div>
+    <div class="estado">${esc(p.palavra)}</div>
+    <div class="linhaviva">${esc(p.resumo)}</div>
+    <div class="sub">${esc(p.desde)} · ${p.tarefas.feitas} de ${p.tarefas.total} tarefas feitas</div>
+    <div class="contas">
+      <span class="b-vivo"><i></i>${c.vivo} a trabalhar</span>
+      <span class="b-espera"><i></i>${c.espera} à espera</span>
+      <span class="b-parado"><i></i>${c.parado} parados</span>
+    </div>
+    ${p.humano ? `<div class="accao"><b>Precisa de ti</b>${esc(p.accao)}<button>Arrancar</button></div>` : ''}
+  </div>`;
+}).join('');
+document.getElementById('rotulos').innerHTML = rotulos;
+
+// ---- cromo: fita, carril, comandos, legenda ---------------------------------
+const vivos = cena.filter(p => p.estado === 'vivo').length;
+const parados = cena.filter(p => p.estado === 'parado').length;
+const fechados = cena.filter(p => p.estado === 'neutro').length;
+const precisa = cena.filter(p => p.humano).length;
+
+document.getElementById('cromo').innerHTML = `
+<div class="fita">
+  <span class="marca">FORJA</span>
+  <span class="frase"><b class="v">${vivos}</b> a trabalhar${parados ? ` · <b class="p">${parados}</b> parado${parados > 1 ? 's' : ''}` : ''}${fechados ? ` · <b class="n">${fechados}</b> terminado${fechados > 1 ? 's' : ''}` : ''}</span>
+  <span class="direita">
+    ${precisa ? `<span class="alerta">${precisa} precisa de ti</span>` : ''}
+    <span class="relogio">${cena === CENAS.parado ? '00:16' : '19:12'}</span>
+  </span>
+</div>
+<div class="carril">
+  <h3>Projetos</h3>
+  ${cena.map((p, i) => `<div class="chip b-${p.estado}${i === 0 ? ' on' : ''}"><i></i><span><b>${esc(p.projeto)}</b><small>${esc(p.palavra.toLowerCase())} · ${esc(p.desde.replace('começou ', '').replace('durou ', ''))}</small></span></div>`).join('')}
+</div>
+<div class="comandos">
+  <button class="largo">Ver só um projeto</button>
+  <button class="largo">Ecrã inteiro</button>
+  <div class="grupo"><button>+</button><button>−</button><button title="enquadrar tudo">⤢</button></div>
+</div>
+<div class="legenda">
+  <div class="b-vivo"><i></i>verde: está a trabalhar agora</div>
+  <div class="b-espera"><i class="anel"></i>amarelo: parou de escrever, está à espera</div>
+  <div class="b-parado"><i class="anel"></i>vermelho: sem sinal há mais de 5 minutos</div>
+  <div class="b-neutro"><i class="anel"></i>cinzento: já entregou, ou ainda não foi preciso</div>
+  <p>Cada risco à volta do projeto é um membro da equipa. Riscos grossos: os cinco que estão sempre no trabalho.</p>
+</div>
+${comDetalhe ? `<aside class="detalhe b-${DETALHE.banda}">
+  <h2>${esc(porKey(DETALHE.papel).nome)}</h2>
+  <div class="sub">no projeto ${esc(DETALHE.projeto)}</div>
+  <dl>
+    <dt>O que está a fazer</dt><dd>${esc(DETALHE.agora)}</dd>
+    <dt>Tarefa</dt><dd>${esc(DETALHE.aFazer)}</dd>
+    <dt>Último sinal</dt><dd>${esc(DETALHE.sinal)}</dd>
+    <dt>Capacidade</dt><dd>${esc(DETALHE.modelo)}</dd>
+  </dl></aside>` : ''}`;
+</script>
+</body>
+</html>

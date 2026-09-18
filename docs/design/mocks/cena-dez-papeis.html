@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>Cena da forja — dez papéis em duas profundidades (esboço de geometria)</title>
+<style>
+  :root{
+    --bg:#0E0C0B; --surface:#17130F; --line:#3A2F27; --ink:#F3E9DC; --dim:#A89A8A;
+    --ember:#FF7A2F; --wood:#CFA063; --indigo:#93A0FF; --indigo-2:#C3C9FF;
+    --patina:#63C9A9; --patina-2:#A8E3D0; --alarm:#FF4F3E; --amber:#F0B23F;
+    --steel:#C9D1DA; --steel-2:#9AA6B2; --slate:#8FB3C9; --slate-2:#B9D3E3;
+    --s2:8px; --s3:12px; --s5:24px;
+    --hud:'Barlow Condensed','Arial Narrow',sans-serif;
+    --body:'Barlow',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.4 var(--body)}
+  .stage{position:relative}
+  .scene{display:block;width:100%;height:auto}
+  .hud{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--s3) var(--s2);
+       padding:0 var(--s5);margin-top:-56px;position:relative}
+  .card{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--c);
+        border-radius:8px;padding:var(--s3);min-height:104px}
+  .card.idle{opacity:.7}
+  .nm{font:700 20px/1 var(--hud);letter-spacing:.04em;text-transform:uppercase;color:var(--c)}
+  .word{font:700 34px/1 var(--hud);text-transform:uppercase;color:var(--t);margin-top:8px}
+  .tag{font:700 10px/1 var(--hud);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+       border:1px solid var(--line);border-radius:4px;padding:2px 4px 1px}
+  @media (prefers-reduced-motion:no-preference){
+    .station.pulse .glow{animation:pulse 2.4s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}
+  }
+  /* a cena é só desktop: a ≤ 1000 px desaparece e o HUD deixa de a acompanhar */
+  @media (max-width:1000px){
+    .scene{display:none}
+    .hud{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:var(--s3)}
+  }
+  .guide{stroke:#F0B23F;stroke-width:1;stroke-dasharray:3 5;opacity:.45}
+  .note{padding:var(--s5);color:var(--dim);font:400 13px/1.6 var(--mono);max-width:1100px}
+  .note b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div id="scene"></div>
+  <div class="hud" id="hud"></div>
+</div>
+<p class="note" id="note"></p>
+
+<script type="module">
+// ---- geometria proposta (DESIGN.md §2) --------------------------------------
+const W = 1440, H = 240;
+const PAD = 24, GAP = 8, COLS = 5;                 // = padding --s5 e gap --s2 do .hud
+const COL = (W - 2 * PAD - (COLS - 1) * GAP) / COLS;   // 272
+const cx = i => PAD + i * (COL + GAP) + COL / 2;       // 160 440 720 1000 1280
+const DEPTH = .68;                                  // a fila de trás é a da frente a 68 %
+const ROW = {
+  front: { base: 150, k: .62, dx: 0,  haze: 1,   glow: [84, 66], ring: [56, 14] },
+  back:  { base: 100, k: .42, dx: 58, haze: .75, glow: [57, 45], ring: [38, 9.5] }
+};
+const BACK_BENCH_Y = 118, FLOOR_Y = 176;
+
+const LOUD = new Set(['bloqueado', 'precisa do Sponsor']);
+function tones(state){
+  if (state === 'a trabalhar') return 'work';
+  if (LOUD.has(state)) return 'alarm';
+  if (state === 'morto') return 'dead';
+  if (state === 'terminado') return 'done';
+  if (state === 'sem resposta') return 'lost';
+  if (state === 'inativo') return 'idle';
+  return 'wait';
+}
+function station(m, row){
+  const r = ROW[row], k = r.k, x0 = cx(m.col) + r.dx;
+  const X = d => Math.round((x0 + d * k) * 10) / 10, Y = d => Math.round((r.base + d * k) * 10) / 10;
+  const tone = tones(m.state);
+  const fresh = tone === 'work' && !m.quiet, quiet = tone === 'work' && m.quiet, loud = tone === 'alarm';
+  const glowOp = fresh ? 1 : quiet ? .5 : tone === 'wait' ? .35 : loud ? .55 : 0;   // não muda com a profundidade
+  const glowCol = loud ? 'var(--alarm)' : `var(--${m.c})`;
+  const dim = ['idle','dead','lost','fail','done'].includes(tone) ? .45 : 1;
+  const body = Math.round(dim * r.haze * 100) / 100;
+  const [gx, gy] = r.glow, [rx, ry] = r.ring;
+  const ring = loud || tone === 'fail' ? `<ellipse cx="${x0}" cy="${Y(14)}" rx="${rx}" ry="${ry}" fill="none" stroke="var(--alarm)" stroke-width="${3 * (row === 'back' ? DEPTH : 1)}"/>`
+    : quiet ? `<ellipse cx="${x0}" cy="${Y(14)}" rx="${rx}" ry="${ry}" fill="none" stroke="var(--amber)" stroke-width="3" stroke-dasharray="4 8"/>`
+    : tone === 'lost' ? `<ellipse cx="${x0}" cy="${Y(14)}" rx="${rx}" ry="${ry}" fill="none" stroke="var(--amber)" stroke-width="3"/>` : '';
+  const cross = tone === 'dead' ? `<g stroke="var(--alarm)" stroke-width="${6 * (row === 'back' ? DEPTH : 1)}" stroke-linecap="round"><line x1="${X(-56)}" y1="${Y(-80)}" x2="${X(56)}" y2="${Y(20)}"/><line x1="${X(56)}" y1="${Y(-80)}" x2="${X(-56)}" y2="${Y(20)}"/></g>` : '';
+  const sparks = tone === 'work' ? [0,1,2,3,4,5].map(j => `<circle cx="${X(-30 + j*12 + (j%2?5:0))}" cy="${Y(-52 - (j*11)%34)}" r="${(j%3?1.6:2.2) * (row==='back'?DEPTH:1)}" fill="var(--${m.c})" opacity="${quiet?.4:.85-(j%3)*.2}"/>`).join('') : '';
+  const bar = `x="${X(-24)}" y="${Y(-42)}" width="${Math.round(58*k)}" height="${Math.round(4*k*10)/10}" fill="var(--${m.c})"`;
+  const hot = tone === 'work' ? `<rect ${bar} opacity="${quiet?.35:.7}" filter="url(#bloom)"/><rect ${bar} opacity="${quiet?.5:.9}"/>` : '';
+  const id = `g-${m.key}`;
+  return `<g class="station ${fresh ? 'pulse' : ''}">
+    <defs><radialGradient id="${id}" cx="50%" cy="60%" r="50%"><stop offset="0" stop-color="${glowCol}" stop-opacity=".9"/><stop offset=".45" stop-color="${glowCol}" stop-opacity=".32"/><stop offset="1" stop-color="${glowCol}" stop-opacity="0"/></radialGradient></defs>
+    <ellipse class="glow" cx="${x0}" cy="${Y(-30)}" rx="${gx}" ry="${gy}" fill="url(#${id})" opacity="${glowOp}"/>
+    ${ring}
+    <g opacity="${body}">
+      <rect x="${X(-28)}" y="${Y(4)}" width="${Math.round(56*k)}" height="${Math.round(42*k)}" fill="#1A1412" stroke="#332A24"/>
+      <rect x="${X(-20)}" y="${Y(-6)}" width="${Math.round(40*k)}" height="${Math.round(10*k)}" fill="#2A2321"/>
+      <rect x="${X(-12)}" y="${Y(-22)}" width="${Math.round(24*k)}" height="${Math.round(16*k)}" fill="#332B28"/>
+      <polygon points="${X(-56)},${Y(-30)} ${X(-24)},${Y(-42)} ${X(-24)},${Y(-22)} ${X(-48)},${Y(-22)}" fill="#3B322E"/>
+      <rect x="${X(-24)}" y="${Y(-42)}" width="${Math.round(58*k)}" height="${Math.round(20*k)}" fill="#3E3531" stroke="#4A403B"/>
+      ${hot}
+    </g>
+    ${sparks}${cross}
+  </g>`;
+}
+
+// ---- elenco de demonstração (estados que põem a geometria à prova) ----------
+const core = [
+  { key:'lead',      col:0, name:'Lead',         c:'ember',   state:'a trabalhar' },
+  { key:'architect', col:1, name:'Architect',    c:'slate',   state:'a trabalhar' },
+  { key:'frontend',  col:2, name:'Frontend Dev', c:'patina',  state:'a trabalhar', quiet:true },
+  { key:'backend',   col:3, name:'Backend Dev',  c:'indigo',  state:'inativo' },
+  { key:'reviewer',  col:4, name:'Reviewer',     c:'steel',   state:'terminado' }
+];
+const demand = [
+  { key:'pm', col:0, name:'Product Manager',   c:'wood',     state:'bloqueado' },
+  { key:'pd', col:1, name:'Product Designer',  c:'patina-2', state:'a trabalhar' },
+  { key:'ts', col:2, name:'Technology Scout',  c:'indigo-2', state:'inativo' },
+  { key:'qa', col:3, name:'QA',                c:'slate-2',  state:'inativo' },
+  { key:'sr', col:4, name:'Security Reviewer', c:'steel-2',  state:'morto' }
+];
+
+const guides = [0,1,2,3,4].map(i => `<line class="guide" x1="${cx(i)}" y1="0" x2="${cx(i)}" y2="${H}"/>`).join('');
+document.getElementById('scene').innerHTML = `<svg class="scene" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax meet" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0E0C0B"/><stop offset="1" stop-color="#1A1513"/></linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#211B16"/><stop offset="1" stop-color="#0F0D0C"/></linearGradient>
+    <filter id="bloom" x="-50%" y="-300%" width="200%" height="700%"><feGaussianBlur stdDeviation="6"/></filter>
+  </defs>
+  <rect width="${W}" height="${FLOOR_Y}" fill="url(#wall)"/>
+  <rect y="${FLOOR_Y}" width="${W}" height="${H - FLOOR_Y}" fill="url(#floor)"/>
+  <rect x="0" y="${BACK_BENCH_Y}" width="${W}" height="6" fill="#2A2321" opacity=".6"/>
+  ${demand.map(m => station(m, 'back')).join('')}
+  <line x1="0" y1="${FLOOR_Y}" x2="${W}" y2="${FLOOR_Y}" stroke="#3A2F27"/>
+  ${core.map(m => station(m, 'front')).join('')}
+  ${location.search.includes('guides') ? guides : ''}
+</svg>`;
+
+const wordCol = s => s === 'a trabalhar' ? 'var(--ember)' : s === 'terminado' ? 'var(--patina)'
+  : s === 'bloqueado' ? 'var(--alarm)' : s === 'morto' ? 'var(--alarm)' : 'var(--dim)';
+const card = (m, onDemand) => `<article class="card ${m.state==='inativo'?'idle':''}" style="--c:var(--${m.c});--t:${wordCol(m.state)}">
+  <div class="nm">${m.name}</div>
+  ${onDemand ? '<span class="tag">a pedido</span>' : ''}
+  <div class="word">${m.state}</div>
+</article>`;
+document.getElementById('hud').innerHTML = core.map(m => card(m, false)).join('') + demand.map(m => card(m, true)).join('');
+
+const n = document.querySelectorAll('#scene svg *').length;
+document.getElementById('note').innerHTML =
+  `<b>Esboço de geometria</b> — colunas em ${[0,1,2,3,4].map(cx).join(' · ')} (as mesmas do HUD: padding 24, gap 8, 5 colunas de 272).<br>`
+  + `Fila da frente (núcleo): base 150, escala .62, dx 0. Fila de trás (a pedido): base 100, escala .42, dx +58, opacidade do corpo × .75 — o brilho de estado não muda com a profundidade.<br>`
+  + `Coluna 2 (Architect + Product Designer) e coluna 1 (Lead + Product Manager bloqueado) têm as duas estações acesas ao mesmo tempo. Elementos SVG: <b>${n}</b> (orçamento ≤ 300).`;
+</script>
+</body>
+</html>

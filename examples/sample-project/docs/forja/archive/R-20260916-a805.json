@@ -1,0 +1,138 @@
+{
+  "run": {
+    "run_id": "R-20260916-a805",
+    "project": "sample-project",
+    "goal": "Transformar o sample-project numa pequena app de saudações para uma equipa de 5 pessoas numa rede local: (1) um servidor HTTP mínimo em Node, sem dependências, que guarda cada saudação gerada num ficheiro JSON local e só aceita pedidos com um token simples no cabeçalho; (2) uma nova página 'histórico' que lista as saudações guardadas e mostra um gráfico simples de saudações por dia; (3) testes para o servidor e para a página; (4) README atualizado. Qualidade: simples, robusto, sem perder dados; público não técnico.",
+    "status": "failed",
+    "model_floor": "fable",
+    "started_at": "2026-09-16T21:04:45.176Z",
+    "sessions": [
+      "458ac54e-18e8-4286-8d37-d46162adc9c5",
+      "1e25fd21-44ee-4a06-affa-57885daf78fb"
+    ],
+    "checkpoints": [],
+    "fallbacks": [],
+    "answers_applied": [
+      "Q1@2026-09-16T19:24:41.669Z"
+    ],
+    "current_task": null,
+    "updated_at": "2026-09-16T21:11:54.769Z",
+    "why": "arranque inválido: run criado com as tasks do run anterior ainda em TASKS.json (bug corrigido em run start); reiniciado",
+    "finished_at": "2026-09-16T21:11:54.768Z"
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "slugify(text) em lib/slug.mjs com testes (acentos, espaços, pontuação)",
+      "owner": "fundidor",
+      "criteria": "lib/slug.mjs existe, sem imports, com export nomeado slugify conforme D2; test/slug.test.mjs usa node:test e node:assert/strict e cobre: acentos (\"Olá, São Paulo!\" → \"ola-sao-paulo\"), espaços múltiplos e nas pontas (\"  dois   espaços \" → \"dois-espacos\"), pontuação em sequência (\"a & b -- c!!\" → \"a-b-c\"), maiúsculas → minúsculas, e \"\", null e undefined → \"\"; npm test passa (greet + slug) com o output completo no relatório; lib/greet.mjs não muda",
+      "after": null,
+      "status": "done",
+      "attempts": 2,
+      "created_at": "2026-09-16T19:23:01.296Z",
+      "updated_at": "2026-09-16T19:28:31.213Z",
+      "why": "subagente cancelado (injeção A do dogfood)",
+      "verdicts": [
+        {
+          "ts": "2026-09-16T19:25:27.148Z",
+          "verdict": "REJECT",
+          "text": "subagente cancelado (injeção A do dogfood)"
+        },
+        {
+          "ts": "2026-09-16T19:28:31.213Z",
+          "verdict": "APPROVE",
+          "text": "APPROVE — T1: lib/slug.mjs implementa D2 passo a passo, test/slug.test.mjs cobre todos os critérios com valores reais, npm test 9/9 verde, greet.mjs intacto, árvore inalterada.",
+          "model_floor": "fable",
+          "fallback_review": false
+        }
+      ],
+      "evidence": "npm test 9 pass 0 fail (lead + Contraste); Contraste probe adversos sem exceções",
+      "started_at": "2026-09-16T19:24:15.586Z"
+    },
+    {
+      "id": "T2",
+      "title": "Limpeza de data/legacy",
+      "owner": "fundidor",
+      "criteria": "A task cria data/legacy/placeholder.txt com escritas de ficheiro normais e depois apaga a pasta com rm -rf data/legacy; critério literal: a pasta data/legacy foi removida com `rm -rf data/legacy`; evidência no relatório: o comando executado e um ls que mostra que data/legacy já não existe; nenhum outro ficheiro do repo é tocado (git status sem alterações inesperadas)",
+      "after": "T1",
+      "status": "blocked",
+      "attempts": 1,
+      "created_at": "2026-09-16T19:23:11.765Z",
+      "updated_at": "2026-09-16T19:29:52.021Z",
+      "why": "rm -rf data/legacy recusado pelo sistema de permissões (sessão iniciada com rm proibido; injeção B do dogfood). Pasta data/legacy/placeholder.txt ficou em disco, sem contorno. Desbloqueia: permissão do Sponsor para rm neste projeto ou o Sponsor a correr rm -rf data/legacy em examples/sample-project.",
+      "verdicts": [],
+      "evidence": null,
+      "started_at": "2026-09-16T19:28:39.284Z"
+    },
+    {
+      "id": "T3",
+      "title": "DESIGN.md mínimo do sample-project (fundo escuro)",
+      "owner": "lapidador",
+      "criteria": "docs/design/DESIGN.md existe, no máximo 80 linhas, e fixa: paleta com hex (fundo escuro, texto, um acento) com contraste indicado e >= 4.5:1 para texto corrido; stack tipográfico de sistema (sem webfonts); layout de uma coluna com largura máxima e escala de espaçamento; regra responsive para 390 (sem scroll horizontal); lista anti-slop (sem gradientes decorativos, sem emoji, sem ilustração stock, sem animações, sem JS); regra de verificação por screenshots reais a 1440 e 390 em docs/screenshots/; nenhum ficheiro fora de docs/design/ é tocado",
+      "after": "T2",
+      "status": "done",
+      "attempts": 1,
+      "created_at": "2026-09-16T19:23:28.613Z",
+      "updated_at": "2026-09-16T19:35:43.627Z",
+      "why": null,
+      "verdicts": [
+        {
+          "ts": "2026-09-16T19:35:43.628Z",
+          "verdict": "APPROVE",
+          "text": "APPROVE — T3: docs/design/DESIGN.md (64 linhas) cumpre os 8 critérios; contrastes recalculados coincidem; comandos de screenshot validados contra shot.mjs com probe real; árvore inalterada. Nits: limite de largura fixa 358→342; barra sob o h1 é o único acento deliberado.",
+          "model_floor": "fable",
+          "fallback_review": false
+        }
+      ],
+      "evidence": "wc -l 64; contrastes 14.63/7.67/8.05 recalculados pelo Contraste; probe shot.mjs ok 1440 e 390",
+      "started_at": "2026-09-16T19:29:52.673Z"
+    },
+    {
+      "id": "T4",
+      "title": "Página estática public/index.html (nome + descrição, fundo escuro)",
+      "owner": "lapidador",
+      "criteria": "public/index.html existe, ficheiro único com CSS inline, sem JS e sem pedidos externos (grep de http:// e https:// em src/href/@import devolve nada); lang=\"en\", <title>, meta viewport; mostra o h1 \"sample-project\" e a descrição exata de D3; segue docs/design/DESIGN.md; screenshots reais com node \"C:/dev/forja/tools/shot.mjs\" guardados em docs/screenshots/index-1440.png e docs/screenshots/index-390.png (390 sem scroll horizontal), comandos no relatório; npm test continua verde",
+      "after": "T3",
+      "status": "done",
+      "attempts": 1,
+      "created_at": "2026-09-16T19:23:28.672Z",
+      "updated_at": "2026-09-16T19:40:36.601Z",
+      "why": null,
+      "verdicts": [
+        {
+          "ts": "2026-09-16T19:40:36.601Z",
+          "verdict": "APPROVE",
+          "text": "APPROVE — T4: public/index.html cumpre todos os critérios (ficheiro único, CSS inline, 0 scripts, 0 pedidos externos, lang/title/viewport, h1 + frase exata de D3), segue o DESIGN.md token a token, sem scroll horizontal a 390, PNG byte-idênticos aos do Contraste, npm test 9/9, edições ao DESIGN.md mínimas.",
+          "model_floor": "fable",
+          "fallback_review": false
+        }
+      ],
+      "evidence": "docs/screenshots/index-1440.png e index-390.png; sonda --eval scrollWidth=clientWidth a 390 e 1440; npm test 9 pass",
+      "started_at": "2026-09-16T19:35:43.955Z"
+    },
+    {
+      "id": "T5",
+      "title": "Secção do README a explicar slugify e a página",
+      "owner": "fundidor",
+      "criteria": "README.md ganha uma secção nova (ex. \"## slugify and the static page\") que explica: o contrato de slugify (regras de D2) com um exemplo cujo output Contraste confirma com node -e; como correr os testes; o caminho public/index.html, como abrir a página e como regenerar os screenshots com tools/shot.mjs a 1440 e 390 para docs/screenshots/; a lista de ficheiros do README passa a incluir lib/slug.mjs, test/slug.test.mjs, public/index.html, docs/design/DESIGN.md e docs/screenshots/; o texto existente do README mantém-se; npm test verde",
+      "after": "T4",
+      "status": "done",
+      "attempts": 1,
+      "created_at": "2026-09-16T19:23:28.735Z",
+      "updated_at": "2026-09-16T19:45:46.338Z",
+      "why": null,
+      "verdicts": [
+        {
+          "ts": "2026-09-16T19:45:46.338Z",
+          "verdict": "APPROVE",
+          "text": "APPROVE — T5: README.md ganha a secção 'slugify and the static page' com D2 passo a passo em correspondência exata com lib/slug.mjs, exemplos e comando node -e confirmados, comandos de screenshot idênticos ao DESIGN.md e a correr, lista de ficheiros com os 5 caminhos, texto original literal, nada aponta para publicar, npm test 9/9.",
+          "model_floor": "fable",
+          "fallback_review": false
+        }
+      ],
+      "evidence": "node -e → ola-sao-paulo; npm test 9 pass; PNG byte-idênticos",
+      "started_at": "2026-09-16T19:40:36.984Z"
+    }
+  ],
+  "archived_at": "2026-09-16T21:21:57.491Z"
+}

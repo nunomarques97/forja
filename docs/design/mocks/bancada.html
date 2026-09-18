@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forja · Bancada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,900;1,9..144,500;1,9..144,700&family=Archivo:wdth,wght@75..125,400;75..125,500;75..125,600;75..125,700&display=swap" rel="stylesheet">
+<style>
+  /* Direção A — Bancada. Editorial, tipográfica: o elenco são cinco lâminas
+     horizontais pousadas na bancada, a palavra de estado é enorme, a linha do
+     tempo é um fio por baixo, a fila do Sponsor são bilhetes rasgados à direita. */
+  :root {
+    --bg: #151210; --slab: #1D1915; --slab-2: #241E19; --rule: #362E27; --rule-soft: #2A241F;
+    --ink: #F4ECDF; --muted: #AFA394; --dim: #948A7D;
+    --brasa: #FF8A3D; --madeira: #D3A76A; --indigo: #9AA3FF; --patina: #6CCBAE; --alarme: #FF5B4A; --ambar: #F2B544;
+    --display: 'Fraunces', Georgia, serif; --ui: 'Archivo', system-ui, sans-serif;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+    --r0: 0; --r1: 2px; --r2: 4px;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--ui); font-variant-numeric: tabular-nums; }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--brasa); outline-offset: 2px; }
+  .m-ferreiro { --c: var(--brasa); } .m-bigorna { --c: var(--madeira); } .m-fundidor { --c: var(--indigo); } .m-lapidador { --c: var(--patina); } .m-contraste { --c: var(--alarme); } .m-native { --c: var(--muted); }
+  .t-work { --t: var(--brasa); } .t-wait { --t: var(--indigo); } .t-done { --t: var(--patina); } .t-idle { --t: var(--dim); }
+  .t-fail, .t-lost, .t-dead, .t-alarm, .t-sponsor { --t: var(--alarme); }
+
+  .page { max-width: 1440px; margin: 0 auto; padding: var(--s5) var(--s6) var(--s8); }
+  header.top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--s5); align-items: end; padding-bottom: var(--s4); border-bottom: 1px solid var(--rule); margin-bottom: var(--s5); }
+  .brand { font: 700 18px/1 var(--display); letter-spacing: .02em; }
+  .brand small { display: block; font: 500 11px/1.4 var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+  .goal { min-width: 0; }
+  .goal h1 { margin: 0; font: italic 500 30px/1.15 var(--display); letter-spacing: -.005em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .goal .sub { color: var(--muted); font-size: 13px; margin-top: 4px; display: flex; gap: var(--s3); flex-wrap: wrap; }
+  .runstate { text-align: right; }
+  .runstate .word { font: 900 26px/1 var(--display); color: var(--t); }
+  .runstate .word.loud { background: var(--alarme); color: #1A0D0B; padding: 6px 12px; display: inline-block; }
+  .runstate .sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .demo { background: var(--ambar); color: #1A1508; font-weight: 600; padding: 6px 12px; margin-bottom: var(--s4); border-radius: var(--r1); }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: var(--s6); align-items: start; }
+  .label { font: 600 11px/1 var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 var(--s3); display: flex; align-items: baseline; gap: var(--s3); }
+  .label .n { font: 500 11px var(--ui); color: var(--dim); letter-spacing: 0; text-transform: none; }
+  section + section { margin-top: var(--s7); }
+
+  /* ---- slabs ---- */
+  .slabs { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2); }
+  .slab { display: grid; grid-template-columns: 228px minmax(280px, 1fr) minmax(0, 1.35fr); gap: 0 var(--s5); background: var(--slab); border-left: 8px solid var(--c); padding: var(--s4) var(--s5) var(--s4) var(--s4); min-height: 118px; position: relative; }
+  .slab.loud { background: #2C1613; outline: 2px solid var(--alarme); outline-offset: -2px; }
+  .slab.dead, .slab.lost { outline: 2px dashed var(--alarme); outline-offset: -2px; }
+  .slab.dead { background: #1A1412; }
+  .slab.idle { background: #191613; }
+  .slab.idle .who .name, .slab.idle .who .mono { opacity: .55; }
+  .who { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--s3); align-content: start; }
+  .mono { font: 900 40px/40px var(--display); color: var(--c); width: 44px; text-align: center; }
+  .who .name { font: 700 19px/1.15 var(--ui); font-stretch: 110%; letter-spacing: -.01em; }
+  .who .role { color: var(--muted); font-size: 13px; line-height: 1.35; margin-top: 3px; }
+  .state { align-self: start; min-width: 0; }
+  .state .word { font: 900 40px/1 var(--display); color: var(--t); letter-spacing: -.015em; margin: -3px 0 6px; overflow-wrap: anywhere; }
+  .slab.idle .state .word { font-weight: 500; }
+  .slab.loud .state .word { background: var(--alarme); color: #1A0D0B; padding: 4px 10px; display: inline-block; }
+  .slab.dead .state .word { text-decoration: line-through; text-decoration-thickness: 3px; }
+  .since { color: var(--muted); font-size: 13px; display: flex; gap: var(--s2); flex-wrap: wrap; }
+  .since b { color: var(--ink); font-weight: 600; }
+  .alive { margin-top: 6px; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; padding: 2px 8px 2px 0; }
+  .alive::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--patina); flex: none; }
+  .alive.quiet { color: var(--ambar); font-weight: 600; border: 1px solid var(--ambar); padding: 2px 10px; }
+  .alive.quiet::before { background: var(--ambar); }
+  .alive.silent { color: var(--alarme); font-weight: 600; } .alive.silent::before { background: var(--alarme); }
+  .alive.none { display: none; }
+  .work { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2); align-content: start; }
+  .inst { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px var(--s3); padding: var(--s2) 0; border-top: 1px solid var(--rule-soft); }
+  .inst:first-child { border-top: 0; padding-top: 0; }
+  .inst .task { font-weight: 600; font-size: 15px; display: flex; gap: var(--s2); align-items: baseline; min-width: 0; }
+  .inst .task .id { font: 600 12px/1 var(--ui); color: var(--bg); background: var(--ink); padding: 3px 6px; border-radius: var(--r1); flex: none; }
+  .inst .task .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .inst .st { font: 700 12px/1 var(--ui); color: var(--t); letter-spacing: .04em; text-transform: uppercase; justify-self: end; white-space: nowrap; }
+  .inst .st.loud { background: var(--alarme); color: #1A0D0B; padding: 3px 6px; }
+  .inst .detail { grid-column: 1 / -1; color: var(--ink); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+  .inst .detail.verdict-REJECT { color: var(--alarme); font-weight: 600; } .inst .detail.verdict-DONE, .inst .detail.verdict-APPROVE { color: var(--patina); font-weight: 600; }
+  .inst .meta { grid-column: 1 / -1; color: var(--dim); font-size: 12px; display: flex; gap: var(--s3); flex-wrap: wrap; }
+  .inst .meta code { font: 500 12px var(--ui); color: var(--muted); }
+  .parallel { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+
+  /* native tools: one neutral thin row */
+  .native { background: none; border: 1px dashed var(--rule); padding: var(--s3) var(--s4); display: grid; grid-template-columns: 228px minmax(0, 1fr); gap: var(--s5); color: var(--muted); font-size: 13px; }
+  .native .list { display: grid; gap: 4px; }
+  .native .row { display: grid; grid-template-columns: 110px 96px minmax(0, 1fr) auto; gap: var(--s3); align-items: baseline; }
+  .native .row b { color: var(--ink); font-weight: 600; }
+  .native .row .st { color: var(--t); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+
+  /* ---- hairline timeline ---- */
+  .axis { display: block; width: 100%; height: 64px; }
+  .axis .base { stroke: var(--rule); stroke-width: 1; }
+  .axis .tick { stroke-width: 2; }
+  .axis text { font: 500 11px var(--ui); fill: var(--muted); }
+  .tl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 var(--s6); margin-top: var(--s3); }
+  .tl .e { display: grid; grid-template-columns: 44px 68px minmax(0, 1fr); gap: var(--s3); padding: 5px 0; border-top: 1px solid var(--rule-soft); font-size: 13px; align-items: baseline; }
+  .tl .e .t { color: var(--dim); font-size: 12px; }
+  .tl .e .k { color: var(--t); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .tl .e .x { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+
+  .two { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--s6); }
+  .ledger .r { display: grid; grid-template-columns: 44px 56px minmax(0, 1fr); gap: var(--s3); padding: var(--s2) 0; border-top: 1px solid var(--rule-soft); font-size: 14px; align-items: baseline; }
+  .ledger .r .v { font: 700 12px var(--ui); letter-spacing: .06em; padding: 2px 6px; text-align: center; border-radius: var(--r1); }
+  .ledger .r .v.REJECT { background: var(--alarme); color: #1A0D0B; } .ledger .r .v.APPROVE { background: var(--patina); color: #0B1A14; }
+  .ledger .r .t { color: var(--dim); font-size: 12px; }
+  .ledger .r .x { overflow-wrap: anywhere; }
+  .ledger .r .x small { color: var(--muted); display: block; font-size: 12px; }
+  .tasks .r { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: var(--s3); padding: var(--s2) 0; border-top: 1px solid var(--rule-soft); font-size: 14px; align-items: baseline; }
+  .tasks .r .id { font-weight: 700; }
+  .tasks .r .s { font: 600 11px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--t); }
+  .tasks .r small { color: var(--muted); display: block; font-size: 12px; }
+  .empty { color: var(--dim); font-size: 13px; padding: var(--s2) 0; border-top: 1px solid var(--rule-soft); }
+
+  /* ---- Sponsor column: torn tickets ---- */
+  aside > .label { color: var(--alarme); }
+  .tickets { display: grid; gap: var(--s4); }
+  .ticket { background: #F4ECDF; color: #1A1410; padding: var(--s4) var(--s4) var(--s5); position: relative; border-top: 10px solid var(--alarme);
+    mask: linear-gradient(#000 0 0) top / 100% calc(100% - 9px) no-repeat, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 14px 9px repeat-x; }
+  .ticket.pending { border-top-color: var(--indigo); }
+  .ticket .k { font: 700 11px/1 var(--ui); letter-spacing: .14em; text-transform: uppercase; color: #8A1E12; display: flex; justify-content: space-between; }
+  .ticket .k span:last-child { color: #6B6157; letter-spacing: 0; text-transform: none; font-weight: 500; }
+  .ticket .q { font: 700 19px/1.25 var(--display); margin: var(--s2) 0 var(--s2); letter-spacing: -.005em; }
+  .ticket .d { font-size: 13px; color: #3E352D; line-height: 1.4; }
+  .ticket .d b { color: #1A1410; }
+  .ticket .d + .d { margin-top: 4px; }
+  .ticket .who { display: block; margin-top: var(--s2); font-size: 12px; color: #6B6157; }
+  .tickets .none { background: var(--slab); color: var(--muted); padding: var(--s4); font-size: 14px; }
+  .decisions .r { padding: var(--s2) 0; border-top: 1px solid var(--rule-soft); font-size: 14px; }
+  .decisions .r b { font-weight: 700; margin-right: var(--s2); }
+  .decisions .r small { display: block; color: var(--muted); font-size: 12px; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
+  .stats div { border-top: 1px solid var(--rule); padding-top: var(--s2); font-size: 12px; color: var(--muted); }
+  .stats div b { display: block; font: 700 22px/1.1 var(--display); color: var(--ink); }
+
+  /* compact roster strip — phone only, keeps the five names + state words in the first screen */
+  .strip { display: none; }
+  @media (max-width: 900px) {
+    .strip { display: grid; gap: 2px; margin: 0 0 var(--s5); }
+    .strip a { display: grid; grid-template-columns: 30px 92px minmax(0, 1fr) auto; gap: var(--s2); align-items: center; text-decoration: none; background: var(--slab); border-left: 5px solid var(--c); padding: 6px 10px 6px 8px; min-height: 44px; }
+    .strip a.loud { background: #2C1613; outline: 2px solid var(--alarme); outline-offset: -2px; }
+    .strip .mo { font: 900 18px/1 var(--display); color: var(--c); }
+    .strip .nm { font-weight: 700; font-size: 14px; }
+    .strip .sw { font: 700 14px/1.1 var(--display); color: var(--t); white-space: nowrap; }
+    .strip a.loud .sw { background: var(--alarme); color: #1A0D0B; padding: 3px 6px; justify-self: start; }
+    .strip .ag { color: var(--muted); font-size: 11px; text-align: right; max-width: 132px; line-height: 1.2; }
+    .strip .ag.quiet { color: var(--ambar); font-weight: 600; }
+    .strip .ag.silent { color: var(--alarme); font-weight: 600; }
+  }
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s3); }
+  .legend span { font: 700 12px/1 var(--ui); letter-spacing: .04em; text-transform: uppercase; color: var(--t); padding: 6px 8px; border: 1px solid var(--rule); }
+  .legend span.loud { background: var(--alarme); color: #1A0D0B; border-color: var(--alarme); }
+  .legend span.dead { text-decoration: line-through; text-decoration-thickness: 2px; border-style: dashed; border-color: var(--alarme); }
+  .legend span.lost { border-style: dashed; border-color: var(--alarme); }
+  .legend span.quiet { color: var(--ambar); border-color: var(--ambar); }
+
+  @media (max-width: 900px) {
+    .page { padding: var(--s4) var(--s4) var(--s7); }
+    header.top { grid-template-columns: minmax(0, 1fr) auto; gap: var(--s3); align-items: center; margin-bottom: var(--s4); padding-bottom: var(--s3); }
+    .brand { font-size: 16px; white-space: nowrap; } .brand small { display: inline; margin-left: 6px; letter-spacing: .06em; font-size: 10px; }
+    .goal { grid-column: 1 / -1; order: 3; }
+    .goal h1 { font-size: 19px; white-space: normal; }
+    .goal .sub span:nth-child(n+3) { display: none; }
+    .runstate .word { font-size: 16px; } .runstate .word.loud { padding: 4px 8px; }
+    .runstate .sub { display: none; }
+    .grid { grid-template-columns: minmax(0, 1fr); gap: var(--s6); }
+    aside { order: -1; }
+    .slab { grid-template-columns: minmax(0, 1fr); gap: var(--s3); padding: var(--s3) var(--s3) var(--s3) var(--s3); border-left-width: 6px; min-height: 0; }
+    .who { grid-template-columns: 34px minmax(0, 1fr); }
+    .mono { font-size: 30px; line-height: 30px; width: 34px; }
+    .who .name { font-size: 17px; }
+    .state .word { font-size: 30px; }
+    .work { border-top: 1px solid var(--rule); padding-top: var(--s2); }
+    .native { grid-template-columns: minmax(0, 1fr); gap: var(--s2); }
+    .native .row { grid-template-columns: minmax(0, 1fr) auto; }
+    .native .row .tk, .native .row .md { grid-column: 1 / -1; }
+    .tl { grid-template-columns: minmax(0, 1fr); }
+    .tl .e { grid-template-columns: 44px minmax(0, 1fr); } .tl .e .k { display: none; }
+    .two { grid-template-columns: minmax(0, 1fr); gap: var(--s6); }
+    section + section { margin-top: var(--s6); }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .alive:not(.quiet):not(.silent)::before { animation: beat 2.4s ease-in-out infinite; }
+    @keyframes beat { 50% { opacity: .35; } }
+  }
+</style>
+</head>
+<body>
+<div class="page" id="app"><p style="color:var(--muted)">a carregar o instantâneo…</p></div>
+<script type="module">
+import * as F from './crew-shared.js';
+const { esc, ago, dur, clock, toneOf, LOUD } = F;
+
+const MONO = { ferreiro: 'Fe', bigorna: 'Bi', fundidor: 'Fu', lapidador: 'La', contraste: 'Co' };
+
+function sliceTask(i, run) {
+  const s = F.splitTask(i.task);
+  const id = i.taskId || s.id;
+  const title = (id && F.taskTitle(run, id)) || s.title || i.task || '—';
+  return { id, title };
+}
+
+function instanceRow(i, run, now, member) {
+  const { id, title } = sliceTask(i, run);
+  const tone = toneOf(i.state);
+  const verdict = i.handback?.status || i.verdict;
+  const detail = i.permission ? `permissão pendente — ${i.permission.tool}: ${i.permission.message}` : (i.progress?.text || i.detail || i.lastAction || '');
+  return `<div class="inst t-${tone}">
+    <div class="task">${id ? `<span class="id">${esc(id)}</span>` : ''}<span class="title" title="${esc(i.task)}">${esc(title)}</span></div>
+    <div class="st ${LOUD.has(i.state) ? 'loud' : ''}">${esc(i.state)} · ${ago(now, i.since)}</div>
+    <div class="detail ${verdict ? 'verdict-' + esc(verdict) : ''}">${esc(detail || (verdict ? `entregou ${verdict}` : ''))}</div>
+    <div class="meta">${i.resolvedModel ? `<span>modelo <code>${esc(i.resolvedModel)}</code></span>` : ''}<span>começou às ${clock(i.startedAt)}</span>${i.calls ? `<span>${i.calls} chamadas</span>` : ''}${i.inferred ? '<span>estado inferido</span>' : ''}${i.background ? '<span>em background</span>' : ''}</div>
+  </div>`;
+}
+
+function slab(c, run, now) {
+  const tone = toneOf(c.state);
+  const live = F.liveness(c, run, now);
+  const cls = ['slab', 'm-' + c.key, 't-' + tone, LOUD.has(c.state) ? 'loud' : '', tone === 'dead' ? 'dead' : '', tone === 'lost' ? 'lost' : '', tone === 'idle' ? 'idle' : ''].join(' ');
+  let work;
+  if (c.key === 'ferreiro') {
+    work = `<div class="inst t-${tone}">
+      <div class="task"><span class="id">run</span><span class="title" title="${esc(run.goal)}">${esc(run.goal || 'sem objetivo registado')}</span></div>
+      <div class="st">${esc(run.status)}</div>
+      <div class="detail">${esc(c.detail || c.lastAction || '')}</div>
+      <div class="meta"><span>modelo <code>modelo da sessão · mínimo ${esc(run.modelFloor || '—')}</code></span><span>${c.calls ?? 0} chamadas</span>${c.lastAction ? `<span>última ação: ${esc(c.lastAction)}</span>` : ''}</div>
+    </div>`;
+  } else if (!c.instances?.length) {
+    work = `<div class="inst t-idle"><div class="task"><span class="title">sem instância neste run</span></div><div class="st">—</div><div class="detail">${esc(c.detail || 'ainda não foi chamado')}</div></div>`;
+  } else {
+    const active = c.instances.filter(i => !['terminado', 'falhou', 'inativo'].includes(i.state)).length;
+    work = (active > 1 ? `<div class="parallel">${active} instâncias em paralelo</div>` : '') + c.instances.map(i => instanceRow(i, run, now, c)).join('');
+  }
+  return `<article id="slab-${c.key}" class="${cls}" aria-label="${esc(c.name)}: ${esc(c.state)}">
+    <div class="who"><div class="mono" aria-hidden="true">${MONO[c.key] || c.name[0]}</div><div><div class="name">${esc(c.name)}</div><div class="role">${esc(c.role)}</div></div></div>
+    <div class="state"><div class="word">${esc(c.state)}</div>
+      <div class="since">${c.since ? `<span><b>${ago(now, c.since)}</b></span><span>desde as ${clock(c.since)}</span>` : '<span>sem instância neste run</span>'}</div>
+      <div class="alive ${live.kind}">${esc(live.text)}</div></div>
+    <div class="work">${work}</div>
+  </article>`;
+}
+
+function nativeGroup(list, run, now) {
+  if (!list.length) return `<div class="native"><div>Ferramentas nativas</div><div class="list"><span>nenhuma neste run</span></div></div>`;
+  return `<div class="native m-native"><div><b style="color:var(--ink)">Ferramentas nativas</b><br>Explore, claude-code-guide… correm em Sonnet; não são elenco.</div><div class="list">${list.map(n => `<div class="row t-${toneOf(n.state)}"><b>${esc(n.type)}</b><span class="st">${esc(n.state)} · ${ago(now, n.since)}</span><span class="tk">${esc(n.task || '')}${n.detail ? ' — ' + esc(n.detail) : ''}</span><span class="md">${esc(n.resolvedModel || '')}</span></div>`).join('')}</div></div>`;
+}
+
+function axis(run, now) {
+  const t0 = run.startedAt, span = Math.max(1, now - t0);
+  const x = ts => 8 + ((ts - t0) / span) * 984;
+  const ticks = run.timeline.map(e => { const tone = e.role ? `var(--${({ ferreiro: 'brasa', bigorna: 'madeira', fundidor: 'indigo', lapidador: 'patina', contraste: 'alarme' })[e.role] || 'muted'})` : (F.kindTone(e.kind) === 'alarm' || F.kindTone(e.kind) === 'sponsor' ? 'var(--alarme)' : 'var(--muted)'); const h = /ask|permission|handback|fail|block/.test(e.kind) ? 22 : 12; return `<line class="tick" x1="${x(e.ts).toFixed(1)}" x2="${x(e.ts).toFixed(1)}" y1="${34 - h}" y2="34" stroke="${tone}"><title>${esc(clock(e.ts))} ${esc(e.text)}</title></line>`; }).join('');
+  return `<svg class="axis" viewBox="0 0 1000 64" preserveAspectRatio="none" role="img" aria-label="linha do tempo do run">
+    <line class="base" x1="8" x2="992" y1="34" y2="34"/>${ticks}
+    <line x1="992" x2="992" y1="18" y2="50" stroke="var(--ink)" stroke-width="2"/>
+    <text x="8" y="56">${clock(t0)} · começou ${ago(now, t0)}</text><text x="992" y="56" text-anchor="end">agora · ${clock(now)}</text>
+  </svg>`;
+}
+
+function timelineList(run) {
+  const items = run.timeline.slice(-12);
+  return `<div class="tl">${items.map(e => `<div class="e t-${F.kindTone(e.kind)}"><span class="t">${clock(e.ts)}</span><span class="k">${esc(F.KIND_LABEL[e.kind] || e.kind)}</span><span class="x" title="${esc(e.text)}">${esc(e.text.split('\n')[0])}</span></div>`).join('')}</div>`;
+}
+
+function tickets(items, now) {
+  if (!items.length) return `<div class="none">Nada pendente. O run não precisa do Sponsor neste momento.</div>`;
+  return items.map(q => `<article class="ticket ${q.status === 'pending' ? 'pending' : ''}"><div class="k"><span>${esc(q.kind)}${q.id ? ' ' + esc(q.id) : ''}</span><span>${ago(now, q.since)} · ${clock(q.since)}</span></div>
+    <div class="q">${esc(q.title)}</div>
+    ${q.fallback ? `<div class="d"><b>Se não responder:</b> ${esc(q.fallback)}</div>` : ''}${q.why ? `<div class="d"><b>Porquê:</b> ${esc(q.why)}</div>` : ''}${q.task ? `<div class="d"><b>Task:</b> ${esc(q.task)}</div>` : ''}
+    <span class="who">pedido por ${esc(q.who)}</span></article>`).join('');
+}
+
+function ledger(run) {
+  const rs = F.reviews(run);
+  if (!rs.length) return `<div class="empty">Ainda sem veredictos neste run.</div>`;
+  return rs.map(r => `<div class="r"><span class="t">${clock(r.ts)}</span><span class="v ${esc(r.verdict)}">${esc(r.verdict)}</span><span class="x">${r.taskId ? `<b>${esc(r.taskId)}</b> · ` : ''}${esc(r.text.replace(/^(APPROVE|REJECT)\s*—\s*/, ''))}<small>por ${F.memberName(r.by)}${r.echo ? ' · confirmado pelo CLI' : ''}</small></span></div>`).join('');
+}
+
+function tasks(run) {
+  if (!run.tasks.length) return `<div class="empty">Sem tasks registadas pelo CLI neste run.</div>`;
+  const label = Object.fromEntries(F.KANBAN);
+  const tone = { todo: 'idle', doing: 'work', review: 'wait', done: 'done', failed: 'fail', blocked: 'alarm' };
+  return run.tasks.map(t => `<div class="r t-${tone[t.status] || 'idle'}"><span class="id">${esc(t.id)}</span><span>${esc(t.title || F.taskTitle(run, t.id) || '—')}<small>${F.memberName(t.owner)} · tentativas ${t.attempts}${t.why ? ' · ' + esc(t.why) : ''}</small></span><span class="s">${esc(label[t.status] || t.status)}</span></div>`).join('');
+}
+
+function legend() {
+  return `<div class="legend">${F.STATES.map(s => { const t = toneOf(s); return `<span class="t-${t} ${LOUD.has(s) ? 'loud' : ''} ${t}">${esc(s)}</span>`; }).join('')}<span class="t-work quiet">a trabalhar · silêncio há 1 min 40 s</span></div>`;
+}
+
+const { run, now, demo, src } = await F.loadSnapshot();
+const q = F.sponsorQueue(run, now);
+const rt = toneOf(run.status);
+document.getElementById('app').innerHTML = `
+  ${demo ? `<div class="demo">Demonstração: estados remapeados sobre ${esc(src)} para mostrar todas as palavras de estado. O texto é o real.</div>` : ''}
+  <header class="top">
+    <div class="brand">Forja<small>${esc(run.project)}</small></div>
+    <div class="goal"><h1 title="${esc(run.goal)}">${run.goalSource === 'prompt' ? '<span style="color:var(--muted);font-style:normal;font-size:.6em;vertical-align:middle">último prompt · </span>' : ''}${esc(run.goal || 'sem objetivo registado')}</h1><div class="sub"><span>instantâneo das ${clock(now)}</span><span>começou às ${clock(run.startedAt)} (${ago(now, run.startedAt)})</span><span>${run.counts.events} eventos</span><span>modelo mínimo ${esc(run.modelFloor || '—')}</span><span>permissões ${esc(run.permissionMode)}</span></div></div>
+    <div class="runstate t-${rt}"><div class="word ${LOUD.has(run.status) ? 'loud' : ''}">run ${esc(run.status)}</div><div class="sub">${esc(run.statusDetail || '')}${run.openQuestions ? ` · ${run.openQuestions} pergunta${run.openQuestions > 1 ? 's' : ''} para o Sponsor` : ''}</div></div>
+  </header>
+  <nav class="strip" aria-label="elenco (resumo)">${run.roster.map(c => { const t = toneOf(c.state), l = F.liveness(c, run, now); return `<a href="#slab-${c.key}" class="m-${c.key} t-${t} ${LOUD.has(c.state) ? 'loud' : ''}"><span class="mo" aria-hidden="true">${MONO[c.key]}</span><span class="nm">${esc(c.name)}</span><span class="sw">${esc(c.state)}</span><span class="ag ${l.kind}">${l.kind === 'quiet' || l.kind === 'silent' ? esc(l.text) : ago(now, c.since)}</span></a>`; }).join('')}</nav>
+  <div class="grid">
+    <main>
+      <section><h2 class="label">Elenco <span class="n">cinco lugares fixos · inativo é um estado</span></h2>
+        <div class="slabs">${run.roster.map(c => slab(c, run, now)).join('')}</div>
+        <div style="margin-top:var(--s2)">${nativeGroup(run.native, run, now)}</div>
+      </section>
+      <section><h2 class="label">Linha do tempo <span class="n">${run.timeline.length} entradas · marcas altas = entregas, pedidos, falhas</span></h2>${axis(run, now)}${timelineList(run)}</section>
+      <section class="two">
+        <div class="ledger"><h2 class="label">Revisões <span class="n">veredictos do Contraste</span></h2>${ledger(run)}</div>
+        <div class="tasks"><h2 class="label">Tasks <span class="n">${run.tasks.length}</span></h2>${tasks(run)}</div>
+      </section>
+      <section><h2 class="label">Legenda de estados</h2>${legend()}</section>
+    </main>
+    <aside>
+      <h2 class="label">Precisa do Sponsor <span class="n">${q.length} pendente${q.length === 1 ? '' : 's'}</span></h2>
+      <div class="tickets">${tickets(q, now)}</div>
+      <section class="decisions"><h2 class="label">Decisões da Bigorna <span class="n">${run.decisions.length}</span></h2>${run.decisions.length ? run.decisions.map(d => `<div class="r"><b>${esc(d.id)}</b>${esc(d.text)}<small>${esc(d.why || '')}${d.reversible && !/revers/i.test(d.why || '') ? ' · reversível' : ''} · ${clock(d.ts)}</small></div>`).join('') : '<div class="empty">Sem decisões registadas.</div>'}</section>
+      <section class="stats"><div>eventos<b>${run.counts.events}</b></div><div>erros<b>${run.counts.errors}</b></div><div>instâncias<b>${run.counts.instances}</b></div></section>
+    </aside>
+  </div>`;
+</script>
+</body>
+</html>

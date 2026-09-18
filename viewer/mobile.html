@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forja</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/viewer.css">
+<link rel="stylesheet" href="/assets/feed.css">
+</head>
+<body data-mode="mobile">
+<nav class="tabs" role="tablist" aria-label="Vistas do Forja">
+  <span class="marca">FORJA</span>
+  <a role="tab" id="tab-eventos" href="#eventos" data-view="eventos" aria-controls="feed" aria-selected="true">Eventos</a>
+  <a role="tab" id="tab-modelos" href="#modelos" data-view="modelos" aria-controls="hub" aria-selected="false">Modelos e ligações</a>
+  <span id="feed-estado" class="estado" role="status" aria-live="polite">a ligar…</span>
+</nav>
+<div id="feed" class="feed" role="tabpanel" aria-labelledby="tab-eventos"></div>
+<div class="page" id="hub" role="tabpanel" aria-labelledby="tab-modelos" hidden>
+  <!-- faixa de ligação perdida: o wrapper é permanente (cola ao topo e é a região ao vivo); o conteúdo entra e sai em viewer.js -->
+  <div id="conn-banner" role="status" aria-live="polite"></div>
+  <header class="top">
+    <div id="head-main" style="display:contents">
+      <div class="brand">Forja<small>a ligar…</small></div>
+      <div class="goal"><h1>a carregar o instantâneo…</h1></div>
+    </div>
+    <div class="runstate">
+      <div class="top-row"><span id="sponsor-n" class="sponsor-n" aria-live="polite"></span><span id="run-badge" class="badge t-idle" aria-live="polite">run a ligar…</span></div>
+      <div id="run-detail" class="detail"></div>
+      <div id="asof" class="asof"></div>
+    </div>
+  </header>
+  <div id="runsel" class="runsel-bar"></div>
+
+  <div class="stage">
+    <div id="scene"></div>
+    <div id="demand-bar"></div>
+    <div id="scene-legend" class="legend"><span><b>linha cheia = o Lead chama · tracejado = fluxo de trabalho (representação)</b></span></div>
+  </div>
+
+  <section id="rows" class="rows" aria-label="Elenco">
+    <button type="button" class="row-btn m-lead t-idle idle" disabled><span class="mo" aria-hidden="true">Le</span><span class="who"><b>Lead</b><span class="rl">Coordena, delega, verifica em disco, regista</span></span><span class="st"><span class="sw">a ligar…</span></span></button>
+    <button type="button" class="row-btn m-architect t-idle idle" disabled><span class="mo" aria-hidden="true">Ar</span><span class="who"><b>Architect</b><span class="rl">O plano de tasks; replaneia quando parte</span></span><span class="st"><span class="sw">a ligar…</span></span></button>
+    <button type="button" class="row-btn m-frontend-dev t-idle idle" disabled><span class="mo" aria-hidden="true">FD</span><span class="who"><b>Frontend Dev</b><span class="rl">Ecrãs, estilo, verificação visual</span></span><span class="st"><span class="sw">a ligar…</span></span></button>
+    <button type="button" class="row-btn m-backend-dev t-idle idle" disabled><span class="mo" aria-hidden="true">BD</span><span class="who"><b>Backend Dev</b><span class="rl">Servidor, dados, scripts</span></span><span class="st"><span class="sw">a ligar…</span></span></button>
+    <button type="button" class="row-btn m-reviewer t-idle idle" disabled><span class="mo" aria-hidden="true">Re</span><span class="who"><b>Reviewer</b><span class="rl">Revisão independente — aprova ou recusa</span></span><span class="st"><span class="sw">a ligar…</span></span></button>
+    <button type="button" class="row-btn m-product-manager t-idle idle demand" disabled><span class="mo" aria-hidden="true">PM</span><span class="who"><b>Product Manager</b><span class="rl"><em class="tag">a pedido</em> Perfil de produto, enquadramento, decisões, relatório</span></span><span class="st"><span class="sw">a ligar…</span></span></button>
+    <button type="button" class="row-btn m-product-designer t-idle idle demand" disabled><span class="mo" aria-hidden="true">PD</span><span class="who"><b>Product Designer</b><span class="rl"><em class="tag">a pedido</em> Direção visual: mocks, escolha, DESIGN.md</span></span><span class="st"><span class="sw">a ligar…</span></span></button>
+    <button type="button" class="row-btn m-technology-scout t-idle idle demand" disabled><span class="mo" aria-hidden="true">TS</span><span class="who"><b>Technology Scout</b><span class="rl"><em class="tag">a pedido</em> Escolha de tecnologia por capacidade</span></span><span class="st"><span class="sw">a ligar…</span></span></button>
+    <button type="button" class="row-btn m-qa t-idle idle demand" disabled><span class="mo" aria-hidden="true">QA</span><span class="who"><b>QA</b><span class="rl"><em class="tag">a pedido</em> Validação final: e2e, regressão</span></span><span class="st"><span class="sw">a ligar…</span></span></button>
+    <button type="button" class="row-btn m-security-reviewer t-idle idle demand" disabled><span class="mo" aria-hidden="true">SR</span><span class="who"><b>Security Reviewer</b><span class="rl"><em class="tag">a pedido</em> Segunda revisão: auth, segredos, rede, dependências</span></span><span class="st"><span class="sw">a ligar…</span></span></button>
+  </section>
+
+  <div id="native" class="native m-native"></div>
+
+  <section class="sec newrun" aria-labelledby="newrun-h">
+    <h2 class="label" id="newrun-h">Novo run</h2>
+    <div id="newrun"></div>
+  </section>
+
+  <section class="sec queue" aria-labelledby="queue-h">
+    <h2 class="label" id="queue-h">Precisa do Sponsor <span class="n" id="queue-n"></span></h2>
+    <div id="queue"></div>
+  </section>
+  <section class="sec" aria-labelledby="tasks-h">
+    <h2 class="label" id="tasks-h">Tasks</h2>
+    <div id="tasks"></div>
+  </section>
+  <section class="sec" aria-labelledby="dec-h">
+    <h2 class="label" id="dec-h">Decisões <span class="n">últimas 5</span></h2>
+    <div id="decisions"></div>
+  </section>
+
+  <footer id="conn" class="conn">a tentar ligar… (a consultar de 5 em 5 s)</footer>
+</div>
+
+<script type="module">
+  import { bootFeed, initTabs } from '/assets/feed.js';
+  window.forjaFeed = bootFeed();
+  // «Modelos e ligações» é o viewer de sempre; só arranca quando a vista é aberta.
+  initTabs({ bootHub: () => import('/assets/viewer.js').then(m => { window.forja = m.boot('mobile'); }) }); // handle para verificação (render/tick/state)
+</script>
+</body>
+</html>

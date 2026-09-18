@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cena — agentes ligados · direção B: Constelação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="agentes-base.css">
+<style>
+  /* ---- direção B: constelação ----
+     Nós circulares com halo pela cor de identidade, Lead maior no centro,
+     arestas curvas. O núcleo orbita perto, os papéis a pedido ficam na órbita
+     de fora. Fluxo animado só quando há hand-back recente (só opacidade). */
+  .edge{fill:none;stroke-linecap:round}
+  .edge.hub{stroke:#6E5C4D;stroke-width:1.5;opacity:.9}
+  .edge.flow{stroke:#4E4238;stroke-width:1.5;stroke-dasharray:6 6}
+  .cold .edge{opacity:.35}
+  .ring{fill:var(--surface);stroke:var(--c);stroke-width:2}
+  .ring.demand{stroke-width:1.5;stroke-dasharray:7 5}
+  .mono{font:700 22px/1 var(--hud);letter-spacing:.03em;fill:var(--c);text-anchor:middle}
+  .mono.sm{font-size:16px}
+  .mono.lead{font-size:26px}
+  .dotnotch{fill:var(--c)}
+  @media (prefers-reduced-motion:no-preference){
+    .node.live .halo{animation:pulse 2.4s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+    .hb{animation:hb 1.7s ease-in-out infinite}
+    .hb2{animation-delay:.32s} .hb3{animation-delay:.64s}
+    @keyframes hb{0%,100%{opacity:.05}45%{opacity:1}}
+  }
+  .hb{opacity:.85}
+  .mobile{display:none}
+  @media (max-width:720px){
+    .desktop{display:none} .mobile{display:block}
+    .fold{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;margin:var(--s2) var(--s4) 0;
+          padding:var(--s2) var(--s3);background:var(--surface);border:1px solid var(--line);
+          border-radius:8px;min-height:44px}
+    .fold b{font:700 14px/1 var(--hud);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+    .pill{display:inline-flex;align-items:center;gap:5px;font:400 12px/1 var(--mono);
+          border:1px solid var(--line);border-radius:999px;padding:6px 9px 5px}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { ROLES, EDGES, byKey, scenario, esc, glyph, glyphOf, glowOpacity, glowColour, bodyOpacity, isLive, toneOf } from './agentes-dados.js';
+import { renderHeader, renderHud, renderLegend } from './agentes-chrome.js';
+
+const sc = scenario();
+const M = new Map(sc.members.map(m => [m.key, m]));
+const W = 1440, H = 240, MW = 390, MH = 230;
+
+/* ---------- posições ----------
+   O Lead ocupa o centro; os quatro papéis de núcleo formam um losango à volta
+   dele na ordem do fluxo (Architect à esquerda, os dois Devs em cima e em
+   baixo, Reviewer à direita) — assim as quatro arestas de fluxo do núcleo são
+   os lados do losango e nenhuma passa por cima do Lead. Os cinco papéis a
+   pedido ficam na órbita de fora, cada um ao lado do papel a quem entrega. */
+const P = {
+  'lead':              { x: 720,  y: 120, r: 36 },
+  'architect':         { x: 438,  y: 120, r: 25 },
+  'frontend-dev':      { x: 720,  y: 42,  r: 25 },
+  'backend-dev':       { x: 720,  y: 198, r: 25 },
+  'reviewer':          { x: 1002, y: 120, r: 25 },
+  'product-manager':   { x: 182,  y: 58,  r: 18 },
+  'product-designer':  { x: 464,  y: 28,  r: 18 },
+  'technology-scout':  { x: 950,  y: 28,  r: 18 },
+  'qa':                { x: 1270, y: 190, r: 18 },
+  'security-reviewer': { x: 1270, y: 58,  r: 18 },
+};
+const PM_ = {   // telemóvel: o mesmo losango, só o núcleo
+  'lead':         { x: 195, y: 128, r: 28 },
+  'architect':    { x: 74,  y: 128, r: 21 },
+  'frontend-dev': { x: 195, y: 54,  r: 21 },
+  'backend-dev':  { x: 195, y: 202, r: 21 },
+  'reviewer':     { x: 316, y: 128, r: 21 },
+};
+// curvatura por aresta (desvio máximo = |bow| / 2; sinal = lado).
+// Quase todas são quase retas: só três precisam de contornar um nó.
+const BOW = {
+  'lead>product-manager': -30, 'lead>security-reviewer': -30, 'lead>product-designer': 12,
+  'lead>technology-scout': -12, 'lead>qa': 14, 'lead>architect': 14, 'lead>frontend-dev': -12,
+  'lead>backend-dev': -12, 'lead>reviewer': 14,
+  'architect>frontend-dev': -16, 'architect>backend-dev': 16, 'frontend-dev>reviewer': -16,
+  'backend-dev>reviewer': 16, 'reviewer>security-reviewer': -14, 'qa>lead': -22,
+  'product-manager>architect': 14, 'technology-scout>frontend-dev': -14,
+  'technology-scout>backend-dev': 16, 'product-designer>frontend-dev': -14,
+};
+function curve(a, b, G, bow) {
+  const A = G[a], B = G[b];
+  const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1;
+  const px = -dy / L, py = dx / L;
+  const cxp = (A.x + B.x) / 2 + px * bow, cyp = (A.y + B.y) / 2 + py * bow;
+  // recorta nas bordas dos dois círculos, para a linha não entrar no nó
+  const t0 = Math.min(.45, (A.r + 3) / L), t1 = 1 - Math.min(.45, (B.r + 3) / L);
+  const at = t => ({ x: (1 - t) ** 2 * A.x + 2 * (1 - t) * t * cxp + t * t * B.x,
+                     y: (1 - t) ** 2 * A.y + 2 * (1 - t) * t * cyp + t * t * B.y });
+  const p0 = at(t0), p1 = at(t1);
+  // ponto de controlo do troço: a quadrática que passa pelos três pontos
+  const mid = at((t0 + t1) / 2);
+  const c = { x: 2 * mid.x - (p0.x + p1.x) / 2, y: 2 * mid.y - (p0.y + p1.y) / 2 };
+  return { d: `M ${r1(p0.x)} ${r1(p0.y)} Q ${r1(c.x)} ${r1(c.y)} ${r1(p1.x)} ${r1(p1.y)}`, at };
+}
+const r1 = v => Math.round(v * 10) / 10;
+
+/* ---------- nós ---------- */
+function node(m, G, tag) {
+  const g = G[m.key], core = byKey(m.key).core;
+  const op = bodyOpacity(m), glowOp = glowOpacity(m), gcol = glowColour(m);
+  const id = `hb-${m.key}${tag}`;
+  const halo = glowOp ? `<circle class="halo" cx="${g.x}" cy="${g.y}" r="${g.r * 2.2}" fill="url(#${id})" opacity="${glowOp}"/>` : '';
+  const grad = glowOp ? `<radialGradient id="${id}"><stop offset="0" stop-color="${gcol}" stop-opacity=".55"/><stop offset=".38" stop-color="${gcol}" stop-opacity=".22"/><stop offset="1" stop-color="${gcol}" stop-opacity="0"/></radialGradient>` : '';
+  const gk = glyphOf(m), gr = core ? 8 : 6.5;
+  const a = -Math.PI / 4;   // badge no quadrante superior direito da coroa
+  const badge = gk === 'none' ? '' :
+    `<g transform="translate(${r1(g.x + Math.cos(a) * g.r)} ${r1(g.y + Math.sin(a) * g.r)})"><circle r="${gr + 3.5}" fill="var(--bg)" stroke="var(--line)"/>${glyph(gk, 0, 0, gr)}</g>`;
+  // instâncias ativas: pontos na coroa de baixo, um por instância
+  const n = Math.min((m.tasks || []).length, 3);
+  const notches = [...Array(n)].map((_, j) => {
+    const ang = Math.PI / 2 + (j - (n - 1) / 2) * .34;
+    return `<circle class="dotnotch" cx="${r1(g.x + Math.cos(ang) * g.r)}" cy="${r1(g.y + Math.sin(ang) * g.r)}" r="2.6"/>`;
+  }).join('');
+  const cross = toneOf(m.state) === 'dead'
+    ? `<g stroke="var(--alarm)" stroke-width="3" stroke-linecap="round"><line x1="${r1(g.x - g.r * .7)}" y1="${r1(g.y - g.r * .7)}" x2="${r1(g.x + g.r * .7)}" y2="${r1(g.y + g.r * .7)}"/><line x1="${r1(g.x + g.r * .7)}" y1="${r1(g.y - g.r * .7)}" x2="${r1(g.x - g.r * .7)}" y2="${r1(g.y + g.r * .7)}"/></g>` : '';
+  const size = g.r >= 30 ? 'lead' : g.r >= 23 ? '' : 'sm';
+  return { grad, g: `<g class="node m-${m.key} ${isLive(m) ? 'live' : ''}">${halo}
+    <g opacity="${op}">
+      <circle class="ring ${core ? '' : 'demand'}" cx="${g.x}" cy="${g.y}" r="${g.r}"/>
+      <text class="mono ${size}" x="${g.x}" y="${g.y + (g.r >= 30 ? 9 : g.r >= 23 ? 8 : 6)}">${esc(m.mono)}</text>
+      ${notches}
+    </g>${badge}${cross}</g>` };
+}
+
+/* ---------- cena ---------- */
+function scene(keys, G, vw, vh, tag) {
+  const set = new Set(keys);
+  const edges = EDGES.filter(e => set.has(e.a) && set.has(e.b));
+  const paths = new Map();
+  const draw = kind => edges.filter(e => e.kind === kind).map(e => {
+    const c = curve(e.a, e.b, G, (BOW[`${e.a}>${e.b}`] || 20) * (vw < 500 ? .5 : 1));
+    paths.set(`${e.a}>${e.b}`, c);
+    return `<path class="edge ${kind}" d="${c.d}"/>`;
+  }).join('');
+  const hubD = draw('hub'), flowD = draw('flow');
+  const hb = sc.runnerAlive ? (sc.handbacks || []).map(h => {
+    const c = paths.get(`${h.a}>${h.b}`); if (!c) return '';
+    return [.3, .5, .7].map((t, j) => { const p = c.at(t); return `<circle class="hb hb${j + 1}" cx="${r1(p.x)}" cy="${r1(p.y)}" r="4" fill="var(--patina)"/>`; }).join('');
+  }).join('') : '';
+  const nodes = keys.map(k => node(M.get(k), G, tag));
+  return `<svg class="scene" viewBox="0 0 ${vw} ${vh}" preserveAspectRatio="xMidYMid meet" role="img"
+       aria-label="Ligações do elenco. ${esc(keys.map(k => `${byKey(k).name}: ${M.get(k).state}`).join('. '))}">
+    <defs>${nodes.map(n => n.grad).join('')}</defs>
+    ${hubD}${flowD}${hb}${nodes.map(n => n.g).join('')}
+  </svg>`;
+}
+
+const all = ROLES.map(r => r.key);
+const core = ROLES.filter(r => r.core).map(r => r.key);
+const foldRow = `<div class="fold"><b>a pedido</b>${ROLES.filter(r => !r.core).map(r => {
+  const m = M.get(r.key);
+  return `<span class="pill m-${r.key}" style="color:var(--c)"><svg width="13" height="13" viewBox="-7 -7 14 14" aria-hidden="true">${glyph(glyphOf(m), 0, 0, 6)}</svg>${esc(r.mono)}</span>`;
+}).join('')}<span class="pill" style="color:var(--dim)">abrir os 5 ▾</span></div>`;
+
+document.getElementById('app').innerHTML =
+  renderHeader(sc, 'direção B · constelação') +
+  `<div class="stage desktop ${sc.runnerAlive ? '' : 'cold'}">${scene(all, P, W, H, '')}</div>` +
+  `<div class="stage mobile ${sc.runnerAlive ? '' : 'cold'}">${scene(core, PM_, MW, MH, '-m')}</div>` +
+  `<div class="mobile">${foldRow}</div>` +
+  renderLegend(`linha cheia = o Lead chama · tracejado = fluxo de trabalho (representação)${sc.runnerAlive ? '' : ' · runner parado: a rede está fria'}`) +
+  renderHud(sc);
+
+document.title += ` — ${document.querySelectorAll('.desktop svg *').length} elementos SVG`;
+</script>
+</body>
+</html>

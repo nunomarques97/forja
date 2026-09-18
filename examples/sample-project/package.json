@@ -1,0 +1,10 @@
+{
+  "name": "sample-project",
+  "private": true,
+  "type": "module",
+  "description": "Tiny Node project used to validate `forja bootstrap` (docs/ARCHITECTURE.md §13).",
+  "scripts": {
+    "test": "node --test",
+    "start": "node server.mjs"
+  }
+}

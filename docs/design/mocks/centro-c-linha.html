@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Centro de controlo — direção C: Linha</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* =========================================================================
+   DIREÇÃO C — «LINHA»
+   Lógica de layout: não há grafo. Cada projeto é uma LINHA DE MONTAGEM
+   horizontal, e todas as linhas partilham as mesmas quatro etapas nas mesmas
+   colunas: Planear · Construir · Rever · Fechar. A equipa está estacionada na
+   etapa onde trabalha. Comparar dois projetos é olhar para a mesma coluna em
+   duas linhas — "este ainda está a construir, aquele já está a fechar".
+   Elemento-assinatura: o CURSOR DE ETAPA — o bloco aceso que diz onde o
+   trabalho está agora, e que se alinha verticalmente entre projetos.
+   Tipos: Archivo (títulos/estados) + Public Sans (texto).
+   MOCK — não é código de produção.
+   ========================================================================= */
+:root{
+  --bg:#0B0B0C; --surface:#141415; --surface-2:#1C1C1E; --line:#2E2E31;
+  --ink:#EFEDEA; --dim:#A3A09B;
+  --vivo:#45D48A; --espera:#F0B23F; --parado:#FF4F3E; --neutro:#8A8078;
+  --escuro:#0B0B0C; --ticket:#F1E7D8;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --disp:'Archivo',system-ui,sans-serif; --body:'Public Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);-webkit-font-smoothing:antialiased}
+.b-vivo{--c:var(--vivo)} .b-espera{--c:var(--espera)} .b-parado{--c:var(--parado)} .b-neutro{--c:var(--neutro)}
+
+/* ---------- topo ---------- */
+.topo{display:flex;align-items:center;gap:var(--s4);padding:var(--s3) var(--s5);border-bottom:1px solid var(--line)}
+.marca{font:700 21px/1 var(--disp);letter-spacing:.16em}
+.estadoGeral{display:flex;gap:var(--s3);align-items:center;margin-left:var(--s4)}
+.bolha{display:flex;align-items:center;gap:7px;font:600 15px/1 var(--body)}
+.bolha i{width:11px;height:11px;border-radius:50%;background:var(--c);display:block}
+.acoes{margin-left:auto;display:flex;gap:var(--s2);align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:10px 14px;
+     font:600 13px/1 var(--disp);letter-spacing:.06em;text-transform:uppercase;cursor:pointer;min-height:40px}
+.btn.on{background:var(--surface-2);border-color:var(--ink)}
+.relogio{color:var(--dim);font-size:14px}
+.alerta{background:var(--ticket);color:var(--escuro);border-radius:6px;padding:10px 13px;font:700 13px/1 var(--disp);letter-spacing:.05em}
+
+/* ---------- cabeçalho das etapas (partilhado por todas as linhas) ---------- */
+.eixo{display:grid;grid-template-columns:270px repeat(4,1fr);gap:0;padding:var(--s3) var(--s5) 0;align-items:end}
+.eixo .vazio{}
+.eixo .et{font:600 13px/1 var(--disp);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+          padding:0 0 var(--s2) var(--s3);border-left:1px solid var(--line)}
+
+/* ---------- uma linha por projeto ---------- */
+.linhas{padding:0 var(--s5) var(--s4)}
+.faixa{display:grid;grid-template-columns:270px repeat(4,1fr);background:var(--surface);border:1px solid var(--line);
+       border-left:5px solid var(--c);border-radius:8px;margin-top:var(--s3);overflow:hidden}
+.faixa.b-parado{border-color:var(--parado)}
+
+.ident{padding:var(--s4);border-right:1px solid var(--line)}
+.nome{font:700 25px/1 var(--disp);letter-spacing:.01em}
+.selo{display:inline-block;margin-top:var(--s2);background:var(--c);color:var(--escuro);font:700 14px/1 var(--disp);
+      letter-spacing:.09em;text-transform:uppercase;padding:8px 10px 6px;border-radius:5px}
+.faixa.b-neutro .selo{background:transparent;color:var(--neutro);border:1px solid var(--neutro)}
+.meta{color:var(--dim);font-size:13px;margin-top:8px}
+.contas{display:flex;gap:var(--s3);margin-top:var(--s3);font-size:13px}
+.contas span{display:flex;align-items:center;gap:6px;color:var(--dim)}
+.contas b{font:700 17px/1 var(--disp)}
+.cv{color:var(--vivo)} .ce{color:var(--espera)} .cp{color:var(--parado)} .cn{color:var(--neutro)}
+
+/* ---------- uma etapa dentro da linha ---------- */
+.etapa{border-left:1px solid var(--line);padding:var(--s4) var(--s3);position:relative;min-height:172px}
+.etapa.aqui{background:linear-gradient(180deg,rgba(69,212,138,.10),transparent 72%)}
+.faixa.b-parado .etapa.aqui{background:linear-gradient(180deg,rgba(255,79,62,.14),transparent 72%)}
+.etapa.feita::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--neutro);opacity:.5}
+.etapa.aqui::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--c)}
+.cursor{position:absolute;top:-1px;left:var(--s3);font:700 11px/1 var(--disp);letter-spacing:.1em;text-transform:uppercase;
+        color:var(--escuro);background:var(--c);padding:5px 7px 4px;border-radius:0 0 5px 5px}
+.gente{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s5)}
+.pessoa{display:flex;align-items:center;gap:var(--s2);border:1px solid var(--line);border-radius:999px;
+        padding:6px 12px 6px 6px;background:var(--surface-2);min-height:40px}
+.pessoa .disco{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;
+                font:700 12px/1 var(--disp);flex:none}
+.pessoa .txt b{display:block;font:600 13.5px/1.1 var(--body)}
+.pessoa .txt small{display:block;color:var(--dim);font-size:11.5px;margin-top:2px}
+.p-vivo{border-color:var(--vivo)} .p-vivo .disco{background:var(--vivo);color:var(--escuro)}
+.p-vivo .txt b{color:var(--ink)}
+.p-espera{border-color:var(--espera)} .p-espera .disco{background:transparent;border:2px solid var(--espera);color:var(--espera)}
+.p-parado{border-color:var(--parado)} .p-parado .disco{background:var(--parado);color:var(--escuro)}
+.p-neutro{opacity:.72} .p-neutro .disco{background:transparent;border:1px solid var(--neutro);color:var(--neutro)}
+.p-neutro .txt b{color:var(--dim);font-weight:500}
+
+/* ---------- o Lead: o maestro, atravessa a linha toda ---------- */
+.maestro{grid-column:1 / -1;display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s4);
+         border-top:1px solid var(--line);background:var(--surface-2)}
+.maestro .disco{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font:700 14px/1 var(--disp);
+                background:var(--c);color:var(--escuro);flex:none}
+.faixa.b-neutro .maestro .disco{background:transparent;border:1px solid var(--neutro);color:var(--neutro)}
+.maestro .frase{font:600 18px/1.25 var(--body)}
+.maestro .frase small{display:block;color:var(--dim);font:400 13.5px/1.4 var(--body);margin-top:4px}
+.maestro .ultimo{margin-left:auto;text-align:right;color:var(--dim);font-size:13px;max-width:44ch}
+.maestro .accao{margin-left:auto;background:var(--ticket);color:var(--escuro);border-radius:8px;padding:10px var(--s3);
+                display:flex;gap:var(--s3);align-items:center;font-size:14px;font-weight:600}
+.maestro .accao button{background:var(--escuro);color:var(--ticket);border:0;border-radius:5px;padding:11px 13px;
+                       font:700 13px/1 var(--disp);letter-spacing:.06em;text-transform:uppercase;min-height:44px;cursor:pointer}
+
+/* ---------- legenda e rodapé ---------- */
+.legenda{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);padding:0 var(--s5) var(--s4);color:var(--dim);font-size:13.5px}
+.legenda span{display:flex;align-items:center;gap:7px}
+.legenda i{width:13px;height:13px;border-radius:50%;background:var(--c);display:block}
+.legenda i.anel{background:transparent;border:2px solid var(--c)}
+.rodape{border-top:1px solid var(--line);padding:var(--s3) var(--s5);color:var(--dim);font-size:13px;display:flex;gap:var(--s5)}
+
+/* ---------- telemóvel: a linha fica de pé ---------- */
+@media (max-width:720px){
+  .topo{flex-wrap:wrap;gap:var(--s2) var(--s3);padding:var(--s3) var(--s4)}
+  .marca{font-size:18px} .relogio{display:none}
+  .acoes{width:100%;margin-left:0} .btn{flex:1;padding:10px 8px;font-size:12px}
+  .acoes .btn:nth-child(3){display:none}
+  .eixo{display:none}
+  .linhas{padding:0 var(--s4) var(--s4)}
+  .faixa{grid-template-columns:1fr}
+  .ident{border-right:0;border-bottom:1px solid var(--line)}
+  .etapa{border-left:0;border-top:1px solid var(--line);min-height:0;padding:var(--s3) var(--s4) var(--s4)}
+  .etapa .titulo{display:block;font:600 12px/1 var(--disp);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+                 margin-bottom:var(--s3)}
+  .cursor{position:static;display:inline-block;border-radius:5px;margin-left:var(--s2);order:2}
+  .gente{margin-top:0}
+  .pessoa{min-height:44px}
+  /* etapas que não são a de agora encolhem para uma linha: o telemóvel mostra
+     onde o trabalho está, não tudo o que já passou */
+  .etapa:not(.aqui) .gente{display:none}
+  .etapa:not(.aqui){padding:var(--s3) var(--s4)}
+  .etapa:not(.aqui) .titulo{margin-bottom:0;display:flex;justify-content:space-between;align-items:center}
+  .etapa .resumoEtapa{display:inline;font:400 13px/1 var(--body);letter-spacing:0;text-transform:none;color:var(--dim)}
+  .etapa.aqui .resumoEtapa{display:none}
+  .maestro{flex-wrap:wrap} .maestro .ultimo{margin-left:0;text-align:left;max-width:none}
+  .maestro .accao{margin-left:0;width:100%}
+}
+.titulo{display:none}
+@media (prefers-reduced-motion: no-preference){
+  .p-vivo .disco{animation:pulso 2.4s ease-in-out infinite}
+  @keyframes pulso{0%,100%{box-shadow:0 0 0 0 rgba(69,212,138,.55)}50%{box-shadow:0 0 0 7px rgba(69,212,138,0)}}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { CENAS, PAPEIS, ETAPAS, DETALHE, porKey, esc } from './centro-dados.js';
+
+const q = new URLSearchParams(location.search);
+const cena = CENAS[q.get('cena') === 'parado' ? 'parado' : 'agora'];
+
+const idxEtapa = p => p.fase === 'fim' ? ETAPAS.length : ETAPAS.findIndex(e => e.key === p.fase);
+
+function pessoa(p, key) {
+  const pa = porKey(key), e = p.equipa[key] || { banda: 'neutro', frase: 'ainda não foi preciso' };
+  return `<div class="pessoa p-${e.banda}">
+    <span class="disco">${pa.mono}</span>
+    <span class="txt"><b>${esc(pa.nome)}</b><small>${esc(e.frase)}${e.ha ? ` · ${esc(e.ha)}` : ''}</small></span>
+  </div>`;
+}
+
+// uma linha só, para as etapas que ficam fechadas no telemóvel
+function resumoEtapa(p, et) {
+  const bandas = et.papeis.map(k => (p.equipa[k] || {}).banda || 'neutro');
+  const vivos = bandas.filter(b => b === 'vivo').length;
+  const espera = bandas.filter(b => b === 'espera').length;
+  const parados = bandas.filter(b => b === 'parado').length;
+  if (parados) return `${parados} parado${parados > 1 ? 's' : ''}`;
+  if (vivos) return `${vivos} a trabalhar`;
+  if (espera) return `${espera} à espera`;
+  const feitos = et.papeis.filter(k => p.equipa[k] && p.equipa[k].ha).length;
+  return feitos ? `${feitos} já entregaram` : 'não foi preciso';
+}
+
+function faixa(p) {
+  const aqui = idxEtapa(p), c = p.contagem;
+  const etapas = ETAPAS.map((et, i) => {
+    const classe = i === aqui ? 'aqui' : i < aqui ? 'feita' : '';
+    return `<div class="etapa ${classe}">
+      ${i === aqui ? `<span class="cursor">${p.estado === 'parado' ? 'parou aqui' : 'é aqui agora'}</span>` : ''}
+      <span class="titulo">${esc(et.nome)}<span class="resumoEtapa">${esc(resumoEtapa(p, et))}</span></span>
+      <div class="gente">${et.papeis.map(k => pessoa(p, k)).join('')}</div>
+    </div>`;
+  }).join('');
+  const lead = p.equipa['lead'];
+  return `<section class="faixa b-${p.estado}">
+    <div class="ident">
+      <div class="nome">${esc(p.projeto)}</div>
+      <div class="selo">${esc(p.palavra)}</div>
+      <div class="meta">${esc(p.desde)}<br>${p.tarefas.feitas} de ${p.tarefas.total} tarefas feitas</div>
+      <div class="contas">
+        <span class="cv"><b>${c.vivo}</b>a trabalhar</span>
+        <span class="ce"><b>${c.espera}</b>à espera</span>
+        <span class="cp"><b>${c.parado}</b>parados</span>
+      </div>
+    </div>
+    ${etapas}
+    <div class="maestro">
+      <span class="disco">Le</span>
+      <span class="frase">${esc(p.resumo)}<small>Lead · ${esc(lead.frase)}${lead.ha ? ` · ${esc(lead.ha)}` : ''}</small></span>
+      ${p.humano
+        ? `<span class="accao">Precisa de ti: ${esc(p.accao)}<button>Arrancar</button></span>`
+        : `<span class="ultimo">${esc(p.ultimo)}</span>`}
+    </div>
+  </section>`;
+}
+
+const vivos = cena.filter(p => p.estado === 'vivo').length;
+const parados = cena.filter(p => p.estado === 'parado').length;
+const fechados = cena.filter(p => p.estado === 'neutro').length;
+const precisa = cena.filter(p => p.humano).length;
+
+document.getElementById('app').innerHTML = `
+<header class="topo">
+  <span class="marca">FORJA</span>
+  <span class="estadoGeral">
+    <span class="bolha b-vivo"><i></i>${vivos} a trabalhar</span>
+    ${parados ? `<span class="bolha b-parado"><i></i>${parados} parado${parados > 1 ? 's' : ''}</span>` : ''}
+    ${fechados ? `<span class="bolha b-neutro"><i></i>${fechados} terminado${fechados > 1 ? 's' : ''}</span>` : ''}
+  </span>
+  <span class="acoes">
+    ${precisa ? `<span class="alerta">${precisa} precisa de ti</span>` : ''}
+    <button class="btn on">Todos os projetos</button><button class="btn">Só um</button>
+    <button class="btn">Linhas mais altas</button><button class="btn">Ecrã inteiro</button>
+    <span class="relogio">${cena === CENAS.parado ? '00:16' : '19:12'}</span>
+  </span>
+</header>
+<div class="eixo">
+  <div class="vazio"></div>
+  ${ETAPAS.map(e => `<div class="et">${esc(e.nome)}</div>`).join('')}
+</div>
+<main class="linhas">${cena.map(faixa).join('')}</main>
+<div class="legenda">
+  <span class="b-vivo"><i></i>verde: está a trabalhar agora</span>
+  <span class="b-espera"><i class="anel"></i>amarelo: parou de escrever, está à espera</span>
+  <span class="b-parado"><i class="anel"></i>vermelho: sem sinal há mais de 5 minutos</span>
+  <span class="b-neutro"><i class="anel"></i>cinzento: já entregou, ou ainda não foi preciso</span>
+  <span>a coluna acesa é a etapa onde o trabalho está agora</span>
+</div>
+<footer class="rodape">
+  <span>Atualizado agora mesmo</span><span>${cena.length} projetos</span>
+  <span>${cena.reduce((n, p) => n + p.contagem.vivo, 0)} pessoas da equipa a trabalhar agora</span>
+</footer>`;
+</script>
+</body>
+</html>

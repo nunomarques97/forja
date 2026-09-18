@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forja · Overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Martian+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Direction C — Overview. A glanceable board: one tile per project, the
+     handoffs listed as their own objects, and a short ticker of the newest calls. */
+  :root {
+    --bg: #111722; --surface: #182030; --raise: #1F2940; --ink: #E6EBF2; --muted: #8C98AA; --rule: #2A354B;
+    --main: #3A8BDB; --sub: #BA7612;
+    --sans: 'Archivo', system-ui, sans-serif; --mono: 'Martian Mono', ui-monospace, monospace;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); }
+  .page { max-width: 1320px; margin: 0 auto; padding: var(--s5) var(--s6) var(--s7); }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); margin-bottom: var(--s5); }
+  h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: .01em; }
+  .meta { font: 11px var(--mono); color: var(--muted); }
+  .tabs { margin-left: auto; display: flex; gap: var(--s1); }
+  .tabs button { font: 500 13px var(--sans); background: none; color: var(--muted); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-color: var(--ink); }
+  button:focus-visible, .tk:focus-visible { outline: 2px solid var(--main); outline-offset: 2px; }
+  h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: var(--s6) 0 var(--s3); }
+  h2:first-child { margin-top: 0; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--s4); }
+  .tile { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: var(--s4) var(--s5) var(--s5); }
+  .tile .head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
+  .tile .name { font-size: 22px; font-weight: 700; }
+  .tile .count { font: 500 28px var(--mono); }
+  .tile .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .split { margin: var(--s4) 0 var(--s1); display: flex; gap: 2px; height: 10px; }
+  .split i { border-radius: 3px; min-width: 4px; }
+  .splitlab { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .splitlab b { color: var(--ink); font-weight: 600; }
+  .tools { margin-top: var(--s4); display: grid; grid-template-columns: 130px 1fr 28px; gap: 6px var(--s3); align-items: center; font-size: 12px; }
+  .tools .tn { font-family: var(--mono); color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+  .tools .bar { height: 8px; display: flex; gap: 2px; }
+  .tools .bar i { border-radius: 2px; }
+  .tools .v { font-family: var(--mono); color: var(--muted); text-align: right; }
+  .strip { margin-top: var(--s4); position: relative; height: 22px; border-top: 1px solid var(--rule); }
+  .strip i { position: absolute; top: 6px; width: 3px; height: 12px; border-radius: 2px; }
+  .striplab { display: flex; justify-content: space-between; font: 10px var(--mono); color: var(--muted); }
+
+  .handoffs { display: grid; gap: var(--s3); }
+  .ho { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: var(--s4) var(--s5); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: var(--s5); align-items: center; }
+  .ho .who { font-size: 12px; color: var(--muted); }
+  .ho .who b { color: var(--ink); }
+  .ho .desc { font-size: 17px; font-weight: 600; margin: 4px 0; }
+  .ho .v { display: inline-flex; align-items: center; gap: 6px; font: 500 11px var(--mono); border: 1px solid var(--ink); border-radius: 99px; padding: 2px 9px 2px 7px; margin-right: var(--s2); }
+  .ho > div { min-width: 0; }
+  .ho .quote { overflow-wrap: anywhere; font-size: 13px; color: var(--muted); margin: var(--s2) 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .gantt { position: relative; height: 64px; }
+  .gantt .span { position: absolute; top: 10px; height: 14px; border-radius: 4px; border: 1.5px solid var(--main); background: color-mix(in srgb, var(--main) 22%, transparent); }
+  .gantt .k { position: absolute; top: 38px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--sub); border: 2px solid var(--surface); }
+  .gantt .k.back { border-radius: 2px; transform: rotate(45deg); }
+  .gantt .lab { position: absolute; font: 10px var(--mono); color: var(--muted); }
+
+  .ticker { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  .tk { display: grid; grid-template-columns: 76px 10px 120px 130px minmax(0, 1fr); gap: var(--s3); align-items: center; padding: 8px var(--s5); border-bottom: 1px solid var(--rule); font-size: 13px; cursor: pointer; }
+  .tk:last-child { border-bottom: 0; }
+  .tk:hover { background: var(--raise); }
+  .tk .t { font: 11px var(--mono); color: var(--muted); }
+  .tk .m { width: 8px; height: 8px; border-radius: 50%; }
+  .tk .p { color: var(--muted); } .tk .tool { font: 12px var(--mono); }
+  .tk .s { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .more { display: block; padding: 10px var(--s5); font: 500 13px var(--sans); color: var(--main); background: none; border: 0; cursor: pointer; }
+
+  .raw-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; }
+  table.raw { border-collapse: collapse; font: 11px var(--mono); width: 100%; }
+  table.raw th, table.raw td { border: 1px solid var(--rule); padding: 3px 6px; text-align: left; vertical-align: top; white-space: nowrap; }
+  table.raw th { background: var(--raise); position: sticky; top: 0; }
+  table.raw td.input { white-space: normal; min-width: 320px; word-break: break-all; }
+  table.raw td.num { cursor: pointer; color: var(--main); }
+  table.raw pre { margin: 4px 0; white-space: pre-wrap; word-break: break-all; }
+  table.raw tr.flash td { background: #3A3320; }
+  body[data-view="raw"] #visual, body[data-view="visual"] #raw { display: none; }
+
+  @media (max-width: 720px) {
+    .page { padding: var(--s4) var(--s4) var(--s6); }
+    .tabs { margin-left: 0; }
+    .tiles { grid-template-columns: 1fr; }
+    .tile { padding: var(--s4); }
+    .tools { grid-template-columns: 110px 1fr 24px; }
+    .ho { grid-template-columns: 1fr; gap: var(--s3); padding: var(--s4); }
+    .tk { grid-template-columns: 64px 8px minmax(0, 1fr); padding: 8px var(--s4); }
+    .tk .p { display: none; } .tk .s { grid-column: 3; } .tk .tool { grid-column: 3; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>Forja</h1>
+    <span class="meta" id="meta">loading…</span>
+    <div class="tabs" role="tablist">
+      <button data-tab="visual" role="tab">Overview</button>
+      <button data-tab="raw" role="tab">Raw table</button>
+    </div>
+  </header>
+  <section id="visual">
+    <h2>Projects</h2>
+    <div class="tiles" id="tiles"></div>
+    <h2>Handoffs to subagents</h2>
+    <div class="handoffs" id="handoffs"></div>
+    <h2>Newest tool calls</h2>
+    <div class="ticker" id="ticker"></div>
+  </section>
+  <section id="raw"></section>
+</div>
+<script type="module">
+import { loadEvents, model, summarize, t0, fmtTime, fmtDur, renderRawTable, wireTabs, esc } from './shared.js';
+
+const events = await loadEvents();
+const M = model(events);
+renderRawTable(document.getElementById('raw'), events);
+wireTabs();
+document.getElementById('meta').textContent = `snapshot of data/events.jsonl · ${M.ok.length} events · latest ${fmtTime(M.last)}`;
+
+const col = rec => rec.agent_type ? 'var(--sub)' : 'var(--main)';
+
+document.getElementById('tiles').innerHTML = M.projects.map(p => {
+  const sub = p.events.filter(e => e.rec.agent_type).length, main = p.events.length - sub;
+  const times = p.events.map(e => t0(e.rec)), a = Math.min(...times), b = Math.max(...times), span = Math.max(1, b - a);
+  const tools = [...p.tools].sort((x, y) => y[1] - x[1]);
+  const max = tools[0][1];
+  const toolRows = tools.map(([name, n]) => {
+    const s = p.events.filter(e => e.rec.tool_name === name && e.rec.agent_type).length;
+    return `<span class="tn">${esc(name)}</span>
+      <span class="bar" style="width:${(n / max) * 100}%">${n - s ? `<i style="flex:${n - s};background:var(--main)"></i>` : ''}${s ? `<i style="flex:${s};background:var(--sub)"></i>` : ''}</span>
+      <span class="v">${n}</span>`;
+  }).join('');
+  return `<article class="tile">
+    <div class="head"><span class="name">${esc(p.name)}</span><span class="count">${p.events.length}</span></div>
+    <div class="sub">${p.sessions.size} session${p.sessions.size > 1 ? 's' : ''} · ${fmtTime(a)}–${fmtTime(b)}</div>
+    <div class="split"><i style="flex:${main};background:var(--main)"></i>${sub ? `<i style="flex:${sub};background:var(--sub)"></i>` : ''}</div>
+    <div class="splitlab"><span><b>${main}</b> main session</span><span><b>${sub}</b> reviewer subagent</span></div>
+    <div class="tools">${toolRows}</div>
+    <div class="strip">${p.events.map(e => `<i style="left:calc(${((t0(e.rec) - a) / span) * 100}% - 1px);background:${col(e.rec)}"></i>`).join('')}</div>
+    <div class="striplab"><span>${fmtTime(a)}</span><span>${fmtTime(b)}</span></div>
+  </article>`;
+}).join('');
+
+const ho = document.getElementById('handoffs');
+ho.innerHTML = M.handoffs.length ? M.handoffs.map(h => {
+  const pad = (h.end - h.start) * 0.04, a = h.start - pad, span = (h.end + pad) - a;
+  const pct = t => ((t - a) / span) * 100;
+  const msg = h.handback ? String(h.handback.rec.tool_input.message).replace(/^\s*[A-Z_]+\s*[—-]\s*/, '') : '';
+  return `<article class="ho">
+    <div>
+      <div class="who"><b>${esc(h.project)}</b> · main session → <b>${esc(h.agentType || 'subagent')}</b> · ${fmtTime(h.start)}</div>
+      <div class="desc">${esc(summarize(h.call.rec))}</div>
+      ${h.verdict ? `<span class="v">✓ ${esc(h.verdict)}</span>` : ''}<span class="who">${h.events.length} calls by the reviewer · ${fmtDur(h.end - h.start)}</span>
+      ${msg ? `<p class="quote">${esc(msg)}</p>` : ''}
+    </div>
+    <div class="gantt" aria-label="Agent call span with subagent calls inside">
+      <span class="lab" style="left:0;top:-4px">main session waits</span>
+      <div class="span" style="left:${pct(h.start)}%;width:${pct(h.end) - pct(h.start)}%"></div>
+      ${h.events.map(e => `<i class="k ${e === h.handback ? 'back' : ''}" style="left:${pct(t0(e.rec))}%" title="${esc(e.rec.tool_name)}: ${esc(summarize(e.rec))}"></i>`).join('')}
+      <span class="lab" style="left:0;top:52px">${fmtTime(h.start)}</span>
+      <span class="lab" style="right:0;top:52px">${fmtTime(h.end)}</span>
+    </div>
+  </article>`;
+}).join('') : '<p class="meta">No subagent handoffs in the file yet.</p>';
+
+document.getElementById('ticker').innerHTML = [...M.ok].reverse().slice(0, 8).map(e => `
+  <div class="tk" tabindex="0" onclick="jumpToRaw(${e.line})">
+    <span class="t">${fmtTime(t0(e.rec))}</span><span class="m" style="background:${col(e.rec)}"></span>
+    <span class="p">${esc(e.rec.project)}</span><span class="tool">${esc(e.rec.tool_name)}</span><span class="s">${esc(summarize(e.rec))}</span>
+  </div>`).join('') + `<button class="more" data-tab="raw" onclick="document.querySelector('[data-tab=raw]').click()">See all ${M.ok.length} in the raw table →</button>`;
+</script>
+</body>
+</html>

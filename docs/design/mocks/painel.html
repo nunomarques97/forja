@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forja · Painel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Azeret+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Direção C — Painel. Painel de instrumentos: grelha densa, uma luz de estado e
+     dois mostradores (tempo no estado, silêncio) por membro, faixa kanban das
+     tasks, livro-razão das revisões, caixa de entrada do Sponsor com margem
+     vermelha. */
+  :root {
+    --bg: #101214; --panel: #171A1E; --panel-2: #1D2126; --rule: #2C323A; --rule-soft: #22272D;
+    --ink: #EEF1F4; --muted: #9AA3AD; --dim: #8A939D;
+    --brasa: #FF8C42; --madeira: #D4A96A; --indigo: #8E9BFF; --patina: #5FCDA9; --alarme: #FF5147; --ambar: #F3B940;
+    --ui: 'Familjen Grotesk', system-ui, sans-serif; --mono: 'Azeret Mono', ui-monospace, monospace;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+    --r1: 3px; --r2: 6px;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 13px/1.4 var(--ui); }
+  :focus-visible { outline: 2px solid var(--brasa); outline-offset: 2px; }
+  .m-ferreiro { --c: var(--brasa); } .m-bigorna { --c: var(--madeira); } .m-fundidor { --c: var(--indigo); } .m-lapidador { --c: var(--patina); } .m-contraste { --c: var(--alarme); } .m-native { --c: var(--muted); }
+  .t-work { --t: var(--brasa); } .t-wait { --t: var(--indigo); } .t-done { --t: var(--patina); } .t-idle { --t: var(--dim); }
+  .t-fail, .t-lost, .t-dead, .t-alarm, .t-sponsor { --t: var(--alarme); }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  .page { padding: var(--s3) var(--s4) var(--s6); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
+  /* status bar */
+  .bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: var(--s5); align-items: center; background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r2); padding: var(--s2) var(--s4); }
+  .brand { font: 700 15px/1 var(--ui); letter-spacing: .1em; text-transform: uppercase; }
+  .brand small { display: block; font: 500 10px/1.4 var(--mono); letter-spacing: .04em; color: var(--muted); text-transform: none; margin-top: 3px; }
+  .goal { min-width: 0; }
+  .goal b { display: block; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .goal small { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+  .readouts { display: flex; gap: var(--s4); }
+  .ro { text-align: center; }
+  .ro b { display: block; font: 700 18px/1 var(--mono); }
+  .ro span { font: 500 10px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .ro.alarm b { color: var(--alarme); }
+  .runstate { display: flex; align-items: center; gap: var(--s2); padding: 6px 10px; border: 1px solid var(--t); border-radius: var(--r1); color: var(--t); font: 700 13px/1 var(--ui); letter-spacing: .06em; text-transform: uppercase; }
+  .runstate.loud { background: var(--alarme); color: #1A0B09; border-color: var(--alarme); }
+  .runstate.loud .led { background: #1A0B09; box-shadow: none; }
+  .led { width: 11px; height: 11px; border-radius: 50%; background: var(--t); box-shadow: 0 0 0 2px color-mix(in srgb, var(--t) 30%, transparent); flex: none; }
+  .t-idle .led { box-shadow: none; }
+  .demo { background: var(--ambar); color: #1A1508; font-weight: 600; padding: 6px 12px; border-radius: var(--r1); }
+
+  .label { font: 600 10px/1 var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 var(--s2); display: flex; gap: var(--s2); align-items: baseline; }
+  .label .n { font: 500 10px var(--mono); color: var(--dim); letter-spacing: 0; text-transform: none; }
+
+  /* instruments */
+  .roster { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s3); }
+  .ins { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r2); padding: var(--s3); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2); align-content: start; min-width: 0; }
+  .ins.loud { border: 2px solid var(--alarme); background: #23151A; }
+  .ins.dead, .ins.lost { border: 2px dashed var(--alarme); }
+  .ins.idle { background: #141619; }
+  .ins .hd { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: var(--s2); align-items: center; }
+  .ins .hd .led { justify-self: center; }
+  .ins .hd b { font-size: 15px; font-weight: 700; color: var(--c); }
+  .ins .hd small { display: block; color: var(--muted); font-size: 11px; line-height: 1.3; }
+  .ins.idle .hd b { opacity: .6; }
+  .word { font: 700 22px/1.05 var(--ui); color: var(--t); letter-spacing: -.01em; overflow-wrap: anywhere; }
+  .ins.loud .word { background: var(--alarme); color: #1A0B09; padding: 3px 8px; border-radius: var(--r1); justify-self: start; font-size: 20px; }
+  .ins.dead .word { text-decoration: line-through; text-decoration-thickness: 3px; }
+  .gauges { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s2); border-top: 1px solid var(--rule-soft); border-bottom: 1px solid var(--rule-soft); padding: var(--s2) 0; }
+  .g { display: grid; justify-items: center; text-align: center; gap: 2px; min-width: 0; }
+  .g svg { width: 56px; height: 44px; display: block; }
+  .g .v { font: 700 13px/1 var(--mono); color: var(--t); white-space: nowrap; }
+  .g .v.quiet { color: var(--ambar); } .g .v.silent { color: var(--alarme); } .g .v.ok { color: var(--patina); } .g .v.off { color: var(--dim); }
+  .g .l { font: 500 10px/1.3 var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+  .g .l small { display: block; text-transform: none; letter-spacing: 0; font-family: var(--mono); color: var(--dim); }
+  .quietbox { border: 1px solid var(--ambar); color: var(--ambar); font-weight: 600; font-size: 12px; padding: 4px 8px; border-radius: var(--r1); justify-self: start; }
+  .inst { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; padding-top: 6px; border-top: 1px solid var(--rule-soft); min-width: 0; }
+  .inst:first-of-type { border-top: 0; padding-top: 0; }
+  .inst .task { display: flex; gap: 6px; align-items: baseline; min-width: 0; font-weight: 600; }
+  .inst .task .id { font: 700 10px/1 var(--mono); color: var(--bg); background: var(--ink); padding: 3px 5px; border-radius: var(--r1); flex: none; }
+  .inst .task .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .inst .ist { font: 600 10px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--t); }
+  .inst .ist.loud { background: var(--alarme); color: #1A0B09; padding: 3px 5px; border-radius: var(--r1); justify-self: start; }
+  .inst .detail { font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+  .inst .detail.v-REJECT { color: var(--alarme); font-weight: 600; } .inst .detail.v-DONE, .inst .detail.v-APPROVE { color: var(--patina); font-weight: 600; }
+  .inst .model { font: 400 10px/1.4 var(--mono); color: var(--dim); } .inst .model b { color: var(--muted); font-weight: 500; }
+  .native { background: none; border: 1px dashed var(--rule); border-radius: var(--r2); padding: var(--s2) var(--s3); display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--s4); color: var(--muted); font-size: 12px; align-items: center; }
+  .native .row { display: grid; grid-template-columns: 120px 190px minmax(0, 1fr) auto; gap: var(--s3); }
+  .native .row b { color: var(--ink); } .native .row .s { color: var(--t); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
+
+  /* kanban strip */
+  .kanban { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--s2); }
+  .col { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r2); padding: var(--s2); min-height: 86px; }
+  .col.blocked, .col.failed { border-color: color-mix(in srgb, var(--alarme) 45%, var(--rule)); }
+  .col .ch { display: flex; justify-content: space-between; font: 600 10px/1 var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--t); margin-bottom: var(--s2); }
+  .col .ch span { font-family: var(--mono); color: var(--muted); }
+  .card { background: var(--panel-2); border-radius: var(--r1); padding: 6px 8px; margin-bottom: 4px; font-size: 12px; border-left: 3px solid var(--c); }
+  .card b { font-family: var(--mono); font-weight: 700; margin-right: 4px; }
+  .card small { display: block; color: var(--muted); font-size: 11px; }
+  .card small.bad { color: var(--alarme); }
+
+  .three { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--s3); }
+  .pnl { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r2); padding: var(--s3); }
+  .pnl.inbox { border: 2px solid var(--alarme); border-left-width: 10px; background: #1B1416; }
+  .pnl.inbox .label { color: var(--alarme); }
+  .ledger table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .ledger th { text-align: left; font: 600 10px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); padding: 0 6px 6px 0; border-bottom: 1px solid var(--rule); }
+  .ledger td { padding: 6px 6px 6px 0; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  .ledger td.t { font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+  .v { font: 700 10px/1 var(--mono); padding: 3px 6px; border-radius: var(--r1); display: inline-block; }
+  .v.REJECT { background: var(--alarme); color: #1A0B09; } .v.APPROVE { background: var(--patina); color: #0B1A14; }
+  .q { border-top: 1px solid var(--rule-soft); padding: var(--s2) 0; }
+  .q:first-of-type { border-top: 0; padding-top: 0; }
+  .q .k { display: flex; justify-content: space-between; font: 600 10px/1 var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--alarme); }
+  .q .k span:last-child { color: var(--muted); font-family: var(--mono); letter-spacing: 0; text-transform: none; }
+  .q .t { font-weight: 600; font-size: 14px; margin: 4px 0; line-height: 1.3; }
+  .q .d { font-size: 12px; color: var(--muted); } .q .d b { color: var(--ink); font-weight: 500; }
+  .q .who { font-size: 11px; color: var(--dim); margin-top: 4px; }
+  .none { color: var(--dim); font-size: 12px; }
+  .log .e { display: grid; grid-template-columns: 38px 8px minmax(0, 1fr); gap: var(--s2); padding: 3px 0; border-top: 1px solid var(--rule-soft); font: 400 11px/1.5 var(--mono); align-items: baseline; }
+  .log .e .t { color: var(--dim); } .log .e i { width: 6px; height: 6px; border-radius: 50%; background: var(--t); display: inline-block; }
+  .log .e .x { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px; }
+  .legend span { font: 600 10px/1 var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--t); padding: 6px 8px; border: 1px solid var(--rule); border-radius: var(--r1); display: inline-flex; gap: 6px; align-items: center; }
+  .legend span::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--t); }
+  .legend span.loud { background: var(--alarme); color: #1A0B09; border-color: var(--alarme); } .legend span.loud::before { background: #1A0B09; }
+  .legend span.dead { text-decoration: line-through; border: 1px dashed var(--alarme); } .legend span.lost { border: 1px dashed var(--alarme); }
+  .legend span.quiet { color: var(--ambar); border-color: var(--ambar); } .legend span.quiet::before { background: var(--ambar); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ins.loud .hd .led, .runstate.loud .led { animation: blink 1s steps(2, end) infinite; }
+    @keyframes blink { 50% { opacity: .25; } }
+  }
+  @media (max-width: 900px) {
+    .page { padding: var(--s2) var(--s3) var(--s5); gap: var(--s3); }
+    .bar { grid-template-columns: minmax(0, 1fr) auto; gap: var(--s2) var(--s3); padding: var(--s2) var(--s3); }
+    .goal { grid-column: 1 / -1; } .goal b { white-space: normal; font-size: 14px; }
+    .readouts { grid-column: 1 / -1; justify-content: space-between; }
+    .roster { grid-template-columns: minmax(0, 1fr); }
+    .native { grid-template-columns: minmax(0, 1fr); gap: var(--s2); }
+    .native .row { grid-template-columns: minmax(0, 1fr) auto; } .native .row .tk, .native .row .md { grid-column: 1 / -1; }
+    .kanban { display: flex; overflow-x: auto; gap: var(--s2); padding-bottom: var(--s1); }
+    .col { flex: 0 0 172px; }
+    .three { grid-template-columns: minmax(0, 1fr); }
+    .three .inbox { order: -1; }
+  }
+</style>
+</head>
+<body>
+<div class="page" id="app"><p style="color:var(--muted)">a carregar o instantâneo…</p></div>
+<script type="module">
+import * as F from './crew-shared.js';
+const { esc, ago, dur, clock, toneOf, LOUD } = F;
+
+// 270° arc gauge. value in 0..1; zones = [[from,to,colour]] in 0..1.
+function gauge(value, colour, zones = []) {
+  const cx = 28, cy = 26, r = 20, a0 = 135, sweep = 270;
+  const pt = (a, rr = r) => { const t = (a * Math.PI) / 180; return [cx + rr * Math.cos(t), cy + rr * Math.sin(t)]; };
+  const arc = (f, t, rr = r) => { const [x1, y1] = pt(a0 + f * sweep, rr), [x2, y2] = pt(a0 + t * sweep, rr); return `M${x1.toFixed(1)},${y1.toFixed(1)} A${rr},${rr} 0 ${(t - f) * sweep > 180 ? 1 : 0} 1 ${x2.toFixed(1)},${y2.toFixed(1)}`; };
+  const v = Math.max(0, Math.min(1, value ?? 0));
+  const [nx, ny] = pt(a0 + v * sweep, r - 3), [nx0, ny0] = pt(a0 + v * sweep, 6);
+  return `<svg viewBox="0 0 56 44" aria-hidden="true">
+    <path d="${arc(0, 1)}" stroke="var(--rule)" stroke-width="5" fill="none"/>
+    ${zones.map(([f, t, c]) => `<path d="${arc(f, t, r)}" stroke="${c}" stroke-width="5" fill="none" opacity=".35"/>`).join('')}
+    ${value != null ? `<path d="${arc(0, Math.max(v, .002))}" stroke="${colour}" stroke-width="5" fill="none"/>` : ''}
+    ${value != null ? `<line x1="${nx0.toFixed(1)}" y1="${ny0.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/>` : ''}
+    <circle cx="${cx}" cy="${cy}" r="3" fill="var(--ink)"/></svg>`;
+}
+// piecewise staleness scale: 0–90 s → 0–⅓, 90 s–5 min → ⅓–⅔, 5–30 min → ⅔–1
+function staleScale(ms, th) { if (ms == null) return null; if (ms <= th.QUIET_MS) return (ms / th.QUIET_MS) / 3; if (ms <= th.UNRESPONSIVE_MS) return 1 / 3 + ((ms - th.QUIET_MS) / (th.UNRESPONSIVE_MS - th.QUIET_MS)) / 3; return Math.min(1, 2 / 3 + ((ms - th.UNRESPONSIVE_MS) / (th.DEAD_MS - th.UNRESPONSIVE_MS)) / 3); }
+
+function sliceTask(i, run) { const s = F.splitTask(i.task); const id = i.taskId || s.id; return { id, title: (id && F.taskTitle(run, id)) || s.title || i.task || '—' }; }
+function instRow(i, run, now) {
+  const { id, title } = sliceTask(i, run); const tone = toneOf(i.state); const v = i.handback?.status || i.verdict;
+  const detail = i.permission ? `permissão pendente — ${i.permission.tool}: ${i.permission.message}` : (i.progress?.text || i.detail || i.lastAction || (v ? `entregou ${v}` : ''));
+  return `<div class="inst t-${tone}"><div class="task">${id ? `<span class="id">${esc(id)}</span>` : ''}<span class="title" title="${esc(i.task)}">${esc(title)}</span></div><div class="ist ${LOUD.has(i.state) ? 'loud' : ''}">${esc(i.state)} · ${ago(now, i.since)}</div><div class="detail ${v ? 'v-' + esc(v) : ''}">${esc(detail)}</div><div class="model">modelo <b>${esc(i.resolvedModel || '—')}</b> · início ${clock(i.startedAt)}${i.calls ? ` · ${i.calls} chamadas` : ''}</div></div>`;
+}
+
+function instrument(c, run, now, th) {
+  const tone = toneOf(c.state); const live = F.liveness(c, run, now);
+  const cls = ['ins', 'm-' + c.key, 't-' + tone, LOUD.has(c.state) ? 'loud' : '', tone === 'dead' ? 'dead' : '', tone === 'lost' ? 'lost' : '', tone === 'idle' ? 'idle' : ''].join(' ');
+  const elapsed = c.since ? now - c.since : null;
+  const col = getComputedStyle(document.documentElement).getPropertyValue({ work: '--brasa', wait: '--indigo', done: '--patina', idle: '--dim' }[tone] || '--alarme').trim();
+  const stale = live.kind === 'none' ? null : live.ms;
+  const staleCol = live.kind === 'ok' ? 'var(--patina)' : live.kind === 'quiet' ? 'var(--ambar)' : 'var(--alarme)';
+  const zones = [[0, 1 / 3, '#5FCDA9'], [1 / 3, 2 / 3, '#F3B940'], [2 / 3, 1, '#FF5147']];
+  let body;
+  if (c.key === 'ferreiro') body = `<div class="inst t-${tone}"><div class="task"><span class="id">run</span><span class="title" title="${esc(run.goal)}">${esc(run.goal || 'sem objetivo')}</span></div><div class="ist t-${toneOf(run.status)} ${LOUD.has(run.status) ? 'loud' : ''}">run ${esc(run.status)}</div><div class="detail">${esc(c.detail || c.lastAction || '')}</div><div class="model">modelo <b>da sessão · mínimo ${esc(run.modelFloor || '—')}</b> · ${c.calls ?? 0} chamadas</div></div>`;
+  else if (!c.instances?.length) body = `<div class="inst t-idle"><div class="task"><span class="title">sem instância neste run</span></div><div class="detail">ainda não foi chamado</div></div>`;
+  else body = c.instances.map(i => instRow(i, run, now)).join('');
+  return `<section class="${cls}" aria-label="${esc(c.name)}: ${esc(c.state)}">
+    <div class="hd"><span class="led"></span><div><b>${esc(c.name)}</b><small>${esc(c.role)}</small></div></div>
+    <div class="word">${esc(c.state)}</div>
+    <div class="gauges">
+      <div class="g">${gauge(elapsed == null ? null : Math.min(1, elapsed / 3600000), col)}<div><div class="v ${elapsed == null ? 'off' : ''}">${elapsed == null ? '—' : dur(elapsed)}</div><div class="l">no estado<small>${c.since ? 'desde ' + clock(c.since) : 'sem instância'}</small></div></div></div>
+      <div class="g">${gauge(staleScale(stale, th), staleCol, zones)}<div><div class="v ${live.kind}">${stale == null ? '—' : dur(stale)}</div><div class="l">silêncio<small>${live.kind === 'none' ? 'não se aplica' : live.kind === 'quiet' ? 'acima de 90 s' : live.kind === 'silent' ? 'sem prova de vida' : 'abaixo de 90 s'}</small></div></div></div>
+    </div>
+    ${live.kind === 'quiet' ? `<div class="quietbox">${esc(live.text)}</div>` : ''}
+    ${body}</section>`;
+}
+
+const { run, now, demo, src, snap } = await F.loadSnapshot();
+const th = snap.thresholds; const q = F.sponsorQueue(run, now); const rt = toneOf(run.status); const cols = F.kanban(run); const rs = F.reviews(run);
+document.getElementById('app').innerHTML = `
+  ${demo ? `<div class="demo">Demonstração: estados remapeados sobre ${esc(src)}; o texto é o real.</div>` : ''}
+  <header class="bar">
+    <div class="brand">Forja<small>${esc(run.project)} · ${clock(now)}</small></div>
+    <div class="goal"><b title="${esc(run.goal)}">${run.goalSource === 'prompt' ? '<span style="color:var(--muted);font-weight:500">último prompt · </span>' : ''}${esc(run.goal || 'sem objetivo registado')}</b><small>início ${clock(run.startedAt)} (${ago(now, run.startedAt)}) · modelo mínimo ${esc(run.modelFloor || '—')} · permissões ${esc(run.permissionMode)}${run.statusDetail ? ' · ' + esc(run.statusDetail) : ''}</small></div>
+    <div class="readouts"><div class="ro"><b>${run.counts.events}</b><span>eventos</span></div><div class="ro ${run.counts.errors ? 'alarm' : ''}"><b>${run.counts.errors}</b><span>erros</span></div><div class="ro"><b>${run.counts.instances}</b><span>instâncias</span></div><div class="ro ${q.length ? 'alarm' : ''}"><b>${q.length}</b><span>Sponsor</span></div></div>
+    <div class="runstate t-${rt} ${LOUD.has(run.status) ? 'loud' : ''}"><span class="led"></span>run ${esc(run.status)}</div>
+  </header>
+  <section><h2 class="label">Elenco <span class="n">5 lugares fixos · luz = estado · mostradores: tempo no estado, silêncio (verde &lt; 90 s, âmbar &lt; 5 min, vermelho até 30 min)</span></h2>
+    <div class="roster">${run.roster.map(c => instrument(c, run, now, th)).join('')}</div></section>
+  <div class="native m-native"><div><b style="color:var(--ink)">Ferramentas nativas</b> · não são elenco</div><div>${run.native.length ? run.native.map(n => `<div class="row t-${toneOf(n.state)}"><b>${esc(n.type)}</b><span class="s">${esc(n.state)} · ${ago(now, n.since)}</span><span class="tk">${esc(n.task || '')}${n.detail ? ' — ' + esc(n.detail) : ''}</span><span class="md mono">${esc(n.resolvedModel || '')}</span></div>`).join('') : '<span class="none">nenhuma neste run</span>'}</div></div>
+  <section><h2 class="label">Tasks <span class="n">${run.tasks.length} · registadas pelo CLI</span></h2>
+    <div class="kanban">${F.KANBAN.map(([k, l]) => `<div class="col ${k} t-${({ todo: 'idle', doing: 'work', review: 'wait', done: 'done', failed: 'fail', blocked: 'alarm' })[k]}"><div class="ch">${esc(l)}<span>${cols[k].length}</span></div>${cols[k].map(t => `<div class="card m-${esc(t.owner)}"><b>${esc(t.id)}</b>${esc(t.title || '—')}<small>${F.memberName(t.owner)} · tentativas ${t.attempts}</small>${t.why ? `<small class="bad">${esc(t.why)}</small>` : ''}</div>`).join('')}</div>`).join('')}</div></section>
+  <div class="three">
+    <section class="pnl ledger"><h2 class="label">Revisões <span class="n">livro-razão do Contraste</span></h2>${rs.length ? `<table><thead><tr><th>hora</th><th>task</th><th>veredicto</th><th>motivo</th></tr></thead><tbody>${rs.map(r => `<tr><td class="t">${clock(r.ts)}</td><td class="mono">${esc(r.taskId || '—')}</td><td><span class="v ${esc(r.verdict)}">${esc(r.verdict)}</span></td><td>${esc(r.text.replace(/^(APPROVE|REJECT)\s*—\s*/, ''))}</td></tr>`).join('')}</tbody></table>` : '<div class="none">sem veredictos</div>'}
+      <h2 class="label" style="margin-top:var(--s3)">Decisões <span class="n">${run.decisions.length}</span></h2>${run.decisions.length ? run.decisions.map(d => `<div class="q"><div class="k" style="color:var(--madeira)"><span>${esc(d.id)}${d.reversible ? ' · reversível' : ''}</span><span>${clock(d.ts)}</span></div><div class="t">${esc(d.text)}</div><div class="d">${esc(d.why || '')}</div></div>`).join('') : '<div class="none">sem decisões</div>'}</section>
+    <section class="pnl inbox"><h2 class="label">Precisa do Sponsor <span class="n">${q.length} pendente${q.length === 1 ? '' : 's'}</span></h2>${q.length ? q.map(i => `<div class="q"><div class="k"><span>${esc(i.kind)}${i.id ? ' ' + esc(i.id) : ''}</span><span>${ago(now, i.since)} · ${clock(i.since)}</span></div><div class="t">${esc(i.title)}</div>${i.fallback ? `<div class="d"><b>se não responder:</b> ${esc(i.fallback)}</div>` : ''}${i.why ? `<div class="d"><b>porquê:</b> ${esc(i.why)}</div>` : ''}<div class="who">pedido por ${esc(i.who)}${i.task ? ' · ' + esc(i.task) : ''}</div></div>`).join('') : '<div class="none">nada pendente para o Sponsor</div>'}</section>
+    <section class="pnl log"><h2 class="label">Registo <span class="n">${run.timeline.length} entradas · mais recente em baixo</span></h2>${run.timeline.slice(-16).map(e => `<div class="e t-${F.kindTone(e.kind)}"><span class="t">${clock(e.ts)}</span><i></i><span class="x" title="${esc(e.text)}">${esc(e.text.split('\n')[0])}</span></div>`).join('')}</section>
+  </div>
+  <section><h2 class="label">Legenda de estados</h2><div class="legend">${F.STATES.map(s => { const t = toneOf(s); return `<span class="t-${t} ${LOUD.has(s) ? 'loud' : ''} ${t}">${esc(s)}</span>`; }).join('')}<span class="t-work quiet">a trabalhar · silêncio há 1 min 40 s</span></div></section>`;
+</script>
+</body>
+</html>

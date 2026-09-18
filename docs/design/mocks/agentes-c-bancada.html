@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cena — agentes ligados · direção C: Bancada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="agentes-base.css">
+<style>
+  /* ---- direção C: bancada ----
+     Silhuetas de pessoas à volta de uma bancada: o núcleo sentado à frente,
+     os papéis a pedido de pé atrás. As ligações são linhas de passagem de
+     trabalho que atravessam o tampo, como folhas a deslizar. */
+  .edge{fill:none;stroke-linecap:round}
+  .edge.hub{stroke:#7A6552;stroke-width:1.5}
+  .edge.flow{stroke:#514436;stroke-width:1.5;stroke-dasharray:6 6}
+  .cold .edge{opacity:.35}
+  .fig{fill:var(--surface);stroke:var(--c);stroke-width:1.8}
+  .fig.demand{stroke-width:1.4;stroke-dasharray:6 4}
+  .mono{font:700 15px/1 var(--hud);letter-spacing:.06em;fill:var(--c);text-anchor:middle}
+  .mono.sm{font-size:12px}
+  .bench{fill:#241D18;stroke:#3A2F27}
+  .benchtop{fill:#2E251F}
+  .notch{fill:var(--c)}
+  @media (prefers-reduced-motion:no-preference){
+    .node.live .halo{animation:pulse 2.4s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+    .hb{animation:hb 1.7s ease-in-out infinite}
+    .hb2{animation-delay:.32s} .hb3{animation-delay:.64s}
+    @keyframes hb{0%,100%{opacity:.05}45%{opacity:1}}
+  }
+  .hb{opacity:.85}
+  .mobile{display:none}
+  @media (max-width:720px){
+    .desktop{display:none} .mobile{display:block}
+    .fold{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;margin:var(--s2) var(--s4) 0;
+          padding:var(--s2) var(--s3);background:var(--surface);border:1px solid var(--line);
+          border-radius:8px;min-height:44px}
+    .fold b{font:700 14px/1 var(--hud);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+    .pill{display:inline-flex;align-items:center;gap:5px;font:400 12px/1 var(--mono);
+          border:1px solid var(--line);border-radius:4px;padding:6px 6px 5px}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { ROLES, EDGES, byKey, scenario, esc, glyph, glyphOf, glowOpacity, glowColour, bodyOpacity, isLive, toneOf } from './agentes-dados.js';
+import { renderHeader, renderHud, renderLegend } from './agentes-chrome.js';
+
+const sc = scenario();
+const M = new Map(sc.members.map(m => [m.key, m]));
+const W = 1440, H = 240, MW = 390, MH = 190;
+
+/* ---------- lugares ----------
+   `y` é a altura da cabeça; a silhueta desce daí até ao tampo (núcleo) ou até
+   ao chão (a pedido). O Lead está à cabeceira, maior. */
+const BENCH_Y = 192, BENCH_H = 10;
+const P = {
+  'lead':              { x: 148,  y: 118, s: 1.3 },
+  'architect':         { x: 420,  y: 132, s: 1 },
+  'frontend-dev':      { x: 640,  y: 132, s: 1 },
+  'backend-dev':       { x: 860,  y: 132, s: 1 },
+  'reviewer':          { x: 1080, y: 132, s: 1 },
+  'product-manager':   { x: 330,  y: 50,  s: .78 },
+  'product-designer':  { x: 545,  y: 50,  s: .78 },
+  'technology-scout':  { x: 760,  y: 50,  s: .78 },
+  'qa':                { x: 975,  y: 50,  s: .78 },
+  'security-reviewer': { x: 1285, y: 50,  s: .78 },
+};
+const PM_ = {
+  'lead':         { x: 48,  y: 96,  s: .95 },
+  'architect':    { x: 133, y: 104, s: .78 },
+  'frontend-dev': { x: 205, y: 104, s: .78 },
+  'backend-dev':  { x: 277, y: 104, s: .78 },
+  'reviewer':     { x: 349, y: 104, s: .78 },
+};
+const MBENCH = 150;
+
+/* ---------- arestas: arcos que passam pela bancada ----------
+   Cada aresta tem um ponto alto fixo. As que ligam a fila de trás passam por
+   trás de quem está de pé (desenhadas primeiro); as do núcleo passam por trás
+   de quem está sentado, a rasar o tampo — o trabalho desliza pela bancada. */
+const PEAK = {
+  'lead>architect': 158, 'lead>frontend-dev': 152, 'lead>backend-dev': 146, 'lead>reviewer': 140,
+  'architect>frontend-dev': 150, 'architect>backend-dev': 140, 'frontend-dev>reviewer': 134,
+  'backend-dev>reviewer': 152,
+  'lead>product-manager': 86, 'lead>product-designer': 80, 'lead>technology-scout': 74,
+  'lead>qa': 68, 'lead>security-reviewer': 62,
+  'product-manager>architect': 100, 'product-designer>frontend-dev': 100,
+  'technology-scout>frontend-dev': 96, 'technology-scout>backend-dev': 96,
+  'reviewer>security-reviewer': 100, 'qa>lead': 104,
+};
+const r1 = v => Math.round(v * 10) / 10;
+// a mão de quem está sentado é o tampo; a de quem está de pé é o próprio peito
+const hand = (k, G, bench) => {
+  const g = G[k];
+  return byKey(k).core ? { x: g.x, y: (bench ?? BENCH_Y) - 4 } : { x: g.x, y: r1(g.y + 34 * g.s) };
+};
+function arc(a, b, G, peak, bench) {
+  const A = hand(a, G, bench), B = hand(b, G, bench);
+  const c = { x: (A.x + B.x) / 2, y: 2 * peak - (A.y + B.y) / 2 };
+  const at = t => ({ x: (1 - t) ** 2 * A.x + 2 * (1 - t) * t * c.x + t * t * B.x,
+                     y: (1 - t) ** 2 * A.y + 2 * (1 - t) * t * c.y + t * t * B.y });
+  return { d: `M ${r1(A.x)} ${r1(A.y)} Q ${r1(c.x)} ${r1(c.y)} ${r1(B.x)} ${r1(B.y)}`, at };
+}
+
+/* ---------- silhueta ---------- */
+function node(m, G, tag, bench) {
+  const g = G[m.key], core = byKey(m.key).core, s = g.s;
+  const head = 16 * s, sh = 31 * s;          // raio da cabeça, meia-largura dos ombros
+  const op = bodyOpacity(m), glowOp = glowOpacity(m), gcol = glowColour(m);
+  const id = `hc-${m.key}${tag}`;
+  const foot = core ? (bench ?? BENCH_Y) + 2 : g.y + 52 * s;   // até ao tampo / até ao chão
+  const halo = glowOp ? `<ellipse class="halo" cx="${g.x}" cy="${r1(g.y + 6)}" rx="${r1(sh * 2.6)}" ry="${r1((foot - g.y) * 1.5)}" fill="url(#${id})" opacity="${glowOp}"/>` : '';
+  const grad = glowOp ? `<radialGradient id="${id}"><stop offset="0" stop-color="${gcol}" stop-opacity=".5"/><stop offset=".4" stop-color="${gcol}" stop-opacity=".2"/><stop offset="1" stop-color="${gcol}" stop-opacity="0"/></radialGradient>` : '';
+  const neck = g.y + head + 3 * s;
+  const body = `<path class="fig ${core ? '' : 'demand'}" d="M ${r1(g.x - sh)} ${r1(foot)}
+      V ${r1(neck + 16 * s)} Q ${r1(g.x - sh)} ${r1(neck)} ${r1(g.x - sh * .42)} ${r1(neck - 2 * s)}
+      H ${r1(g.x + sh * .42)} Q ${r1(g.x + sh)} ${r1(neck)} ${r1(g.x + sh)} ${r1(neck + 16 * s)}
+      V ${r1(foot)} Z"/>
+    <circle class="fig ${core ? '' : 'demand'}" cx="${g.x}" cy="${g.y}" r="${r1(head)}"/>
+    <text class="mono ${s < .9 ? 'sm' : ''}" x="${g.x}" y="${r1(g.y + 5 * s)}">${esc(m.mono)}</text>`;
+  const gk = glyphOf(m), gr = 7 * Math.max(.8, s);
+  const badge = gk === 'none' ? '' :
+    `<g transform="translate(${r1(g.x + sh + 2)} ${r1(g.y - head * .4)})"><circle r="${r1(gr + 3.5)}" fill="var(--bg)" stroke="var(--line)"/>${glyph(gk, 0, 0, gr)}</g>`;
+  // instâncias ativas: folhas de trabalho pousadas no tampo à frente da pessoa
+  const n = Math.min((m.tasks || []).length, 3);
+  const notches = core ? [...Array(n)].map((_, j) =>
+    `<rect class="notch" x="${r1(g.x - (n * 11 - 4) / 2 + j * 11)}" y="${r1((bench ?? BENCH_Y) + 3)}" width="7" height="4" rx="1"/>`).join('') : '';
+  const cross = toneOf(m.state) === 'dead'
+    ? `<g stroke="var(--alarm)" stroke-width="${r1(2.6 * s)}" stroke-linecap="round"><line x1="${r1(g.x - sh)}" y1="${r1(g.y - head)}" x2="${r1(g.x + sh)}" y2="${r1(neck + 22 * s)}"/><line x1="${r1(g.x + sh)}" y1="${r1(g.y - head)}" x2="${r1(g.x - sh)}" y2="${r1(neck + 22 * s)}"/></g>` : '';
+  return { grad, halo, g: `<g class="node m-${m.key} ${isLive(m) ? 'live' : ''}"><g opacity="${op}">${body}</g>${badge}${cross}${notches}</g>` };
+}
+
+/* ---------- cena ---------- */
+function scene(keys, G, vw, vh, tag, bench) {
+  const set = new Set(keys);
+  const by = bench ?? BENCH_Y;
+  const edges = EDGES.filter(e => set.has(e.a) && set.has(e.b));
+  const paths = new Map();
+  const isBack = e => !byKey(e.a).core || !byKey(e.b).core;
+  const draw = where => edges.filter(e => (where === 'back') === isBack(e)).map(e => {
+    const p = PEAK[`${e.a}>${e.b}`] ?? by - 26;
+    const c = arc(e.a, e.b, G, vw < 500 ? by - (BENCH_Y - p) * .8 : p, by);
+    paths.set(`${e.a}>${e.b}`, c);
+    return `<path class="edge ${e.kind}" d="${c.d}"/>`;
+  }).join('');
+  const backD = draw('back'), frontD = draw('front');
+  const hb = sc.runnerAlive ? (sc.handbacks || []).map(h => {
+    const c = paths.get(`${h.a}>${h.b}`); if (!c) return '';
+    return [.3, .5, .7].map((t, j) => { const p = c.at(t); return `<rect class="hb hb${j + 1}" x="${r1(p.x - 5)}" y="${r1(p.y - 3.5)}" width="10" height="7" rx="1.5" fill="var(--patina)"/>`; }).join('');
+  }).join('') : '';
+  const nodes = keys.map(k => node(M.get(k), G, tag, by));
+  const demand = keys.filter(k => !byKey(k).core), core = keys.filter(k => byKey(k).core);
+  const idx = k => keys.indexOf(k);
+  return `<svg class="scene" viewBox="0 0 ${vw} ${vh}" preserveAspectRatio="xMidYMid meet" role="img"
+       aria-label="Ligações do elenco. ${esc(keys.map(k => `${byKey(k).name}: ${M.get(k).state}`).join('. '))}">
+    <defs>${nodes.map(n => n.grad).join('')}</defs>
+    ${nodes.map(n => n.halo).join('')}
+    <line x1="0" y1="93" x2="${vw}" y2="93" stroke="#2A2321" stroke-width="2"/>
+    ${backD}
+    ${demand.map(k => nodes[idx(k)].g).join('')}
+    ${frontD}${hb}
+    <rect class="bench" x="0" y="${by}" width="${vw}" height="${vh - by}"/>
+    <rect class="benchtop" x="0" y="${by}" width="${vw}" height="${BENCH_H}"/>
+    ${core.map(k => nodes[idx(k)].g).join('')}
+  </svg>`;
+}
+
+const all = ROLES.map(r => r.key);
+const coreKeys = ROLES.filter(r => r.core).map(r => r.key);
+const foldRow = `<div class="fold"><b>a pedido</b>${ROLES.filter(r => !r.core).map(r => {
+  const m = M.get(r.key);
+  return `<span class="pill m-${r.key}" style="color:var(--c)"><svg width="13" height="13" viewBox="-7 -7 14 14" aria-hidden="true">${glyph(glyphOf(m), 0, 0, 6)}</svg>${esc(r.mono)}</span>`;
+}).join('')}<span class="pill" style="color:var(--dim)">abrir os 5 ▾</span></div>`;
+
+document.getElementById('app').innerHTML =
+  renderHeader(sc, 'direção C · bancada') +
+  `<div class="stage desktop ${sc.runnerAlive ? '' : 'cold'}">${scene(all, P, W, H, '', BENCH_Y)}</div>` +
+  `<div class="stage mobile ${sc.runnerAlive ? '' : 'cold'}">${scene(coreKeys, PM_, MW, MH, '-m', MBENCH)}</div>` +
+  `<div class="mobile">${foldRow}</div>` +
+  renderLegend(`linha cheia = o Lead chama · tracejado = fluxo de trabalho (representação)${sc.runnerAlive ? '' : ' · runner parado: a bancada está fria'}`) +
+  renderHud(sc);
+
+document.title += ` — ${document.querySelectorAll('.desktop svg *').length} elementos SVG`;
+</script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+/* Base partilhada pelos três mocks da cena "agentes ligados" (D-SCENE-2).
+   Tokens, tipografia, cabeçalho e HUD são os do DESIGN.md e são IGUAIS nos
+   três: o que muda entre direções é só a cena. Mock, não produção. */
+:root{
+  --bg:#0E0C0B; --surface:#17130F; --surface-2:#211B16; --line:#3A2F27;
+  --ink:#F3E9DC; --dim:#A89A8A;
+  --ember:#FF7A2F; --wood:#CFA063; --indigo:#93A0FF; --indigo-2:#C3C9FF;
+  --patina:#63C9A9; --patina-2:#A8E3D0; --alarm:#FF4F3E; --amber:#F0B23F;
+  --steel:#C9D1DA; --steel-2:#9AA6B2; --slate:#8FB3C9; --slate-2:#B9D3E3;
+  --ticket:#F1E7D8;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --hud:'Barlow Condensed','Arial Narrow',sans-serif;
+  --body:'Barlow',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);
+     -webkit-font-smoothing:antialiased}
+
+/* cores de identidade */
+.m-lead{--c:var(--ember)} .m-architect{--c:var(--slate)} .m-frontend-dev{--c:var(--patina)}
+.m-backend-dev{--c:var(--indigo)} .m-reviewer{--c:var(--steel)}
+.m-product-manager{--c:var(--wood)} .m-product-designer{--c:var(--patina-2)}
+.m-technology-scout{--c:var(--indigo-2)} .m-qa{--c:var(--slate-2)} .m-security-reviewer{--c:var(--steel-2)}
+
+/* ---- cabeçalho ---- */
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--s4);
+       padding:var(--s4) var(--s5) var(--s3)}
+.brand{font:800 22px/1 var(--hud);letter-spacing:.12em}
+.sub{color:var(--dim);font-size:13px;margin-top:6px;max-width:72ch}
+.seal{font:700 20px/1 var(--hud);text-transform:uppercase;letter-spacing:.04em;
+      border:1px solid var(--line);border-radius:8px;padding:8px 12px 6px;white-space:nowrap}
+.seal.work{color:var(--ember)} .seal.dead{color:var(--alarm);border-color:var(--alarm)}
+.seal small{display:block;font:400 11px/1.3 var(--mono);color:var(--dim);letter-spacing:0;text-transform:none}
+.dirname{font:700 13px/1 var(--hud);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+
+/* ---- cena ---- */
+.stage{position:relative}
+.scene{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s4);padding:6px var(--s5) 0;
+        font:400 12px/1.4 var(--mono);color:var(--dim)}
+.legend b{color:var(--ink);font-weight:400}
+.legend svg{vertical-align:-3px}
+
+/* ---- HUD (idêntico nos três) ---- */
+.hud{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--s3) var(--s2);
+     padding:var(--s3) var(--s5) var(--s5)}
+.card{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--c);
+      border-radius:8px;padding:var(--s3);min-height:112px}
+.card.idle{opacity:.7}
+.card.loud{border:2px solid var(--alarm);border-top-width:3px}
+.nm{display:flex;align-items:baseline;gap:var(--s2);font:700 19px/1 var(--hud);
+    letter-spacing:.04em;text-transform:uppercase;color:var(--c)}
+.mo{font:400 11px/1 var(--mono);color:var(--dim)}
+.tag{font:700 10px/1 var(--hud);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+     border:1px solid var(--line);border-radius:4px;padding:3px 4px 2px;margin-left:auto}
+.word{font:700 32px/1 var(--hud);text-transform:uppercase;color:var(--t);margin-top:var(--s2)}
+.detail{color:var(--dim);font-size:13px;margin-top:6px}
+.chips{display:flex;gap:var(--s1);margin-top:var(--s2);flex-wrap:wrap}
+.chip{font:400 11px/1 var(--mono);color:var(--ink);background:var(--surface-2);
+      border:1px solid var(--line);border-radius:4px;padding:4px 5px 3px}
+
+/* ---- telemóvel ---- */
+@media (max-width:720px){
+  header{flex-direction:column;gap:var(--s2);padding:var(--s3) var(--s4)}
+  .seal{align-self:stretch}
+  .hud{grid-template-columns:1fr;gap:var(--s1);padding:var(--s3) var(--s4) var(--s5)}
+  .card{min-height:0;display:grid;grid-template-columns:auto 1fr auto;align-items:center;
+        gap:var(--s2);padding:var(--s2) var(--s3);border-radius:4px;border-top-width:1px;
+        border-left:3px solid var(--c);min-height:56px}
+  .nm{font-size:17px} .tag{margin-left:0}
+  .word{font-size:20px;margin-top:0;text-align:right}
+  .detail,.chips{display:none}
+  .legend{padding:6px var(--s4) 0}
+}

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Saudações — direção B (números primeiro)</title>
+  <style>
+    :root {
+      --bg: #14171c; --text: #e6e8eb; --muted: #a3aab4; --accent: #6fb3f2; --line: #2a2f37;
+      --s-1: 0.25rem; --s-2: 0.5rem; --s-3: 1rem; --s-4: 1.5rem; --s-5: 2.5rem; --s-6: 4rem;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, sans-serif; }
+    body { margin: 0; font-size: 1.125rem; line-height: 1.6; overflow-wrap: anywhere; }
+    main { max-width: 40rem; margin-inline: auto; padding-block: var(--s-6); padding-inline: var(--s-4); }
+    h1 { margin: 0 0 var(--s-3); font-size: 2rem; font-weight: 600; line-height: 1.2; }
+    h2 { margin: 0 0 var(--s-3); font-size: 1.25rem; font-weight: 600; line-height: 1.3; }
+    p { margin: 0; }
+    a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.15em; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .muted { color: var(--muted); font-size: 0.9375rem; }
+    .bloco { margin-top: var(--s-5); }
+    /* formulário */
+    form { margin: 0; }
+    label { display: block; font-size: 0.9375rem; color: var(--muted); margin-bottom: var(--s-1); }
+    input[type="text"], input[type="password"] {
+      display: block; width: 100%; max-width: 100%; min-height: 44px;
+      padding: var(--s-2) var(--s-3); font: inherit; font-size: 1.125rem;
+      color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 2px;
+    }
+    input::placeholder { color: var(--muted); opacity: 1; }
+    button {
+      min-height: 44px; margin-top: var(--s-3); padding: var(--s-2) var(--s-4);
+      font: inherit; font-size: 1.125rem; font-weight: 600; color: var(--bg);
+      background: var(--accent); border: 1px solid var(--accent); border-radius: 2px; cursor: pointer;
+    }
+    .erro-campo { margin: 0 0 var(--s-2); padding-left: var(--s-3); border-left: 2px solid var(--accent); font-size: 1rem; }
+    .erro-campo strong { font-weight: 600; }
+    input[aria-invalid="true"] { border-color: var(--accent); }
+    /* gráfico + tabela */
+    .grafico { display: block; }
+    .numeros { width: 100%; border-collapse: collapse; margin-top: var(--s-3); font-size: 0.9375rem; }
+    .numeros caption { text-align: left; color: var(--muted); font-size: 0.9375rem; margin-bottom: var(--s-2); }
+    .numeros th, .numeros td { padding: var(--s-2) 0; border-bottom: 1px solid var(--line); text-align: left; font-weight: 400; }
+    .numeros thead th { color: var(--muted); }
+    .numeros td { text-align: right; font-variant-numeric: tabular-nums; }
+    @media (max-width: 480px) {
+      h1 { font-size: 1.5rem; }
+      main { padding-block: var(--s-5); }
+    }
+    .resumo { margin-bottom: var(--s-4); color: var(--muted); font-size: 1rem; }
+    .numero { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+      font-size: 2.5rem; font-weight: 600; color: var(--text); line-height: 1.1; display: inline-block; }
+    .resumo .sep { margin-inline: var(--s-2); }
+    .lista { list-style: none; margin: 0; padding: 0; }
+    .lista li { padding: var(--s-2) 0; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-3); justify-content: space-between; }
+    .lista .quando { color: var(--muted); font-size: 0.9375rem;
+      font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Saudações</h1>
+    <p class="resumo"><span class="numero">31</span> guardadas<span class="sep">·</span><span class="numero">4</span> hoje</p>
+    <section>
+      <svg class="grafico" viewBox="0 0 546 300" role="img" width="100%" style="max-width:100%" aria-labelledby="grafico-titulo">
+  <title id="grafico-titulo">Saudações por dia, de 3 de set a 16 de set. Máximo num dia: 6. Total: 31 saudações. Os mesmos números estão na tabela a seguir.</title>
+  <rect x="6.5" y="176" width="26" height="74" fill="var(--accent)" />
+  <text x="19.5" y="168" text-anchor="middle" font-size="20" fill="var(--text)">2</text>
+  <text x="19.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">3</text>
+  <text x="19.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="45.5" y="248" width="26" height="2" fill="var(--line)" />
+  <text x="58.5" y="240" text-anchor="middle" font-size="20" fill="var(--muted)">0</text>
+  <text x="58.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">4</text>
+  <text x="58.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="84.5" y="139" width="26" height="111" fill="var(--accent)" />
+  <text x="97.5" y="131" text-anchor="middle" font-size="20" fill="var(--text)">3</text>
+  <text x="97.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">5</text>
+  <text x="97.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="123.5" y="213" width="26" height="37" fill="var(--accent)" />
+  <text x="136.5" y="205" text-anchor="middle" font-size="20" fill="var(--text)">1</text>
+  <text x="136.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">6</text>
+  <text x="136.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="162.5" y="248" width="26" height="2" fill="var(--line)" />
+  <text x="175.5" y="240" text-anchor="middle" font-size="20" fill="var(--muted)">0</text>
+  <text x="175.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">7</text>
+  <text x="175.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="201.5" y="102" width="26" height="148" fill="var(--accent)" />
+  <text x="214.5" y="94" text-anchor="middle" font-size="20" fill="var(--text)">4</text>
+  <text x="214.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">8</text>
+  <text x="214.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="240.5" y="176" width="26" height="74" fill="var(--accent)" />
+  <text x="253.5" y="168" text-anchor="middle" font-size="20" fill="var(--text)">2</text>
+  <text x="253.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">9</text>
+  <text x="253.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="279.5" y="248" width="26" height="2" fill="var(--line)" />
+  <text x="292.5" y="240" text-anchor="middle" font-size="20" fill="var(--muted)">0</text>
+  <text x="292.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">10</text>
+  <text x="292.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="318.5" y="65" width="26" height="185" fill="var(--accent)" />
+  <text x="331.5" y="57" text-anchor="middle" font-size="20" fill="var(--text)">5</text>
+  <text x="331.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">11</text>
+  <text x="331.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="357.5" y="139" width="26" height="111" fill="var(--accent)" />
+  <text x="370.5" y="131" text-anchor="middle" font-size="20" fill="var(--text)">3</text>
+  <text x="370.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">12</text>
+  <text x="370.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="396.5" y="213" width="26" height="37" fill="var(--accent)" />
+  <text x="409.5" y="205" text-anchor="middle" font-size="20" fill="var(--text)">1</text>
+  <text x="409.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">13</text>
+  <text x="409.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="435.5" y="248" width="26" height="2" fill="var(--line)" />
+  <text x="448.5" y="240" text-anchor="middle" font-size="20" fill="var(--muted)">0</text>
+  <text x="448.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">14</text>
+  <text x="448.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="474.5" y="28" width="26" height="222" fill="var(--accent)" />
+  <text x="487.5" y="20" text-anchor="middle" font-size="20" fill="var(--text)">6</text>
+  <text x="487.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">15</text>
+  <text x="487.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+  <rect x="513.5" y="102" width="26" height="148" fill="var(--accent)" />
+  <text x="526.5" y="94" text-anchor="middle" font-size="20" fill="var(--text)">4</text>
+  <text x="526.5" y="272" text-anchor="middle" font-size="20" fill="var(--muted)">16</text>
+  <text x="526.5" y="290" text-anchor="middle" font-size="16" fill="var(--muted)">set</text>
+</svg>
+      <table class="numeros">
+    <caption>Saudações por dia, os mesmos números do gráfico.</caption>
+    <thead><tr><th scope="col">Dia</th><th scope="col">Saudações</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">quinta, 3 de setembro</th><td>2</td></tr>
+      <tr><th scope="row">sexta, 4 de setembro</th><td>0</td></tr>
+      <tr><th scope="row">sábado, 5 de setembro</th><td>3</td></tr>
+      <tr><th scope="row">domingo, 6 de setembro</th><td>1</td></tr>
+      <tr><th scope="row">segunda, 7 de setembro</th><td>0</td></tr>
+      <tr><th scope="row">terça, 8 de setembro</th><td>4</td></tr>
+      <tr><th scope="row">quarta, 9 de setembro</th><td>2</td></tr>
+      <tr><th scope="row">quinta, 10 de setembro</th><td>0</td></tr>
+      <tr><th scope="row">sexta, 11 de setembro</th><td>5</td></tr>
+      <tr><th scope="row">sábado, 12 de setembro</th><td>3</td></tr>
+      <tr><th scope="row">domingo, 13 de setembro</th><td>1</td></tr>
+      <tr><th scope="row">segunda, 14 de setembro</th><td>0</td></tr>
+      <tr><th scope="row">terça, 15 de setembro</th><td>6</td></tr>
+      <tr><th scope="row">quarta, 16 de setembro</th><td>4</td></tr>
+    </tbody>
+  </table>
+    </section>
+    <section class="bloco">
+      <h2>Nova saudação</h2>
+    <form method="post" action="/saudacoes">
+      <label for="nome">Nome de quem quer cumprimentar</label>
+      <input id="nome" name="nome" type="text" maxlength="80" required autocomplete="off" placeholder="Ana Sofia">
+      <button type="submit">Guardar saudação</button>
+    </form>
+    </section>
+    <section class="bloco">
+      <h2>Últimas saudações</h2>
+      <ul class="lista">
+        <li><span>Olá, Luísa!</span><span class="quando">16/09, 15:56</span></li>
+        <li><span>Olá, Paulo!</span><span class="quando">16/09, 12:39</span></li>
+        <li><span>Olá, Matilde!</span><span class="quando">16/09, 11:22</span></li>
+        <li><span>Olá, Rui!</span><span class="quando">16/09, 10:05</span></li>
+        <li><span>Olá, Alice!</span><span class="quando">15/09, 17:30</span></li>
+        <li><span>Olá, Diogo!</span><span class="quando">15/09, 16:13</span></li>
+        <li><span>Olá, Teresa!</span><span class="quando">15/09, 15:56</span></li>
+        <li><span>Olá, Hugo!</span><span class="quando">15/09, 12:39</span></li>
+        <li><span>Olá, Clara!</span><span class="quando">15/09, 11:22</span></li>
+        <li><span>Olá, Ricardo!</span><span class="quando">15/09, 10:05</span></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

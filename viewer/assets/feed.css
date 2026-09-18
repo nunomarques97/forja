@@ -1,0 +1,95 @@
+/* Feed de eventos-chave — direção C «Voltas» (docs/design/DESIGN.md §«Feed de
+   eventos-chave»). Usa os tokens de viewer.css; as quatro bandas de sinal são
+   as do DESIGN.md (verde a trabalhar · amarelo à espera · vermelho parado/precisa
+   de ti · cinzento já entregou). */
+:root { --vivo: #45D48A; --espera: #F0B23F; --parado: #FF4F3E; --neutro: #8A8078; --escuro: #12100E; }
+.b-vivo { --c: var(--vivo); } .b-espera { --c: var(--espera); } .b-parado { --c: var(--parado); }
+.b-neutro { --c: var(--neutro); } .b-ok { --c: var(--steel); } .b-fim { --c: var(--ticket); }
+
+/* barra das vistas */
+.tabs { display: flex; align-items: center; gap: var(--s5); padding: 0 var(--s5); background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+.tabs .marca { font: 800 22px/1 var(--hud); letter-spacing: .14em; padding: var(--s3) 0; }
+.tabs [role="tab"] { font: 700 16px/1 var(--hud); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); text-decoration: none; padding: 18px 2px 14px; border-bottom: 3px solid transparent; }
+.tabs [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.tabs [role="tab"]:hover { color: var(--ink); }
+.tabs .estado { margin-left: auto; font: 400 12px/1.3 var(--mono); color: var(--dim); display: flex; gap: 8px; align-items: center; }
+.tabs .estado::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+.tabs .estado.ok::before { background: var(--patina); }
+
+.feed { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--s6); padding: var(--s5); }
+.feed h2 { font: 800 15px/1 var(--hud); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin: 0 0 var(--s3); }
+.feed .dia { font: 800 13px/1 var(--hud); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: var(--s5) 0 var(--s2); }
+.feed .dia:first-of-type { margin-top: 0; }
+.feed .vazio { color: var(--dim); }
+.feed .g { width: 18px; height: 18px; flex: none; color: var(--c); }
+.feed .g svg { width: 100%; height: 100%; display: block; }
+.feed .selo { display: inline-block; background: var(--c); color: var(--escuro); font: 700 13px/1 var(--hud); letter-spacing: .08em; padding: 5px 8px 4px; border-radius: var(--r1); white-space: nowrap; }
+.feed .proj { font: 700 14px/1 var(--hud); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+.feed .hora { font: 600 14px/1 var(--hud); letter-spacing: .04em; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* a volta: chamou · começou · terminou · voltou numa linha só */
+.volta { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s2) var(--s4); align-items: center; padding: var(--s3) var(--s4); border: 1px solid var(--line); border-radius: var(--r3); background: var(--surface); margin-bottom: var(--s2); }
+.volta .quem { font: 700 18px/1.1 var(--hud); letter-spacing: .02em; display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.volta .quem .seta { color: var(--dim); }
+.volta .quem .proj { margin-left: var(--s2); }
+.volta .txt { color: var(--dim); font-size: 14px; overflow-wrap: anywhere; }
+.volta .porque { font-size: 14px; overflow-wrap: anywhere; margin-top: 2px; }
+.volta .res { text-align: right; }
+.volta .res .d { color: var(--dim); font-size: 13px; margin-top: 4px; }
+.regua { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); }
+.passo { position: relative; padding-top: 14px; font-size: 13px; color: var(--dim); }
+.passo::before { content: ""; position: absolute; top: 4px; left: 0; right: 0; height: 2px; background: var(--c, var(--line)); }
+.passo::after { content: ""; position: absolute; top: 0; left: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--c, var(--line)); }
+.passo b { display: block; color: var(--ink); font-weight: 600; }
+.passo.feito { --c: var(--neutro); }
+.passo.feito.vivo { --c: var(--vivo); }
+.passo.falta::before { background: repeating-linear-gradient(90deg, var(--espera) 0 5px, transparent 5px 10px); }
+.passo.falta::after { background: var(--bg); border: 2px solid var(--espera); box-sizing: border-box; }
+.passo.falta b { color: var(--espera); }
+.passo.caiu::before { background: repeating-linear-gradient(90deg, var(--parado) 0 5px, transparent 5px 10px); }
+.passo.caiu::after { background: var(--parado); border-radius: 1px; }
+.passo.caiu b { color: var(--parado); }
+.passo.nada b { color: var(--dim); font-weight: 400; }
+@media (prefers-reduced-motion: no-preference) { .passo.feito.vivo::after { animation: feed-pulsa 2.4s ease-in-out infinite; } }
+@keyframes feed-pulsa { 50% { opacity: .4; } }
+
+/* marcos: veredito solto, escalada, relatório, falha — e a linha baixa do arrasto */
+.marco { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: var(--s3); align-items: start; margin: var(--s3) 0; padding: var(--s3) var(--s4); border-left: 4px solid var(--c); background: var(--surface-2); border-radius: var(--r1); }
+.marco .tit { font: 700 20px/1.1 var(--hud); display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap; }
+.marco .txt { margin-top: 4px; opacity: .88; overflow-wrap: anywhere; }
+.marco .extra { color: var(--dim); font-size: 13px; margin-top: 4px; }
+.marco .dir { text-align: right; display: grid; gap: 4px; }
+.marco.medio { margin: var(--s2) 0; padding: var(--s2) var(--s4); }
+.marco.medio .tit { font-size: 17px; }
+.marco.baixo { background: none; border-left-width: 2px; padding: 2px var(--s4); margin: 0 0 var(--s2) 0; align-items: center; }
+.marco.baixo .tit { font: 400 14px/1.4 var(--body); color: var(--dim); }
+.marco.baixo .g { width: 14px; height: 14px; }
+.marco.respondida { opacity: .6; }
+
+/* coluna «Agora» */
+.lado { position: sticky; top: 72px; align-self: start; display: grid; gap: var(--s3); }
+.cp { background: var(--surface); border: 1px solid var(--line); border-top: 5px solid var(--c); border-radius: var(--r3); padding: var(--s3) var(--s4); }
+.cp .l1 { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); }
+.cp .nome { font: 800 20px/1 var(--hud); }
+.cp .pl { display: flex; gap: var(--s2); margin-top: var(--s3); font-size: 14px; }
+.cp .pl b { display: block; font-weight: 600; }
+.cp .pl .t { color: var(--dim); display: block; overflow-wrap: anywhere; }
+.cp.curto { border-top-width: 1px; border-left: 4px solid var(--c); padding: var(--s2) var(--s4); }
+.cp.curto .q { color: var(--dim); font-size: 13px; text-align: right; }
+
+@media (max-width: 980px) {
+  .tabs { gap: var(--s4); padding: 0 var(--s4); }
+  .tabs .marca { display: none; }
+  .tabs .estado { display: none; }
+  .tabs [role="tab"] { font-size: 17px; padding: 16px 2px 12px; }
+  .feed { grid-template-columns: minmax(0, 1fr); padding: var(--s4); gap: var(--s4); }
+  .lado { position: static; order: -1; }
+  .volta { grid-template-columns: minmax(0, 1fr); }
+  .volta .res { text-align: left; display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+  .volta .res .d { margin: 0; }
+  .regua { grid-template-columns: repeat(2, 1fr); row-gap: var(--s2); }
+  .marco { grid-template-columns: 20px minmax(0, 1fr); }
+  .marco .dir { grid-column: 2; text-align: left; display: flex; gap: var(--s2); }
+}
+
+[role="tabpanel"][hidden] { display: none !important; }

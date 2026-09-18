@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Centro de controlo — direção A: Sala</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* =========================================================================
+   DIREÇÃO A — «SALA»
+   Lógica de layout: uma sala com uma mesa por projeto. Cada projeto é um
+   painel fechado, do mesmo tamanho, lado a lado; dentro de cada painel a
+   equipa é uma constelação com o Lead ao centro. Comparam-se painéis, não
+   se navega. Elemento-assinatura: a LOMBADA de estado — a faixa grossa no
+   topo do painel, na cor do sinal, que se lê de longe e de lado.
+   Tipos: Barlow Condensed (títulos/estados) + Barlow (texto).
+   MOCK — não é código de produção.
+   ========================================================================= */
+:root{
+  --bg:#0E0C0B; --surface:#17130F; --surface-2:#211B16; --line:#3A2F27;
+  --ink:#F3E9DC; --dim:#A89A8A;
+  --vivo:#45D48A; --espera:#F0B23F; --parado:#FF4F3E; --neutro:#8A8078;
+  --escuro:#12100E; --ticket:#F1E7D8;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --hud:'Barlow Condensed','Arial Narrow',sans-serif;
+  --body:'Barlow',system-ui,sans-serif;
+  --r-chip:4px; --r-card:10px; --r-pill:999px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);-webkit-font-smoothing:antialiased}
+.b-vivo{--c:var(--vivo)} .b-espera{--c:var(--espera)} .b-parado{--c:var(--parado)} .b-neutro{--c:var(--neutro)}
+
+/* ---------- barra de topo ---------- */
+.topo{display:flex;align-items:center;gap:var(--s4);padding:var(--s3) var(--s5);
+      border-bottom:1px solid var(--line);background:var(--surface)}
+.marca{font:800 24px/1 var(--hud);letter-spacing:.14em}
+.marca span{display:block;font:500 12px/1.2 var(--body);letter-spacing:.04em;color:var(--dim);margin-top:3px}
+.resumoTopo{display:flex;gap:var(--s2);margin-left:var(--s5)}
+.pill{display:flex;align-items:center;gap:var(--s2);border:1px solid var(--line);border-radius:var(--r-pill);
+      padding:7px 14px 6px;font:600 15px/1 var(--hud);letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+.pill i{width:10px;height:10px;border-radius:50%;background:var(--c);display:block}
+.pill.b-neutro{color:var(--dim)}
+.acoes{margin-left:auto;display:flex;gap:var(--s2);align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:var(--r-chip);
+     padding:9px 14px;font:600 14px/1 var(--hud);letter-spacing:.06em;text-transform:uppercase;cursor:pointer;min-height:38px}
+.btn.on{border-color:var(--ink)}
+.relogio{font:600 15px/1 var(--hud);letter-spacing:.08em;color:var(--dim)}
+
+/* ---------- a sala: um painel por projeto ---------- */
+.sala{display:grid;grid-template-columns:repeat(auto-fit,minmax(520px,1fr));gap:var(--s4);padding:var(--s4) var(--s5)}
+.mesa{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden;
+      display:flex;flex-direction:column}
+.mesa.b-parado{border-color:var(--parado)}
+.lombada{height:6px;background:var(--c)}
+.mesa.b-neutro .lombada{background:linear-gradient(90deg,var(--neutro),transparent)}
+
+.cab{display:flex;align-items:flex-start;gap:var(--s3);padding:var(--s4) var(--s4) var(--s3)}
+.nomeProj{font:800 30px/1 var(--hud);letter-spacing:.02em}
+.selo{display:inline-block;margin-top:var(--s2);background:var(--c);color:var(--escuro);
+      font:800 17px/1 var(--hud);letter-spacing:.08em;padding:7px 11px 5px;border-radius:var(--r-chip)}
+.mesa.b-neutro .selo{background:transparent;color:var(--neutro);border:1px solid var(--neutro)}
+.desde{color:var(--dim);font-size:13px;margin-top:6px}
+.cabDir{margin-left:auto;text-align:right}
+.contagem{display:flex;gap:var(--s3);justify-content:flex-end;font:600 14px/1 var(--hud);letter-spacing:.04em}
+.contagem b{font:800 26px/1 var(--hud);display:block;margin-bottom:3px}
+.c-vivo{color:var(--vivo)} .c-espera{color:var(--espera)} .c-parado{color:var(--parado)} .c-neutro{color:var(--neutro)}
+.prog{margin-top:var(--s3);width:190px;margin-left:auto}
+.prog .barra{height:6px;background:var(--surface-2);border-radius:var(--r-pill);overflow:hidden}
+.prog .barra i{display:block;height:100%;background:var(--neutro)}
+.mesa.b-vivo .prog .barra i{background:var(--vivo)}
+.prog .txt{font-size:12px;color:var(--dim);margin-top:5px;text-align:right}
+.ferr{display:flex;gap:6px;justify-content:flex-end;margin-top:var(--s3)}
+.ferr button{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:var(--r-chip);
+             padding:6px 9px;font:600 12px/1 var(--hud);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+
+/* ---------- constelação ---------- */
+.cena{padding:0 var(--s3)}
+.cena svg{display:block;width:100%;height:auto}
+.no-label{font:700 11px/1 var(--hud);letter-spacing:.06em;text-transform:uppercase;fill:var(--dim)}
+.no-label.viva{fill:var(--ink)}
+.mono{font:800 15px/1 var(--hud);letter-spacing:.02em}
+
+/* ---------- o que está a acontecer ---------- */
+ /* bloco, não cartão: sem contorno e sem raio — nada de cartões dentro de cartões */
+.agora{margin:var(--s2) var(--s4) 0;padding:var(--s3);background:var(--surface-2);border-left:3px solid var(--c)}
+.agora .p1{font:600 19px/1.25 var(--body)}
+.agora .p2{color:var(--dim);font-size:14px;margin-top:5px}
+.accao{margin:var(--s3) var(--s4) 0;background:var(--ticket);color:var(--escuro);border-radius:var(--r-card);
+       padding:var(--s3) var(--s4);display:flex;align-items:center;gap:var(--s3)}
+.accao b{font:700 16px/1.2 var(--body)}
+.accao button{margin-left:auto;background:var(--escuro);color:var(--ticket);border:0;border-radius:var(--r-chip);
+              padding:11px 15px;font:700 14px/1 var(--hud);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;min-height:44px}
+.linha{margin:var(--s3) var(--s4) var(--s4);border-top:1px solid var(--line);padding-top:var(--s2)}
+.linha div{display:flex;gap:var(--s3);font-size:13.5px;color:var(--dim);padding:3px 0}
+.linha time{color:var(--neutro);font:600 13px/1.45 var(--hud);letter-spacing:.06em;min-width:44px}
+.linha div:last-child{color:var(--ink)}
+
+/* ---------- legenda + rodapé ---------- */
+.legenda{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);padding:0 var(--s5) var(--s4);color:var(--dim);font-size:13.5px}
+.legenda span{display:flex;align-items:center;gap:7px}
+.legenda i{width:13px;height:13px;border-radius:50%;background:var(--c);display:block}
+.legenda i.anel{background:transparent;border:2px solid var(--c)}
+.rodape{border-top:1px solid var(--line);padding:var(--s3) var(--s5);color:var(--dim);font-size:13px;
+        display:flex;gap:var(--s5);background:var(--surface)}
+
+/* ---------- painel de detalhe (secundário, um clique) ---------- */
+.detalhe{position:fixed;top:0;right:0;bottom:0;width:380px;background:var(--surface);border-left:1px solid var(--line);
+         padding:var(--s5);overflow:auto}
+.detalhe h2{font:800 26px/1 var(--hud);margin:0}
+.detalhe .abas{display:flex;gap:var(--s2);margin:var(--s4) 0}
+.detalhe .abas span{font:600 13px/1 var(--hud);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);
+                    border-bottom:2px solid transparent;padding-bottom:6px}
+.detalhe .abas span.on{color:var(--ink);border-color:var(--c)}
+.detalhe dl{margin:0} .detalhe dt{font-size:12.5px;color:var(--dim);margin-top:var(--s4)}
+.detalhe dd{margin:3px 0 0;font-size:15px}
+
+/* ---------- telemóvel ---------- */
+@media (max-width:720px){
+  /* o telemóvel é o ecrã do Sponsor a meio do dia: o que tem de caber sem
+     rolar é o nome do projeto, a palavra de estado, as contagens e a
+     constelação. Ferramentas de mapa e cronologia descem. */
+  .topo{gap:var(--s3);padding:var(--s3) var(--s4)}
+  .marca{font-size:19px} .marca span{display:none}
+  .resumoTopo{margin-left:var(--s3);gap:6px}
+  .pill{padding:6px 10px 5px;font-size:13px}
+  .acoes .btn:not(:last-child){display:none}
+  .relogio{display:none}
+  .sala{grid-template-columns:1fr;padding:var(--s3) var(--s4);gap:var(--s3)}
+  .nomeProj{font-size:24px} .cab{flex-wrap:wrap;padding:var(--s3) var(--s3) var(--s2)}
+  .selo{font-size:15px;padding:6px 9px 4px} .desde{margin-top:4px}
+  .cabDir{margin-left:0;width:100%;text-align:left;margin-top:var(--s3)}
+  .contagem{justify-content:flex-start;gap:var(--s4);font-size:12px}
+  .contagem b{font-size:21px;margin-bottom:1px}
+  .prog{margin-left:0;width:100%;margin-top:var(--s2)} .prog .txt{text-align:left}
+  .ferr{justify-content:flex-start;margin-top:var(--s2)}
+  .ferr button:nth-child(n+3){display:none}
+  .cena{padding:0}
+  .agora{margin:var(--s2) var(--s3) 0;padding:var(--s3)} .agora .p1{font-size:16px} .agora .p2{font-size:13px}
+  .linha{margin:var(--s2) var(--s3) var(--s3)} .linha div:first-child{display:none}
+  .no-label{font-size:12px}
+  .legenda{padding:0 var(--s4) var(--s4);font-size:13.5px;gap:var(--s1) var(--s4)}
+  .rodape{padding:var(--s3) var(--s4);gap:var(--s4);font-size:12.5px}
+  .detalhe{display:none}
+}
+@media (prefers-reduced-motion: no-preference){
+  .halo{animation:pulso 2.4s ease-in-out infinite}
+  @keyframes pulso{0%,100%{opacity:.45}50%{opacity:1}}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { CENAS, PAPEIS, POS, LIGACOES, DETALHE, porKey, esc, contagemFrase } from './centro-dados.js';
+
+const q = new URLSearchParams(location.search);
+const cena = CENAS[q.get('cena') === 'parado' ? 'parado' : 'agora'];
+const comDetalhe = q.get('detalhe') === '1';
+
+// ---------- constelação de um projeto ----------
+function constelacao(p, { w = 680, h = 360 } = {}) {
+  const pad = { x: 70, y: 56 };
+  const px = k => pad.x + POS[k].x * (w - pad.x * 2);
+  const py = k => pad.y + POS[k].y * (h - pad.y * 2);
+  const rad = k => (POS[k].r === 1 ? 32 : POS[k].r > .6 ? 24 : 18);
+
+  const estado = k => p.equipa[k]?.banda || 'neutro';
+  const ativo = new Set();
+  if (p.espera) ativo.add(`lead|${p.espera}`);
+  if (p.entregaRecente) ativo.add(`${p.entregaRecente.a}|${p.entregaRecente.b}`);
+  const chaveLigacao = l => `${l.a}|${l.b}`;
+  const eAtiva = l => ativo.has(chaveLigacao(l)) || ativo.has(`${l.b}|${l.a}`);
+
+  const linhas = LIGACOES.map(l => {
+    const x1 = px(l.a), y1 = py(l.a), x2 = px(l.b), y2 = py(l.b);
+    const dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy) || 1;
+    const r1 = rad(l.a) + 4, r2 = rad(l.b) + 4;
+    const a = [x1 + dx / d * r1, y1 + dy / d * r1], b = [x2 - dx / d * r2, y2 - dy / d * r2];
+    if (eAtiva(l)) {
+      // a ligação acesa toma o pior dos dois estados: um caminho que passa por
+      // quem está parado nunca se pinta de verde
+      const par = [estado(l.a), estado(l.b)];
+      const banda = par.includes('parado') ? 'parado' : par.includes('vivo') ? 'vivo' : 'espera';
+      const cor = `var(--${banda})`;
+      const pts = [.35, .5, .65].map(t => `<circle cx="${a[0] + (b[0] - a[0]) * t}" cy="${a[1] + (b[1] - a[1]) * t}" r="3.4" fill="${cor}"/>`).join('');
+      return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${cor}" stroke-width="2.4" opacity=".85"/>${pts}`;
+    }
+    const tracejado = l.tipo === 'fluxo' ? ' stroke-dasharray="5 6"' : '';
+    return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#3A2F27" stroke-width="1"${tracejado} opacity="${l.tipo === 'fluxo' ? .55 : .9}"/>`;
+  }).join('');
+
+  const nos = PAPEIS.map(pa => {
+    const b = estado(pa.key), r = rad(pa.key), x = px(pa.key), y = py(pa.key);
+    const cor = `var(--${b})`;
+    let corpo = '', glifo = '';
+    if (b === 'vivo') {
+      corpo = `<circle class="halo" cx="${x}" cy="${y}" r="${r + 13}" fill="${cor}" opacity=".18"/>`
+            + `<circle cx="${x}" cy="${y}" r="${r}" fill="${cor}"/>`;
+      glifo = `<circle cx="${x + r * .72}" cy="${y - r * .72}" r="6.5" fill="var(--escuro)" stroke="${cor}" stroke-width="1.5"/>`
+            + `<circle cx="${x + r * .72}" cy="${y - r * .72}" r="2.6" fill="${cor}"/>`;
+    } else if (b === 'espera') {
+      corpo = `<circle cx="${x}" cy="${y}" r="${r}" fill="${cor}" fill-opacity=".16" stroke="${cor}" stroke-width="3"/>`;
+      glifo = `<circle cx="${x + r * .72}" cy="${y - r * .72}" r="6.5" fill="var(--escuro)" stroke="${cor}" stroke-width="1.5"/>`
+            + `<rect x="${x + r * .72 - 3.4}" y="${y - r * .72 - 1.1}" width="6.8" height="2.2" fill="${cor}"/>`;
+    } else if (b === 'parado') {
+      corpo = `<circle cx="${x}" cy="${y}" r="${r}" fill="${cor}" fill-opacity=".22" stroke="${cor}" stroke-width="3"/>`;
+      glifo = `<circle cx="${x + r * .72}" cy="${y - r * .72}" r="7" fill="var(--escuro)" stroke="${cor}" stroke-width="1.5"/>`
+            + `<path d="M${x + r * .72 - 3} ${y - r * .72 - 3}l6 6M${x + r * .72 + 3} ${y - r * .72 - 3}l-6 6" stroke="${cor}" stroke-width="1.8"/>`;
+    } else {
+      corpo = `<circle cx="${x}" cy="${y}" r="${r}" fill="var(--surface-2)" stroke="var(--neutro)" stroke-width="1.5" stroke-opacity=".7"/>`;
+    }
+    const corTexto = b === 'vivo' ? 'var(--escuro)' : b === 'neutro' ? 'var(--neutro)' : cor;
+    const label = pa.nome.replace('Security Reviewer', 'Security Rev.');
+    // rótulo por cima nos nós da faixa de cima, por baixo nos restantes: nunca
+    // por cima de outro nó nem de uma ligação acesa.
+    const acima = POS[pa.key].y < .2;
+    const ly = acima ? y - r - 10 : y + r + 15;
+    return corpo + glifo
+      + `<text class="mono" x="${x}" y="${y + 5}" text-anchor="middle" fill="${corTexto}">${pa.mono}</text>`
+      + `<text class="no-label${b === 'vivo' || b === 'parado' ? ' viva' : ''}" x="${x}" y="${ly}" text-anchor="middle">${esc(label)}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(PAPEIS.map(pa => `${pa.nome}: ${p.equipa[pa.key]?.frase || 'em repouso'}`).join('. '))}">${linhas}${nos}</svg>`;
+}
+
+// ---------- painel de um projeto ----------
+function mesa(p) {
+  const c = p.contagem;
+  const nomeEspera = p.espera ? porKey(p.espera).nome : null;
+  return `<section class="mesa b-${p.estado}">
+    <div class="lombada"></div>
+    <div class="cab">
+      <div>
+        <div class="nomeProj">${esc(p.projeto)}</div>
+        <div class="selo">${esc(p.palavra)}</div>
+        <div class="desde">${esc(p.desde)}</div>
+      </div>
+      <div class="cabDir">
+        <div class="contagem">
+          <span class="c-vivo"><b>${c.vivo}</b>a trabalhar</span>
+          <span class="c-espera"><b>${c.espera}</b>à espera</span>
+          <span class="c-parado"><b>${c.parado}</b>parados</span>
+          <span class="c-neutro"><b>${c.neutro}</b>em repouso</span>
+        </div>
+        <div class="prog">
+          <div class="barra"><i style="width:${Math.round(p.tarefas.feitas / p.tarefas.total * 100)}%"></i></div>
+          <div class="txt">${p.tarefas.feitas} de ${p.tarefas.total} tarefas feitas</div>
+        </div>
+        <div class="ferr"><button>focar</button><button>ecrã inteiro</button><button>−</button><button>+</button><button>ajustar</button></div>
+      </div>
+    </div>
+    <div class="cena">${constelacao(p)}</div>
+    <div class="agora">
+      <div class="p1">${esc(p.resumo)}</div>
+      <div class="p2">${p.aFazer ? `Tarefa de agora: ${esc(p.aFazer)} · ` : ''}${esc(p.ultimo)}</div>
+    </div>
+    ${p.humano ? `<div class="accao"><b>Precisa de ti</b><span>${esc(p.accao)}</span><button>Arrancar</button></div>` : ''}
+    <div class="linha">${p.linha.map(l => `<div><time>${esc(l.h)}</time><span>${esc(l.t)}</span></div>`).join('')}</div>
+  </section>`;
+}
+
+// ---------- página ----------
+const vivos = cena.filter(p => p.estado === 'vivo').length;
+const parados = cena.filter(p => p.estado === 'parado').length;
+const fechados = cena.filter(p => p.estado === 'neutro').length;
+const precisa = cena.filter(p => p.humano).length;
+
+document.getElementById('app').innerHTML = `
+<header class="topo">
+  <div class="marca">FORJA<span>Centro de controlo</span></div>
+  <div class="resumoTopo">
+    <span class="pill b-vivo"><i></i>${vivos} a trabalhar</span>
+    ${parados ? `<span class="pill b-parado"><i></i>${parados} parado${parados > 1 ? 's' : ''}</span>` : ''}
+    ${fechados ? `<span class="pill b-neutro"><i></i>${fechados} terminado${fechados > 1 ? 's' : ''}</span>` : ''}
+  </div>
+  <div class="acoes">
+    ${precisa ? `<span class="pill" style="--c:var(--ticket);background:var(--ticket);color:var(--escuro);border-color:var(--ticket)">${precisa} precisa de ti</span>` : ''}
+    <button class="btn on">Sala</button><button class="btn">Um projeto</button><button class="btn">Ecrã inteiro</button>
+    <span class="relogio">${cena === CENAS.parado ? '00:16' : '19:12'}</span>
+  </div>
+</header>
+<main class="sala">${cena.map(mesa).join('')}</main>
+<div class="legenda">
+  <span class="b-vivo"><i></i>verde: está a trabalhar agora</span>
+  <span class="b-espera"><i class="anel"></i>amarelo: parou de escrever, está à espera</span>
+  <span class="b-parado"><i class="anel"></i>vermelho: sem sinal há mais de 5 minutos</span>
+  <span class="b-neutro"><i class="anel"></i>cinzento: já entregou, ou ainda não foi preciso</span>
+  <span>linha acesa = é aqui que o trabalho está a passar agora</span>
+</div>
+<footer class="rodape">
+  <span>Atualizado agora mesmo</span><span>${cena.length} projetos</span><span>${cena.reduce((n,p)=>n+p.contagem.vivo,0)} pessoas da equipa a trabalhar agora</span>
+</footer>
+${comDetalhe ? painelDetalhe() : ''}`;
+
+function painelDetalhe() {
+  const d = DETALHE;
+  return `<aside class="detalhe b-${d.banda}">
+    <h2>${esc(porKey(d.papel).nome)}</h2>
+    <div class="desde">no projeto ${esc(d.projeto)}</div>
+    <div class="abas">${d.abas.map((a, i) => `<span class="${i === 0 ? 'on' : ''}">${esc(a)}</span>`).join('')}</div>
+    <div class="selo" style="background:var(--c);color:var(--escuro)">${esc(d.estado)}</div>
+    <dl>
+      <dt>O que está a fazer</dt><dd>${esc(d.agora)}</dd>
+      <dt>Tarefa</dt><dd>${esc(d.aFazer)}</dd>
+      <dt>Desde quando</dt><dd>${esc(d.desde)}</dd>
+      <dt>Último sinal</dt><dd>${esc(d.sinal)}</dd>
+      <dt>Capacidade</dt><dd>${esc(d.modelo)}</dd>
+      <dt>Depende de</dt><dd>${d.depende.map(x => `${esc(x.nome)} — ${esc(x.frase)}`).join('<br>')}</dd>
+    </dl>
+  </aside>`;
+}
+</script>
+</body>
+</html>

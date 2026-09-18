@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forja · Modelos e ligações — C Sequence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Direction C — Sequence. Time is the x-axis; agents are lanes. A handoff is a
+     drop from the main lane down to the agent's lane, and a return trip back up
+     when it hands back — the same call, seen as a diagonal instead of a network hop. */
+  :root {
+    --bg: #EFF1EE; --surface: #FBFCFA; --ink: #1B211E; --muted: #5D665F; --rule: #DCE0DA;
+    --main: #008C7E; --sub: #9B3FB5; --backend: #A6740B; --guide: #2F6FB0;
+    --sans: 'Figtree', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+    --lane-label: 150px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--sans); }
+  header { display: flex; align-items: baseline; gap: var(--s4); padding: var(--s5) var(--s6) var(--s4); }
+  header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  header .meta { font: 12px var(--mono); color: var(--muted); }
+  header .badge { margin-left: auto; font: 11px var(--mono); color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 3px 10px; background: var(--surface); }
+
+  .panel { margin: 0 var(--s6) var(--s6); background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+  .axis { display: grid; grid-template-columns: 150px 1fr; border-bottom: 1px solid var(--rule); }
+  .axis .corner { padding: var(--s2) var(--s3); font: 11px var(--mono); color: var(--muted); }
+  .axis .ticks { position: relative; height: 30px; }
+  .axis .tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--rule); }
+  .axis .tick span { position: absolute; top: 6px; left: 6px; font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
+
+  .lanes { position: relative; }
+  .lane { display: grid; grid-template-columns: 150px 1fr; border-bottom: 1px solid var(--rule); }
+  .lane:last-child { border-bottom: none; }
+  .lane .lbl { padding: var(--s3); border-right: 1px solid var(--rule); display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+  .lane .lbl b { font-size: 13px; font-weight: 600; }
+  .lane .lbl span { font: 11px var(--mono); color: var(--muted); }
+  .lane .track { position: relative; height: 74px; }
+  .lane.main .track { height: 54px; background: color-mix(in srgb, var(--main) 5%, var(--surface)); }
+
+  .grid-v { position: absolute; top: 0; bottom: 0; border-left: 1px dashed color-mix(in srgb, var(--rule) 70%, transparent); }
+
+  .bar { position: absolute; top: 50%; transform: translateY(-50%); height: 22px; border-radius: 5px; background: var(--c); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent); min-width: 5px; }
+  .bar.tick { height: 14px; width: 3px !important; border-radius: 2px; background: var(--main); }
+  .bar .tip { position: absolute; left: 0; top: -20px; font: 10px var(--mono); color: var(--muted); white-space: nowrap; }
+
+  .conn { position: absolute; width: 2px; top: 0; }
+  .conn.down { background: linear-gradient(to bottom, var(--c), color-mix(in srgb, var(--c) 40%, transparent)); }
+
+  .pulse { position: absolute; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); offset-rotate: 0deg; }
+
+  .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); opacity: .55; }
+  .playhead::before { content: "now"; position: absolute; top: -18px; left: -14px; font: 10px var(--mono); color: var(--ink); background: var(--surface); padding: 0 3px; }
+
+  .idle-note { position: absolute; top: 50%; transform: translate(-50%,-50%); font: 11px var(--mono); color: var(--muted); background: var(--surface); padding: 2px 6px; border-radius: 4px; }
+
+  .legend { display: flex; gap: var(--s4); padding: var(--s3) var(--s4); font: 12px var(--mono); color: var(--muted); border-top: 1px solid var(--rule); }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+  .selected { margin: 0 var(--s6) var(--s6); background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: var(--s4); display: flex; align-items: baseline; gap: var(--s5); flex-wrap: wrap; }
+  .selected h2 { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); flex-basis: 100%; }
+  .selected .chip { font: 500 11px var(--mono); padding: 1px 7px; border-radius: 4px; background: color-mix(in srgb, var(--sub) 14%, transparent); border-left: 3px solid var(--sub); }
+  .selected b { font-weight: 600; }
+  .selected span.id { font: 12px var(--mono); color: var(--muted); }
+  .selected .stat { font: 12px var(--mono); color: var(--muted); }
+  .selected .stat b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 760px) {
+    header { flex-wrap: wrap; padding: var(--s4); }
+    header .badge { margin-left: 0; }
+    .panel { margin: 0 var(--s4) var(--s5); }
+    .axis, .lane { grid-template-columns: 84px 1fr; }
+    :root { --lane-label: 84px; }
+    .lane .lbl b { font-size: 11px; }
+    .lane .lbl span { display: none; }
+    .legend { flex-wrap: wrap; gap: var(--s3); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Modelos e ligações</h1>
+  <div class="meta">sessão 6fcc4d98 · forja · 08:37:35–08:46:17</div>
+  <div class="badge">9 handoffs</div>
+</header>
+
+<div class="panel">
+  <div class="axis">
+    <div class="corner">TIME →</div>
+    <div class="ticks" id="ticks"></div>
+  </div>
+  <div class="lanes" id="lanes">
+    <div class="lane main">
+      <div class="lbl"><b>main session</b><span>orchestrator</span></div>
+      <div class="track" id="t-main"></div>
+    </div>
+    <div class="lane">
+      <div class="lbl"><b>reviewer</b><span>6 calls</span></div>
+      <div class="track" id="t-reviewer"></div>
+    </div>
+    <div class="lane">
+      <div class="lbl"><b>backend</b><span>1 call</span></div>
+      <div class="track" id="t-backend"></div>
+    </div>
+    <div class="lane">
+      <div class="lbl"><b>claude-code-guide</b><span>1 call</span></div>
+      <div class="track" id="t-guide"></div>
+    </div>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--main)"></i>dispatched from main</span>
+    <span><i style="background:var(--sub)"></i>reviewer</span>
+    <span><i style="background:var(--backend)"></i>backend</span>
+    <span><i style="background:var(--guide)"></i>claude-code-guide</span>
+  </div>
+</div>
+
+<div class="selected">
+  <h2>Selected handoff</h2>
+  <div><span class="chip">reviewer</span> <span class="id">a14d5a1e2a4750d0d</span></div>
+  <div class="stat">main session → reviewer, <b>08:38:23.188</b> → <b>08:38:37.483</b></div>
+  <div class="stat">duration <b>14 295 ms</b></div>
+  <div class="stat">session <b>6fcc4d98</b></div>
+</div>
+
+<script>
+  // Real handoffs from data/events.jsonl, session 6fcc4d98-f001-4edd-aaf7-d4e79e8fe847.
+  const T0 = Date.parse('2026-09-16T08:37:35.203Z');
+  const T1 = Date.parse('2026-09-16T08:46:17.848Z');
+  const SPAN = T1 - T0;
+  const CALLS = [
+    { id: 'a0729febf0c930824', type: 'reviewer', c: 'var(--sub)', start: '2026-09-16T08:37:35.203Z', stop: '2026-09-16T08:37:41.780Z' },
+    { id: 'a1095075630b92e60', type: 'backend',  c: 'var(--backend)', start: '2026-09-16T08:38:21.368Z', stop: '2026-09-16T08:38:33.637Z' },
+    { id: 'a14d5a1e2a4750d0d', type: 'reviewer', c: 'var(--sub)', start: '2026-09-16T08:38:23.188Z', stop: '2026-09-16T08:38:37.483Z' },
+    { id: 'acf53988bbe6d74ad', type: 'reviewer', c: 'var(--sub)', start: '2026-09-16T08:39:04.968Z', stop: '2026-09-16T08:39:15.354Z' },
+    { id: 'a408d1e6067641c13', type: 'reviewer', c: 'var(--sub)', start: '2026-09-16T08:39:23.692Z', stop: '2026-09-16T08:39:34.590Z' },
+    { id: 'a13cdafd626e35182', type: 'reviewer', c: 'var(--sub)', start: '2026-09-16T08:39:42.260Z', stop: '2026-09-16T08:39:53.802Z' },
+    { id: 'a76fbb2e0c4ab5e92', type: 'claude-code-guide', c: 'var(--guide)', start: '2026-09-16T08:43:13.559Z', stop: '2026-09-16T08:44:36.292Z' },
+    { id: 'a33a011013d46bb4f', type: 'reviewer', c: 'var(--sub)', start: '2026-09-16T08:45:18.570Z', stop: '2026-09-16T08:45:32.673Z' },
+    { id: 'a1d5cc972a08756f5', type: 'reviewer', c: 'var(--sub)', start: '2026-09-16T08:46:00.712Z', stop: '2026-09-16T08:46:17.848Z' },
+  ];
+  const pct = (ms) => ((ms - T0) / SPAN) * 100;
+
+  // minute gridlines
+  const ticksEl = document.getElementById('ticks');
+  for (let m = 38; m <= 46; m++) {
+    const t = Date.parse(`2026-09-16T08:${m}:00.000Z`);
+    const p = pct(t);
+    const d = document.createElement('div');
+    d.className = 'tick'; d.style.left = p + '%';
+    d.innerHTML = `<span>08:${m}</span>`;
+    ticksEl.appendChild(d);
+    for (const laneId of ['t-main', 't-reviewer', 't-backend', 't-guide']) {
+      const g = document.createElement('div');
+      g.className = 'grid-v'; g.style.left = p + '%';
+      g.style.height = '100%';
+      document.getElementById(laneId).appendChild(g);
+    }
+  }
+
+  const laneOf = { reviewer: 't-reviewer', backend: 't-backend', 'claude-code-guide': 't-guide' };
+  const tMain = document.getElementById('t-main');
+
+  CALLS.forEach((call, i) => {
+    const s = Date.parse(call.start), e = Date.parse(call.stop);
+    const left = pct(s), width = Math.max(pct(e) - pct(s), 0.35);
+    const lane = document.getElementById(laneOf[call.type]);
+
+    // dispatch tick in the main lane
+    const tick = document.createElement('div');
+    tick.className = 'bar tick';
+    tick.style.left = left + '%';
+    tMain.appendChild(tick);
+
+    // call bar in the agent's lane
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.left = left + '%';
+    bar.style.width = width + '%';
+    bar.style.setProperty('--c', call.c);
+    const short = call.id.slice(0, 8);
+    const hh = new Date(s).toISOString().slice(11, 19);
+    bar.title = `${call.type} · ${call.id} · ${hh} · ${Math.round((e - s) / 1000)}s`;
+    if (width > 6) {
+      bar.innerHTML = `<span class="tip">${call.type} · ${short}… · ${Math.round((e - s) / 1000)}s</span>`;
+    } else if (i === 2) {
+      // one narrow example gets its label anyway, offset above the lane's other tips
+      bar.innerHTML = `<span class="tip" style="top:-34px">${call.type} · ${short}… · ${Math.round((e - s) / 1000)}s</span>`;
+    }
+    lane.appendChild(bar);
+
+    // connector: drop from main lane to agent lane, pulse travels down then back up
+    const conn = document.createElement('div');
+    conn.className = 'conn down';
+    conn.style.left = left + '%';
+    conn.style.top = '27px';
+    conn.style.height = '47px';
+    conn.style.setProperty('--c', call.c);
+    lane.style.position = 'relative';
+    lane.appendChild(conn);
+
+    const pulseDown = document.createElement('div');
+    pulseDown.className = 'pulse';
+    pulseDown.style.setProperty('--c', call.c);
+    pulseDown.style.left = left + '%';
+    pulseDown.style.top = '0px';
+    const delay = (0.2 + i * 0.5) % 4.6;
+    pulseDown.style.animation = `dropIn 5s ease-in ${delay}s infinite`;
+    lane.appendChild(pulseDown);
+  });
+
+  // idle gap note between call 6 (reviewer 08:39:53) and call 7 (claude-code-guide 08:43:13)
+  const gapStart = pct(Date.parse('2026-09-16T08:39:53.802Z'));
+  const gapEnd = pct(Date.parse('2026-09-16T08:43:13.559Z'));
+  const note = document.createElement('div');
+  note.className = 'idle-note';
+  note.style.left = ((gapStart + gapEnd) / 2) + '%';
+  note.textContent = '3m 19s idle';
+  document.getElementById('t-main').appendChild(note);
+
+  // sweeping playhead, one full pass over the real window every 6s
+  const playhead = document.createElement('div');
+  playhead.className = 'playhead';
+  document.getElementById('lanes').appendChild(playhead);
+  playhead.style.animation = 'sweep 6s linear infinite';
+
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes sweep { from { left: var(--lane-label); } to { left: 100%; } }
+    @keyframes dropIn { 0% { top: 0px; opacity: 0; } 8% { opacity: 1; } 50% { top: 27px; opacity: 1; } 58% { opacity: 0; } 100% { top: 27px; opacity: 0; } }
+  `;
+  document.head.appendChild(style);
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "forja",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "check": "node tools/check.mjs",
+    "fixtures": "node test/fixtures/build-fixtures.mjs",
+    "serve": "node bin/forja.mjs serve",
+    "up": "node bin/forja.mjs up"
+  }
+}

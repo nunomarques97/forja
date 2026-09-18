@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feed de eventos — direção B: Pistas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="feed-base.css">
+<style>
+/* DIREÇÃO B — «PISTAS»
+   Uma pista vertical por projeto, lado a lado, cada uma com o seu próprio
+   feed. O topo de cada pista é o CABEÇO: estado + o que está para acontecer
+   (evento 5), sempre à vista porque a pista rola por baixo dele. Compara-se
+   projetos de lado, nunca se misturam. No telemóvel as pistas passam a
+   separadores (um projeto de cada vez) com a contagem do que precisa de ti.
+   MOCK — não é produção. */
+html,body{height:100%}
+body{display:flex;flex-direction:column}
+.pistas{flex:1;min-height:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(300px,1fr);gap:var(--s3);
+        padding:var(--s4) var(--s5);overflow-x:auto}
+.pista{display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden}
+.cabeco{padding:var(--s4);border-bottom:1px solid var(--line);border-top:6px solid var(--c);background:var(--surface-2)}
+.cabeco .l1{display:flex;align-items:center;justify-content:space-between;gap:var(--s2)}
+.cabeco .nome{font:800 24px/1 var(--hud);letter-spacing:.02em}
+.cabeco .quando{color:var(--dim);font-size:13px;margin-top:4px}
+.prox{margin-top:var(--s3);display:grid;gap:var(--s2)}
+.px{display:flex;gap:var(--s2);align-items:flex-start;font-size:14px}
+.px b{font-weight:600;display:block}
+.px .t{color:var(--dim)}
+.lista{overflow-y:auto;padding:var(--s2) var(--s3) var(--s4)}
+.it{display:grid;grid-template-columns:44px 20px 1fr;gap:0 var(--s2);padding:6px 0;border-bottom:1px solid #2a221c}
+.it:last-child{border-bottom:0}
+.it .hora{padding-top:3px}
+.it .tit{font-size:14px}
+.it .txt{color:var(--dim);font-size:13px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.it.leve .tit{color:var(--dim)}
+.it.imp{background:var(--bg);margin:var(--s2) calc(-1*var(--s2));padding:var(--s3) var(--s2);border:0;border-left:4px solid var(--c);border-radius:var(--r-chip)}
+.it.imp .tit{font:700 18px/1.1 var(--hud);display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
+.it.imp .txt{color:var(--ink);opacity:.86;-webkit-line-clamp:3}
+.diaT{font:800 12px/1 var(--hud);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:var(--s3) 0 var(--s1) 64px}
+.abas{display:none}
+
+@media (max-width:720px){
+  body{display:block}
+  .abas{display:flex;gap:var(--s2);overflow-x:auto;padding:var(--s3) var(--s4) 0;scrollbar-width:none}
+  .aba{flex:none;border:1px solid var(--line);background:none;color:var(--ink);border-radius:var(--r-pill);padding:8px 12px 7px;
+       font:700 14px/1 var(--hud);letter-spacing:.05em;text-transform:uppercase;display:flex;gap:6px;align-items:center}
+  .aba i{width:9px;height:9px;border-radius:50%;background:var(--c)}
+  .aba[aria-selected=true]{background:var(--ink);color:var(--escuro)}
+  .pistas{display:block;padding:var(--s3) var(--s4)}
+  .pista{display:none}
+  .pista.on{display:flex}
+  .lista{overflow:visible}
+}
+</style>
+</head>
+<body>
+<header class="topo">
+  <div class="marca">FORJA<span>o que aconteceu, projeto a projeto</span></div>
+  <div class="nota" id="nota"></div>
+</header>
+<nav class="abas" id="abas" role="tablist"></nav>
+<main class="pistas" id="pistas"></main>
+<script src="feed-dados.js"></script>
+<script src="feed-comum.js"></script>
+<script>
+const { F, hora, dia, ha, esc, G, frase, pendente, projetosVisiveis } = FEEDUI;
+document.getElementById('nota').textContent = `Instantâneo real de ${dia(F.agora)}, ${hora(F.agora)} · últimas ${F.horas} h`;
+const hoje = dia(F.agora);
+document.getElementById('pistas').innerHTML = projetosVisiveis.map((p, i) => {
+  const pend = F.pendentes.filter(x => x.projeto === p.nome).map(pendente);
+  const prox = pend.length ? `<div class="prox">${pend.map(x => `<div class="px b-${x.banda}"><span class="g">${G[x.glifo]}</span><div><b>${esc(x.titulo)}</b>${x.texto ? `<span class="t">${esc(x.texto)}</span>` : ''}</div></div>`).join('')}</div>` : '';
+  let ultDia = hoje; const itens = [];
+  for (const e of F.eventos.filter(e => e.projeto === p.nome).slice(0, 90)) {
+    const x = frase(e); if (!x) continue;
+    const d = dia(e.ts); if (d !== ultDia) { itens.push(`<div class="diaT">${d}</div>`); ultDia = d; }
+    itens.push(`<div class="it ${x.importante ? 'imp' : 'leve'} b-${x.banda}"><span class="hora">${hora(e.ts)}</span><span class="g">${G[x.glifo]}</span><div><div class="tit">${esc(x.titulo)}${x.selo ? ` <span class="selo">${x.selo}</span>` : ''}</div>${x.texto ? `<div class="txt">${esc(x.texto)}</div>` : ''}</div></div>`);
+  }
+  return `<section class="pista${i === 0 ? ' on' : ''}" data-p="${esc(p.nome)}"><header class="cabeco b-${p.estado.banda}"><div class="l1"><span class="nome">${esc(p.nome)}</span><span class="selo">${p.estado.palavra}</span></div>${p.estado.quando ? `<div class="quando">${esc(p.estado.quando)}</div>` : ''}${prox}</header><div class="lista">${itens.join('')}</div></section>`;
+}).join('');
+document.getElementById('abas').innerHTML = projetosVisiveis.map((p, i) => `<button class="aba b-${p.estado.banda}" role="tab" aria-selected="${i === 0}" data-p="${esc(p.nome)}"><i></i>${esc(p.nome)}</button>`).join('');
+document.getElementById('abas').onclick = ev => {
+  const b = ev.target.closest('[data-p]'); if (!b) return;
+  document.querySelectorAll('.aba').forEach(a => a.setAttribute('aria-selected', a === b));
+  document.querySelectorAll('.pista').forEach(s => s.classList.toggle('on', s.dataset.p === b.dataset.p));
+};
+</script>
+</body>
+</html>

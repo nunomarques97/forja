@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Saudações</title>
+  <style>
+    :root {
+      --bg: #14171c; --text: #e6e8eb; --muted: #a3aab4; --accent: #6fb3f2; --line: #2a2f37;
+      --s-1: 0.25rem; --s-2: 0.5rem; --s-3: 1rem; --s-4: 1.5rem; --s-5: 2.5rem; --s-6: 4rem;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, sans-serif; }
+    body { margin: 0; font-size: 1.125rem; line-height: 1.6; overflow-wrap: anywhere; }
+    main { max-width: 40rem; margin-inline: auto; padding-block: var(--s-6); padding-inline: var(--s-4); }
+    h1 { margin: 0 0 var(--s-3); font-size: 2rem; font-weight: 600; line-height: 1.2; }
+    h2 { margin: 0 0 var(--s-3); font-size: 1.25rem; font-weight: 600; line-height: 1.3; }
+    p { margin: 0; }
+    a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.15em; }
+    a.acao { display: inline-block; min-height: 44px; padding-block: var(--s-2); }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .lead { color: var(--muted); font-size: 1rem; margin-bottom: var(--s-4); }
+    .bloco { margin-top: var(--s-5); }
+    form { margin: 0; }
+    label { display: block; font-size: 0.9375rem; color: var(--muted); margin-bottom: var(--s-1); }
+    input[type="text"], input[type="password"] {
+      display: block; width: 100%; max-width: 100%; min-height: 44px;
+      padding: var(--s-2) var(--s-3); font: inherit; font-size: 1.125rem;
+      color: var(--text); background: var(--bg); border: 1px solid var(--muted); border-radius: 2px; }
+    input::placeholder { color: var(--muted); opacity: 1; }
+    button { min-height: 44px; margin-top: var(--s-3); padding: var(--s-2) var(--s-4);
+      font: inherit; font-size: 1.125rem; font-weight: 600; color: var(--bg);
+      background: var(--accent); border: 1px solid var(--accent); border-radius: 2px; cursor: pointer; }
+    .erro-campo { margin: 0 0 var(--s-3); padding-left: var(--s-3); border-left: 2px solid var(--accent); font-size: 1rem; }
+    .erro-campo strong { font-weight: 600; }
+    input[aria-invalid="true"] { border-color: var(--accent); }
+    .ajuda { margin-top: var(--s-2); color: var(--muted); font-size: 0.9375rem; }
+    .vazio { margin-top: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--line); color: var(--muted); font-size: 1rem; }
+    .lista { list-style: none; margin: 0; padding: 0; }
+    .lista li { padding: var(--s-3) 0; border-bottom: 1px solid var(--line); }
+    .lista li:first-child { border-top: 1px solid var(--line); }
+    .lista .saudacao { display: block; font-size: 1.125rem; }
+    .lista .quando { display: block; color: var(--muted); font-size: 0.9375rem; }
+    .total { color: var(--muted); font-size: 0.9375rem; margin-bottom: var(--s-2); }
+    .grafico { display: block; }
+    .numeros { width: 100%; border-collapse: collapse; margin-top: var(--s-3); font-size: 0.9375rem; }
+    .numeros caption { text-align: left; color: var(--muted); font-size: 0.9375rem; margin-bottom: var(--s-2); }
+    .numeros th, .numeros td { padding: var(--s-2) 0; border-bottom: 1px solid var(--line); text-align: left; font-weight: 400; }
+    .numeros thead th { color: var(--muted); }
+    .numeros td { text-align: right; font-variant-numeric: tabular-nums; }
+    .codigo { margin-top: var(--s-4); color: var(--muted); font-size: 0.9375rem; }
+    code { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace; font-size: 0.9375rem; }
+    @media (max-width: 480px) { h1 { font-size: 1.5rem; } main { padding-block: var(--s-5); } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Saudações</h1>
+    <p class="lead">Escreva um nome, carregue no botão e a saudação fica guardada para toda a equipa.</p>
+    <form method="post" action="/saudacoes">
+      <label for="nome">Nome de quem quer cumprimentar</label>
+      <p class="erro-campo" id="erro-nome"><strong>Não foi possível guardar.</strong> Escreva um nome com 1 a 80 caracteres.</p>
+      <input id="nome" name="nome" type="text" maxlength="80" required autocomplete="off" placeholder="Ana Sofia" aria-invalid="true" aria-describedby="erro-nome" value="">
+      <button type="submit">Guardar saudação</button>
+    </form>
+    <section class="bloco">
+      <h2>Saudações guardadas</h2>
+      <p class="total">33 saudações no total, 6 de hoje. As mais recentes primeiro.</p>
+      <ul class="lista">
+        <li><span class="saudacao">Olá, &lt;script&gt;alert(&quot;oi&quot;)&lt;/script&gt;!</span><span class="quando">16 de setembro de 2026 às 18:10</span></li>
+        <li><span class="saudacao">Olá, Maria da Conceição Fernandes Pinto de Almeida e Sousa Vasconcelos Albuquerqu!</span><span class="quando">16 de setembro de 2026 às 18:05</span></li>
+        <li><span class="saudacao">Olá, Ana Sofia!</span><span class="quando">16 de setembro de 2026 às 15:56</span></li>
+        <li><span class="saudacao">Olá, Catarina!</span><span class="quando">16 de setembro de 2026 às 12:39</span></li>
+        <li><span class="saudacao">Olá, Bruno!</span><span class="quando">16 de setembro de 2026 às 11:22</span></li>
+        <li><span class="saudacao">Olá, Helena!</span><span class="quando">16 de setembro de 2026 às 10:05</span></li>
+        <li><span class="saudacao">Olá, Rita!</span><span class="quando">15 de setembro de 2026 às 17:30</span></li>
+        <li><span class="saudacao">Olá, Sofia!</span><span class="quando">15 de setembro de 2026 às 16:13</span></li>
+      </ul>
+    </section>
+    <section class="bloco">
+      <h2>Saudações por dia</h2>
+      <svg class="grafico" viewBox="0 0 546 240" role="img" width="100%" style="max-width:100%" aria-labelledby="grafico-titulo">
+  <title id="grafico-titulo">Saudações por dia, de 3 de set a 16 de set. Máximo num dia: 6. Total: 33 saudações. Os mesmos números estão na tabela a seguir.</title>
+  <rect x="7.5" y="136" width="24" height="54" fill="var(--accent)" />
+  <text x="19.5" y="128" text-anchor="middle" font-size="18" fill="var(--text)">2</text>
+  <text x="19.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">3</text>
+  <text x="19.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="46.5" y="188" width="24" height="2" fill="var(--line)" />
+  <text x="58.5" y="180" text-anchor="middle" font-size="18" fill="var(--muted)">0</text>
+  <text x="58.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">4</text>
+  <text x="58.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="85.5" y="109" width="24" height="81" fill="var(--accent)" />
+  <text x="97.5" y="101" text-anchor="middle" font-size="18" fill="var(--text)">3</text>
+  <text x="97.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">5</text>
+  <text x="97.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="124.5" y="163" width="24" height="27" fill="var(--accent)" />
+  <text x="136.5" y="155" text-anchor="middle" font-size="18" fill="var(--text)">1</text>
+  <text x="136.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">6</text>
+  <text x="136.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="163.5" y="188" width="24" height="2" fill="var(--line)" />
+  <text x="175.5" y="180" text-anchor="middle" font-size="18" fill="var(--muted)">0</text>
+  <text x="175.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">7</text>
+  <text x="175.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="202.5" y="82" width="24" height="108" fill="var(--accent)" />
+  <text x="214.5" y="74" text-anchor="middle" font-size="18" fill="var(--text)">4</text>
+  <text x="214.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">8</text>
+  <text x="214.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="241.5" y="136" width="24" height="54" fill="var(--accent)" />
+  <text x="253.5" y="128" text-anchor="middle" font-size="18" fill="var(--text)">2</text>
+  <text x="253.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">9</text>
+  <text x="253.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="280.5" y="188" width="24" height="2" fill="var(--line)" />
+  <text x="292.5" y="180" text-anchor="middle" font-size="18" fill="var(--muted)">0</text>
+  <text x="292.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">10</text>
+  <text x="292.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="319.5" y="55" width="24" height="135" fill="var(--accent)" />
+  <text x="331.5" y="47" text-anchor="middle" font-size="18" fill="var(--text)">5</text>
+  <text x="331.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">11</text>
+  <text x="331.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="358.5" y="109" width="24" height="81" fill="var(--accent)" />
+  <text x="370.5" y="101" text-anchor="middle" font-size="18" fill="var(--text)">3</text>
+  <text x="370.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">12</text>
+  <text x="370.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="397.5" y="163" width="24" height="27" fill="var(--accent)" />
+  <text x="409.5" y="155" text-anchor="middle" font-size="18" fill="var(--text)">1</text>
+  <text x="409.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">13</text>
+  <text x="409.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="436.5" y="188" width="24" height="2" fill="var(--line)" />
+  <text x="448.5" y="180" text-anchor="middle" font-size="18" fill="var(--muted)">0</text>
+  <text x="448.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">14</text>
+  <text x="448.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="475.5" y="28" width="24" height="162" fill="var(--accent)" />
+  <text x="487.5" y="20" text-anchor="middle" font-size="18" fill="var(--text)">6</text>
+  <text x="487.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">15</text>
+  <text x="487.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+  <rect x="514.5" y="28" width="24" height="162" fill="var(--accent)" />
+  <text x="526.5" y="20" text-anchor="middle" font-size="18" fill="var(--text)">6</text>
+  <text x="526.5" y="212" text-anchor="middle" font-size="19" fill="var(--muted)">16</text>
+  <text x="526.5" y="230" text-anchor="middle" font-size="15" fill="var(--muted)">set</text>
+</svg>
+      <table class="numeros">
+    <caption>Saudações por dia, os mesmos números do gráfico.</caption>
+    <thead><tr><th scope="col">Dia</th><th scope="col">Saudações</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">quinta, 3 de setembro</th><td>2</td></tr>
+      <tr><th scope="row">sexta, 4 de setembro</th><td>0</td></tr>
+      <tr><th scope="row">sábado, 5 de setembro</th><td>3</td></tr>
+      <tr><th scope="row">domingo, 6 de setembro</th><td>1</td></tr>
+      <tr><th scope="row">segunda, 7 de setembro</th><td>0</td></tr>
+      <tr><th scope="row">terça, 8 de setembro</th><td>4</td></tr>
+      <tr><th scope="row">quarta, 9 de setembro</th><td>2</td></tr>
+      <tr><th scope="row">quinta, 10 de setembro</th><td>0</td></tr>
+      <tr><th scope="row">sexta, 11 de setembro</th><td>5</td></tr>
+      <tr><th scope="row">sábado, 12 de setembro</th><td>3</td></tr>
+      <tr><th scope="row">domingo, 13 de setembro</th><td>1</td></tr>
+      <tr><th scope="row">segunda, 14 de setembro</th><td>0</td></tr>
+      <tr><th scope="row">terça, 15 de setembro</th><td>6</td></tr>
+      <tr><th scope="row">quarta, 16 de setembro</th><td>6</td></tr>
+    </tbody>
+  </table>
+    </section>
+  </main>
+</body>
+</html>
