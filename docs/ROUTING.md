@@ -13,7 +13,7 @@ node "$forjaRoot\bin\forja.mjs" start --provider codex --config "$forjaRoot\conf
 
 | Preset | Planning/development | Review | Status |
 |---|---|---|---|
-| `core-economy.json` | Codex Terra; Luna for easy tasks; Sol for hard, security, architecture or retries | Codex Sol | Explicit cloud routes |
+| `core-economy.json` | Codex Terra; Luna for easy tasks; Sol for hard, security, architecture or retries | Codex Sol | Experimental; medium UI trial interrupted |
 | `core-haiku.json` with `--provider claude` | Haiku for easy tasks, Sonnet for normal, Opus for stronger tiers | Opus | Configuration example; not live-tested for this release |
 | `core-local-pilot.json` | Same Codex routes, with installed Ollama model for the first easy development attempt | Codex Sol | Experimental hybrid; still uses cloud sessions |
 
@@ -59,3 +59,11 @@ ollama create forja-gpt-oss:20b-32k -f C:\tools\forja\config\ollama.Modelfile
 Inspect the Modelfile and ensure the base model is installed first: running `ollama create` yourself can obtain a missing base. The FORJA preflight only inspects existing tags/model metadata and rejects remote/cloud models or models without tools. Its endpoint is fixed to loopback. The local invocation ignores user configuration, sets a 32k context window and native compaction threshold of 24k, and preserves `workspace-write` / `read-only` phase sandboxes. On Windows it selects the elevated native sandbox; initial sandbox setup must already work. It never uses the sandbox-bypass flag. User instructions, skills/plugins and CLI background features can still affect execution; this is not full network isolation.
 
 A native Windows smoke test edited a file and executed its assertion in approximately 28 seconds. This establishes basic tool execution only. Memory/VRAM needs and speed depend on the model and hardware. There is no GPU scheduler: do not overlap the pilot with another project's Ollama workload. Stop or finish one workload before starting the other. Cloud-only presets do not load an Ollama model.
+
+## Validation status
+
+Routing, cloud budgets, final-check repair and provider boundaries have deterministic regression coverage. Native local editing passed the small smoke test above. Neither establishes successful unattended completion of a medium product task.
+
+A bounded UI reliability trial used a frozen executor, isolated source copy and fixed external checks. Its first planner returned prose instead of dependency IDs; validation blocked it before product edits. A stricter schema and clearer field instructions were added, and a second plan succeeded. The Sol development invocation then reached its ten-minute cap. Work was preserved, the run remained blocked, and no task received independent approval. Three native cloud invocations were started across both attempts; timeout usage was incomplete, so no total cost or token-saving claim is made.
+
+Post-stop scoring passed the build and six unit tests but only 6/11 fixed browser checks and 1/4 supplemental checks. Several failures reflected a changed search-field accessibility role and one navigation timeout, not established behavioral defects. A separate diagnostic adapting the selector and navigation timeout passed the eleven functional scenarios. The fixed score was not overwritten. Keyboard focus loss and a React StrictMode setup/cleanup/setup failure were reproduced; the latter informed the current review guidance. This was unfinished code, not an approved final product. It does not demonstrate either completed-task speed or quality superiority. Keep the established native defaults unless deliberately evaluating a preset on your own acceptance suite.

@@ -3,13 +3,13 @@
 ## 0.2.0 — Quality gates and explicit routing
 
 - User-configured final acceptance commands run at integration, before approval, and after relevant final regressions. Failed checks return to development within the existing attempt budget.
-- Review prompts cover asynchronous success/failure transitions, paging recovery, empty states, keyboard focus and accessible loading feedback.
+- Review prompts cover asynchronous success/failure transitions, paging recovery, empty states, keyboard focus, accessible loading feedback and repeated UI lifecycle setup/cleanup.
 - Explicit provider/model/effort routes per phase and risk tier, isolated provider settings, per-route time caps and a persisted cloud-session budget. Native executor failures stop without automatic provider fallback.
 - Economy and Haiku configuration examples; an opt-in Ollama pilot through Codex OSS checks for installed local tool-capable weights and retains the workspace sandbox. No automatic downloads or added runtime dependencies.
 - Usage distinguishes executor from inference backend. Older runs remain compatible and their previous invocations count conservatively toward cloud limits.
 - Replaced a machine-speed assertion with deterministic API coverage while liveness refreshes remain unresolved.
 
-Presets require model access in the selected native CLI. Local inference is experimental; its native edit/check smoke test does not establish medium-task quality. Session limits are not token, currency or subscription-quota limits. No automatic commit or push was added.
+Presets require model access in the selected native CLI. Economy and local presets remain experimental: the medium UI trial hit its development timeout and its preserved partial output had reproducible defects; the native local edit/check smoke test does not establish medium-task quality. Existing native model defaults remain unchanged. Session limits are not token, currency or subscription-quota limits. No automatic commit or push was added.
 
 ## 0.1.0 — Core baseline
 

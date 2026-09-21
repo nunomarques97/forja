@@ -31,6 +31,8 @@ Para desenvolver o FORJA: `npm test` e `npm run check`. Sem dependências de run
 
 A versão 0.2 acrescenta checks de aceitação definidos por quem inicia o run, independentes dos checks propostos pelo planner. A revisão inclui transições de erro/recuperação, concorrência de pedidos e acessibilidade quando aplicáveis. Os presets permitem usar modelos económicos em tarefas simples e modelos mais capazes nas revisões; não alteram a configuração global dos teus CLIs. Ollama é uma opção experimental explícita, desligada por defeito.
 
+Os presets económicos também são experimentais: o ensaio de uma tarefa UI atingiu o timeout de desenvolvimento e deixou defeitos no código parcial. Ainda não foi demonstrada qualidade equivalente num tempo semelhante. Os modelos anteriores continuam a ser o padrão; consulta os [resultados e limites](docs/ROUTING.md#validation-status) antes de escolher um preset.
+
 
 `core context --query "..."` mostra a seleção de conhecimento; o manifesto opcional `docs/forja/KNOWLEDGE.json` controla as fontes. Só documentação técnica revista pertence ao Git. Prompts, conversas, perguntas/respostas, handovers e evidência bruta ficam em armazenamento local ignorado. Obsidian pode abrir esse Markdown sem se tornar uma dependência do executor.
 
