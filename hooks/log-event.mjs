@@ -53,7 +53,7 @@ function readStdin() {
 }
 
 // Case- and separator-insensitive key for a Windows path: the same repo shows
-// up as C:\Users\... in one session and c:\Users\... in another.
+// up as C:\Fixtures\... in one session and c:\Fixtures\... in another.
 export function projectKey(cwd) {
   return String(cwd || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 }

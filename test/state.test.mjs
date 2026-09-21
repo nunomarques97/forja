@@ -310,7 +310,7 @@ describe('parallel runs and interleaved projects', () => {
     const { snap } = run('parallel-runs', 20);
     assert.equal(snap.runs.length, 2);
     const s = snap.runs.find(x => x.project === 'sample-project');
-    const v = snap.runs.find(x => x.project === 'indigo-cove');
+    const v = snap.runs.find(x => x.project === 'invest-calcs');
     assert.ok(inst(s, 'a-p1') && !inst(s, 'a-p2'));
     assert.ok(inst(v, 'a-p2') && !inst(v, 'a-p1'));
     assert.equal(s.counts.events, 7);
@@ -492,19 +492,19 @@ describe('forjalvl of a run in the viewer', () => {
     more.forEach((f, i) => al3(st, line(t + (i + 1) * 1000, { run_id: 'R-20260916-lvl1', ...f }), i + 2));
     return { r: sn3(st, t).runs[0], st };
   };
-  test('run.start carries the forjalvl (new name and old); an old event without it reads as max', () => {
+  test('run.start carries the forjalvl (new name and old); an old event without it reads as high', () => {
     const { r, st } = replay({ forjalvl: 'eco', model_level: 'eco' });
     assert.equal(st.badLines, 0);
     assert.equal(r.forja.forjalvl, 'eco');
     assert.equal(r.forja.modelLevel, 'eco', 'modelLevel is kept as an alias of forjalvl in the snapshot');
     assert.equal(r.forja.modelFloor, 'fable', 'the floor is untouched');
-    assert.equal(replay({}).r.forja.forjalvl, 'max', 'runs recorded before this feature');
-    assert.equal(replay({}).r.forja.modelLevel, 'max');
+    assert.equal(replay({}).r.forja.forjalvl, 'high', 'runs recorded before this feature');
+    assert.equal(replay({}).r.forja.modelLevel, 'high');
     assert.equal(replay({ model_level: 'high' }).r.forja.forjalvl, 'high', 'an event recorded before the rename still reads');
     assert.equal(replay({ forjalvl: 'high' }).r.forja.forjalvl, 'high');
     assert.equal(replay({ forjalvl: 'eco', model_level: 'high' }).r.forja.forjalvl, 'eco', 'the new name wins when both are there');
-    assert.equal(replay({ model_level: { a: 1 } }).r.forja.forjalvl, 'max', 'a malformed value falls back, never throws');
-    assert.equal(replay({ forjalvl: { a: 1 } }).r.forja.forjalvl, 'max');
+    assert.equal(replay({ model_level: { a: 1 } }).r.forja.forjalvl, 'high', 'a malformed value falls back, never throws');
+    assert.equal(replay({ forjalvl: { a: 1 } }).r.forja.forjalvl, 'high');
   });
   test('runner.session also carries the forjalvl; an event without it keeps what was known', () => {
     assert.equal(replay({ forjalvl: 'max' }, [{ kind: 'runner.session', phase: 'plan', session_id: 's1', forjalvl: 'eco', model_level: 'eco' }]).r.forja.forjalvl, 'eco');
@@ -526,7 +526,7 @@ describe('autonomy of a run in the viewer', () => {
     const { r, st } = replay({ autonomy: 'total' });
     assert.equal(st.badLines, 0);
     assert.equal(r.forja.autonomy, 'total');
-    assert.equal(r.forja.forjalvl, 'max', 'the forjalvl is untouched');
+    assert.equal(r.forja.forjalvl, 'high', 'the forjalvl is untouched');
     assert.equal(replay({}).r.forja.autonomy, 'normal', 'runs recorded before this feature');
     assert.equal(replay({ autonomy: 'normal' }).r.forja.autonomy, 'normal');
     assert.equal(replay({ autonomy: { a: 1 } }).r.forja.autonomy, 'normal', 'a malformed value falls back, never throws');
@@ -546,7 +546,7 @@ describe('autonomy of a run in the viewer', () => {
 
 // ---------- T-VIS-2: fim de turno de uma sessão do runner (incidente real, 17 set 2026) ----------
 describe('runner sessions: ending the turn is the end of a phase, not a ticket for the Sponsor', () => {
-  // Fixture built from the real stream of the granite run (session
+  // Fixture built from the real stream of the gearlift run (session
   // 3dc453de-…, task T4): `runner.session` emitted from the previous session
   // with the id of the visible one, and the `Stop` hook of that visible session.
   const ls = lines('runner-visible-turn-end');
@@ -586,7 +586,7 @@ describe('runner sessions: ending the turn is the end of a phase, not a ticket f
     // same run. The run has seen `runner.session` events, but this session was
     // never launched by the runner: the end of his turn is his to deal with.
     const SPONSOR = 'aa11bb22-cc33-4d44-8e55-ff6677889900';
-    const line = (offS, fields) => JSON.stringify({ ts: new Date(BASE + offS * 1000).toISOString(), project: 'sample-project', session_id: SPONSOR, cwd: 'C:\dev\examples\sample-project', permission_mode: 'auto', ...fields });
+    const line = (offS, fields) => JSON.stringify({ ts: new Date(BASE + offS * 1000).toISOString(), project: 'sample-project', session_id: SPONSOR, cwd: 'C:\Fixtures\User\Desktop\Repositorios\examples\sample-project', permission_mode: 'auto', ...fields });
     const mixed = [...ls.filter(l => l.trim()),
       line(200, { hook_event_name: 'SessionStart', source: 'startup' }),
       line(201, { hook_event_name: 'UserPromptSubmit', prompt: 'continua o run à mão' }),
@@ -621,14 +621,14 @@ describe('runs verdadeiros e sessões soltas (T-UI-9)', () => {
     const { snap } = run('loose-sessions', NOW);
     assert.equal(snap.runs.length, 5, 'três runs e duas sessões soltas — as sessões de fase não contam à parte');
     assert.deepEqual(snap.runs.map(r => [r.kind, r.project, r.status]), [
-      ['run', 'granite', STATES.TRABALHAR],
-      ['run', 'juniper-hill', STATES.TRABALHAR],
-      ['run', 'violet-pier', STATES.TRABALHAR],
+      ['run', 'gearlift', STATES.TRABALHAR],
+      ['run', 'job-hunter', STATES.TRABALHAR],
+      ['run', 'velora-poker', STATES.TRABALHAR],
       ['session', 'forja', STATES.TERMINADO],
       ['session', 'forja', STATES.ESPERA_INPUT],
     ]);
     const gear = snap.runs[0];
-    assert.deepEqual(gear.sessions, ['gran-run0-aaaa-bbbb-cccc-000000000010', 'gear-fase-aaaa-bbbb-cccc-000000000011'],
+    assert.deepEqual(gear.sessions, ['gear-run0-aaaa-bbbb-cccc-000000000010', 'gear-fase-aaaa-bbbb-cccc-000000000011'],
       'a sessão de fase entra no run, não fica como objeto à parte');
     assert.equal(gear.tasks[0].status, 'done', 'e o que ela fez conta para o run: T1 fechada');
     assert.equal(snap.runs.filter(r => r.kind === 'session' && r.project !== 'forja').length, 0,

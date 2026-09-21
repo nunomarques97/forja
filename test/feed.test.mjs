@@ -28,7 +28,7 @@ describe('títulos legíveis: sem caminhos nem códigos de task', () => {
     assert.equal(looksPath('PASS/FAIL/UNKNOWN/N/A'), false);
     assert.equal(looksPath('e/ou'), false);
     assert.equal(looksPath('https://exemplo.pt/a/b'), false);
-    assert.equal(looksPath('C:\\granite\\docs'), true);
+    assert.equal(looksPath('C:\\gearlift\\docs'), true);
     assert.equal(looksPath('TESTING.md:58'), true);
   });
 });

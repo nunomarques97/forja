@@ -15,22 +15,22 @@ describe('forjalvl names', () => {
     for (const [given, want] of [['max', 'max'], ['máximo', 'max'], ['MAXIMO', 'max'], [' Máximo ', 'max'], ['high', 'high'], ['alto', 'high'], ['Alto', 'high'], ['eco', 'eco'], ['económico', 'eco'], ['economico', 'eco'], ['ECONÓMICO', 'eco']]) {
       assert.equal(normalizeLevel(given), want, `${given} → ${want}`);
     }
-    assert.equal(normalizeLevel(undefined), 'max', 'missing forjalvl = the default, max');
-    assert.equal(normalizeLevel(null), 'max');
-    assert.equal(normalizeLevel(''), 'max');
+    assert.equal(normalizeLevel(undefined), 'high', 'missing forjalvl = the default, high');
+    assert.equal(normalizeLevel(null), 'high');
+    assert.equal(normalizeLevel(''), 'high');
     assert.equal(labelOf('high'), 'alto');
   });
   test('a forjalvl already stored on disk is read tolerantly: garbage reads as the default, never throws', () => {
     assert.equal(levelOf('económico'), 'eco');
-    assert.equal(levelOf('lixo'), 'max');
-    assert.equal(levelOf(undefined), 'max');
-    assert.equal(labelOf('lixo'), 'máximo');
+    assert.equal(levelOf('lixo'), 'high');
+    assert.equal(levelOf(undefined), 'high');
+    assert.equal(labelOf('lixo'), 'alto');
   });
   test('readForjalvl: the new key wins, the pre-rename `model_level` still reads, neither = undefined', () => {
     assert.equal(readForjalvl({ forjalvl: 'eco' }), 'eco');
     assert.equal(readForjalvl({ model_level: 'high' }), 'high', 'a RUN.json/SETTINGS.json written before 17 set 2026');
     assert.equal(readForjalvl({ forjalvl: 'eco', model_level: 'high' }), 'eco', 'the new name wins');
-    assert.equal(readForjalvl({}), undefined, 'nothing set is not the same as "max"');
+    assert.equal(readForjalvl({}), undefined, 'nothing set is not the same as "high"');
     assert.equal(readForjalvl({ outra_chave: 'x' }), undefined);
     assert.equal(readForjalvl(null), undefined);
     assert.equal(readForjalvl(undefined), undefined);
@@ -175,7 +175,7 @@ describe('policyText — the one place the policy is written in words', () => {
       assert.equal(describeLevel(lv), `${LEVEL_LABEL[lv]} — ${EXPECTED[lv]}`, 'describeLevel is the label plus the sentence');
     }
     assert.equal(policyText('máximo'), EXPECTED.max, 'the Portuguese name is accepted');
-    assert.equal(policyText('lixo'), EXPECTED.max, 'a corrupted level on disk reads as the default');
+    assert.equal(policyText('lixo'), EXPECTED.high, 'a corrupted level on disk reads as the default');
   });
   test('the sentence follows the functions, not a copy: the floor moves the Architect only at max', () => {
     assert.match(policyText('max', 'opus'), /^Architect em Opus;/, 'after a fallback the Architect is Opus');

@@ -197,14 +197,26 @@ describe('GET /projects', () => {
     assert.ok(!r.body.includes(root.replace(/\\/g, '\\\\')) && !r.body.includes(root), 'nenhum caminho do PC atravessa o túnel');
     assert.equal((await http('/projects', { method: 'POST', body: '{}' })).status, 405);
   });
-  test('the answer never waits for a liveness check (two locked projects, one live owner)', async () => {
-    await http('/projects'); // the first sighting of each pid is the one synchronous check
-    const t0 = performance.now();
-    const r = await http('/projects');
-    const ms = performance.now() - t0;
-    assert.equal(r.status, 200);
-    assert.equal(r.json.projects.find(p => p.name === 'beta').runnerAlive, true, 'still the right answer');
-    assert.ok(ms < 100, `GET /projects demorou ${ms.toFixed(0)} ms (o PowerShell de ownerAlive custa ~300 ms por projeto com lock)`);
+  test('cached project status remains available while liveness refreshes are unresolved', async () => {
+    resetAliveCache();
+    const staleAt = Date.now() - ALIVE_TTL_MS - 1;
+    ownerAliveCached(decoy.pid, staleAt, () => true);
+    ownerAliveCached(deadPid, staleAt, () => false);
+    const completions = [];
+    const refresh = pid => new Promise(resolve => completions.push(() => resolve(pid === decoy.pid)));
+    try {
+      const projects = listProjectsWithStatus(dataDir, Date.now(), () => assert.fail('cached status must not repeat a blocking check'), refresh);
+      assert.equal(projects.find(p => p.name === 'beta').runnerAlive, true);
+      await Promise.resolve();
+      assert.equal(completions.length, 2, 'both background refreshes started and neither has resolved');
+      const r = await http('/projects');
+      assert.equal(r.status, 200);
+      assert.equal(r.json.projects.find(p => p.name === 'beta').runnerAlive, true);
+      assert.equal(r.json.projects.find(p => p.name === 'gama').runnerAlive, false);
+    } finally {
+      for (const complete of completions) complete();
+      await Promise.resolve();
+    }
   });
 });
 

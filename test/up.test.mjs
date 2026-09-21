@@ -23,7 +23,7 @@ const CF_BEFORE = `2026-09-16T17:56:31Z INF Thank you for trying Cloudflare Tunn
 `;
 const CF_AFTER = `2026-09-16T17:56:36Z INF +--------------------------------------------------------------------------------------------+
 2026-09-16T17:56:36Z INF |  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |
-2026-09-16T17:56:36Z INF |  https://alpha-bravo-charlie-delta.trycloudflare.com                                 |
+2026-09-16T17:56:36Z INF |  https://exciting-sign-function-reaching.trycloudflare.com                                 |
 2026-09-16T17:56:36Z INF +--------------------------------------------------------------------------------------------+
 2026-09-16T17:56:36Z INF Registered tunnel connection connIndex=0 connection=bc275779 event=0 ip=2606:4700:a8::7 location=mad05 protocol=http2
 `;
@@ -45,13 +45,13 @@ create an account and add your key for a longer lasting domain name. see https:/
 describe('parseTunnelUrl', () => {
   test('cloudflared: the "Requesting new quick Tunnel" line does not match; the boxed URL does', () => {
     assert.equal(parseTunnelUrl(CF_BEFORE), null);
-    assert.equal(parseTunnelUrl(CF_BEFORE + CF_AFTER), 'https://alpha-bravo-charlie-delta.trycloudflare.com');
-    assert.equal(parseTunnelUrl(CF_AFTER), 'https://alpha-bravo-charlie-delta.trycloudflare.com');
+    assert.equal(parseTunnelUrl(CF_BEFORE + CF_AFTER), 'https://exciting-sign-function-reaching.trycloudflare.com');
+    assert.equal(parseTunnelUrl(CF_AFTER), 'https://exciting-sign-function-reaching.trycloudflare.com');
   });
   test('cloudflared: a URL split across two chunks is found once the buffer holds it', () => {
     const a = CF_AFTER.slice(0, CF_AFTER.indexOf('https://') + 12); const b = CF_AFTER.slice(a.length);
     assert.equal(parseTunnelUrl(a), null);
-    assert.equal(parseTunnelUrl(a + b), 'https://alpha-bravo-charlie-delta.trycloudflare.com');
+    assert.equal(parseTunnelUrl(a + b), 'https://exciting-sign-function-reaching.trycloudflare.com');
   });
   test('localhost.run: banner decoys (admin.localhost.run, localhost.run/docs) are ignored; the lhr.life URL is found', () => {
     assert.equal(parseTunnelUrl(LHR_BANNER), null);
@@ -66,12 +66,12 @@ describe('parseTunnelUrl', () => {
 
 describe('buildTunnelJson', () => {
   test('exact shape the viewer reads: url, hostnames, mobileUrl, desktopUrl, since — and no token anywhere (T-SEC-1)', () => {
-    const t = buildTunnelJson('https://alpha-bravo-charlie-delta.trycloudflare.com', '2026-09-16T18:00:00.000Z');
+    const t = buildTunnelJson('https://exciting-sign-function-reaching.trycloudflare.com', '2026-09-16T18:00:00.000Z');
     assert.deepEqual(t, {
-      url: 'https://alpha-bravo-charlie-delta.trycloudflare.com',
-      hostnames: ['alpha-bravo-charlie-delta.trycloudflare.com'],
-      mobileUrl: 'https://alpha-bravo-charlie-delta.trycloudflare.com/m',
-      desktopUrl: 'https://alpha-bravo-charlie-delta.trycloudflare.com/',
+      url: 'https://exciting-sign-function-reaching.trycloudflare.com',
+      hostnames: ['exciting-sign-function-reaching.trycloudflare.com'],
+      mobileUrl: 'https://exciting-sign-function-reaching.trycloudflare.com/m',
+      desktopUrl: 'https://exciting-sign-function-reaching.trycloudflare.com/',
       since: '2026-09-16T18:00:00.000Z',
     });
     assert.deepEqual(Object.keys(t), ['url', 'hostnames', 'mobileUrl', 'desktopUrl', 'since']);
@@ -103,7 +103,7 @@ describe('sanitizeClick (lib/notify.mjs)', () => {
     assert.equal(sanitizeClick(''), undefined);
     assert.equal(sanitizeClick('/m?k=abc'), undefined, 'relativa: sem origem, não é um link para o telemóvel');
     assert.equal(sanitizeClick('javascript:alert(1)'), undefined);
-    assert.equal(sanitizeClick('file:///C:/Users/dev/forja/data/viewer-token.txt'), undefined);
+    assert.equal(sanitizeClick('file:///C:/Fixtures/User/forja/data/viewer-token.txt'), undefined);
   });
 });
 
@@ -125,8 +125,8 @@ describe('backoff and commands', () => {
 
 describe('startupPaths and launcherFiles', () => {
   test('launcher lives in the APPDATA Startup folder, wrapper in data/autostart', () => {
-    const p = startupPaths({ appData: 'C:\\Users\\x\\AppData\\Roaming', data: 'C:\\forja\\data' });
-    assert.equal(p.startupDir, join('C:\\Users\\x\\AppData\\Roaming', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'));
+    const p = startupPaths({ appData: 'C:\\Fixtures\\x\\AppData\\Roaming', data: 'C:\\forja\\data' });
+    assert.equal(p.startupDir, join('C:\\Fixtures\\x\\AppData\\Roaming', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'));
     assert.equal(p.launcher, join(p.startupDir, 'forja-up.vbs'));
     assert.equal(p.wrapper, join('C:\\forja\\data', 'autostart', 'forja-up.cmd'));
     assert.equal(p.consoleLog, join('C:\\forja\\data', 'up.console.log'));
@@ -135,7 +135,7 @@ describe('startupPaths and launcherFiles', () => {
     assert.throws(() => startupPaths({ appData: '', data: 'x' }), /APPDATA/);
   });
   test('the .cmd references node, <forja>\\bin\\forja.mjs up, cds into the forja repo, loops on error; the .vbs runs it with window style 0', () => {
-    const p = startupPaths({ appData: 'C:\\Users\\x\\AppData\\Roaming', data: 'C:\\forja\\data' });
+    const p = startupPaths({ appData: 'C:\\Fixtures\\x\\AppData\\Roaming', data: 'C:\\forja\\data' });
     const files = launcherFiles(p, { forja: 'C:\\forja', node: 'C:\\nodejs\\node.exe' });
     const cmd = files[p.wrapper]; const vbs = files[p.launcher];
     assert.ok(cmd.includes('cd /d "C:\\forja"'));
@@ -336,15 +336,15 @@ describe('attributeLeftovers (pure)', () => {
 
 describe('isOurUp (pure)', () => {
   test('only node.exe running <forja>/bin/forja.mjs up (either slash style, quoted or not) is ours', () => {
-    const forja = 'C:\\Users\\x\\forja';
-    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: '"C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\x\\forja\\bin\\forja.mjs" up --port 4317' }, { forja }), true);
-    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: 'node C:/Users/x/forja/bin/forja.mjs up' }, { forja }), true);
-    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: 'node C:/users/X/FORJA/bin/forja.mjs up --no-tunnel' }, { forja }), true);
-    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: 'node C:/Users/x/forja/bin/forja.mjs serve' }, { forja }), false, 'serve is not up');
-    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: 'node C:/Users/x/forja/bin/forja.mjs update' }, { forja }), false, 'prefix match is not up');
-    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: 'node C:/Users/y/other/bin/forja.mjs up' }, { forja }), false, 'another repo');
+    const forja = 'C:\\Fixtures\\x\\forja';
+    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: '"C:\\Program Files\\nodejs\\node.exe" "C:\\Fixtures\\x\\forja\\bin\\forja.mjs" up --port 4317' }, { forja }), true);
+    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: 'node C:/Fixtures/x/forja/bin/forja.mjs up' }, { forja }), true);
+    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: 'node C:/fixtures/X/FORJA/bin/forja.mjs up --no-tunnel' }, { forja }), true);
+    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: 'node C:/Fixtures/x/forja/bin/forja.mjs serve' }, { forja }), false, 'serve is not up');
+    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: 'node C:/Fixtures/x/forja/bin/forja.mjs update' }, { forja }), false, 'prefix match is not up');
+    assert.equal(isOurUp({ Name: 'node.exe', CommandLine: 'node C:/Fixtures/y/other/bin/forja.mjs up' }, { forja }), false, 'another repo');
     assert.equal(isOurUp({ Name: 'node.exe', CommandLine: 'node -e "setTimeout(function(){},60000)"' }, { forja }), false);
-    assert.equal(isOurUp({ Name: 'cmd.exe', CommandLine: 'cmd /c node C:/Users/x/forja/bin/forja.mjs up' }, { forja }), false, 'not node.exe');
+    assert.equal(isOurUp({ Name: 'cmd.exe', CommandLine: 'cmd /c node C:/Fixtures/x/forja/bin/forja.mjs up' }, { forja }), false, 'not node.exe');
     assert.equal(isOurUp(null, { forja }), false);
     // relative command line (the Sponsor's own `node bin\\forja.mjs up`): only a matching creation date attributes it
     const rel = { Name: 'node.exe', CommandLine: '"C:\\Program Files\\nodejs\\node.exe" bin/forja.mjs up --port 4317', CreationDate: '/Date(1758043143861)/' };

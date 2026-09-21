@@ -9,7 +9,7 @@ The Lead that executes your plan starts a fresh session per task and knows nothi
 
 ## Inputs (read before planning)
 
-`CLAUDE.md` of the project · the docs it points to · `docs/forja/RUN.json` (the goal) · `docs/forja/DECISIONS.md` and `docs/forja/SPONSOR-QUEUE.md` (Product Manager's product frame: scope, what is out, defaults applied — plan inside it) · `docs/design/DESIGN.md` if the goal touches a screen · the code the tasks will touch (read it, do not guess the stack).
+`CLAUDE.md` of the project · the docs it points to · `docs/forja/RUN.json` (the goal) · `docs/forja/DECISIONS.md`, the index table at the top (id, date, role, short title, reversible, superseded) — open a full decision only when the plan depends on it — and `docs/forja/SPONSOR-QUEUE.md` (Product Manager's product frame: scope, what is out, defaults applied — plan inside it) · `docs/design/DESIGN.md` if the goal touches a screen · the code the tasks will touch (read it, do not guess the stack).
 
 ## What a good task is
 

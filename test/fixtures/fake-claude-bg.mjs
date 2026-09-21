@@ -33,7 +33,7 @@
 // ends in the limit line: a finished turn to look at, a session that is coming
 // back by itself in truth).
 // FAKE_BG_SUBAGENT (T-VIS-3, the shape of the 17 set 2026 incident in
-// violet-pier): the Lead launches a subagent IN THE BACKGROUND — `SubagentStart`
+// velora-poker): the Lead launches a subagent IN THE BACKGROUND — `SubagentStart`
 // in data/events.jsonl, «Async agent launched successfully … agentId: …» as the
 // tool result in the transcript — says «… is running on T1. Waiting for the
 // hand-back.» (no phase marker) and ends its turn: the hook writes `Stop` with
@@ -96,7 +96,7 @@ if (argv[0] === 'agents') {
     const stopHook = hits(process.env.FAKE_STOP_HOOK, e.name);
     const bgSub = hits(process.env.FAKE_BG_SUBAGENT, e.name);
     // FAKE_LIMIT_WAIT_IDLE: the same wait, but the daemon reports `idle` — the
-    // shape of the real granite transcript 2fbad91c-… (the limit line is the
+    // shape of the real gearlift transcript 2fbad91c-… (the limit line is the
     // last `assistant` text, no tool call after it, the session continues by
     // itself hours later). It must never read as a finished phase.
     const limitWait = hits(process.env.FAKE_LIMIT_WAIT, e.name) || hits(process.env.FAKE_LIMIT_WAIT_IDLE, e.name);
@@ -129,7 +129,7 @@ if (argv[0] === 'agents') {
       } else if (e.bgBack && !e.bgDone) {
         // …and the Lead goes on working — writes the report, calls the Reviewer,
         // commits — for FAKE_BG_SUBAGENT_AFTER polls before ending the phase.
-        // Measured in the violet transcript b48d3201-…: 4 min 08 s, 1 min 27 s and
+        // Measured in the velora transcript b48d3201-…: 4 min 08 s, 1 min 27 s and
         // 1 min 35 s between a hand-back and the next launch. That first `Stop`
         // must not end the phase now that the subagent is back.
         if (e.polls < e.bgBackPoll + Number(process.env.FAKE_BG_SUBAGENT_AFTER || 0)) {
@@ -249,7 +249,7 @@ function writeTranscript(entry, texts, { midTurn = false, launch = null, retriev
     JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'tu1', name: 'Bash', input: { command: 'git status' } }] } }),
     JSON.stringify({ type: 'assistant', isSidechain: true, message: { role: 'assistant', content: [{ type: 'text', text: "REJECT — o Dev escreveu \"You've hit your session limit, resets at 3pm\" no relatório" }] } }),
     // An `Agent` launched in the background: the tool answers at once, exactly
-    // as measured in the violet transcript b48d3201-… (T-VIS-3).
+    // as measured in the velora transcript b48d3201-… (T-VIS-3).
     ...(launch ? [
       JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'tuA', name: 'Agent', input: { subagent_type: 'backend-dev', description: 'T1 · Backend Dev: a task' } }] } }),
       JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tuA', content: [{ type: 'text', text: `Async agent launched successfully. (This tool result is internal metadata.)\nagentId: ${launch} (internal ID - do not mention to user.)\nThe agent is working in the background.` }] }] } }),

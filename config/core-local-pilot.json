@@ -1,0 +1,14 @@
+{
+  "maxSessions": 8,
+  "maxCloudSessions": 4,
+  "maxAttempts": 2,
+  "maxMinutes": 8,
+  "routes": {
+    "plan": { "provider": "codex", "model": "gpt-5.6-terra", "effort": "medium", "maxMinutes": 5 },
+    "develop": { "provider": "codex", "model": "gpt-5.6-terra", "effort": "medium" },
+    "develop.fast": { "provider": "codex", "localProvider": "ollama", "model": "forja-gpt-oss:20b-32k", "effort": "low", "maxMinutes": 3 },
+    "develop.strong": { "provider": "codex", "model": "gpt-5.6-sol", "effort": "medium" },
+    "review": { "provider": "codex", "model": "gpt-5.6-sol", "effort": "medium" },
+    "review.critical": { "provider": "codex", "model": "gpt-5.6-sol", "effort": "high" }
+  }
+}

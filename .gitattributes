@@ -1,0 +1,2 @@
+# Synthetic fixtures have exact-byte assertions and explicit CRLF variants.
+test/fixtures/** text eol=lf

@@ -7,14 +7,20 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { detectLimit, parseResetTime, pickNextTask, buildPrompt, claudeArgs, DISALLOWED, lockPath, acquireLock, beatLock, releaseLock, ownerAlive, LOCK_STALE_MS, taskMinutesFor, levelFromDisk, autonomyFromDisk, reportPath, DEFAULTS, HARD_TASK_FACTOR, parseBackgrounded, parseAgents, findAgent, shortIdOf, isBackground, transcriptText, findTranscript, sessionName, SESSION_NAME_PREFIX, waitingForUsageLimit, stripLimitLines, LIMIT_MARK, flagOn, VISIBLE, VISIBLE_END_STATES, transcriptTurnEnded, stopEventIn, sessionEventWatcher, readSessionEvents, runningSubagentsIn, pendingAsyncAgents, lastTurnText, phaseMarkerIn, SOFT_END_SIGNALS } from '../lib/runner.mjs';
+import { detectLimit, parseResetTime, pickNextTask, buildPrompt, claudeArgs, DISALLOWED, TOOLS, lockPath, acquireLock, beatLock, releaseLock, ownerAlive, LOCK_STALE_MS, taskMinutesFor, levelFromDisk, autonomyFromDisk, reportPath, DEFAULTS, HARD_TASK_FACTOR, parseBackgrounded, parseAgents, findAgent, shortIdOf, isBackground, transcriptText, findTranscript, sessionName, SESSION_NAME_PREFIX, waitingForUsageLimit, stripLimitLines, LIMIT_MARK, flagOn, VISIBLE, VISIBLE_END_STATES, transcriptTurnEnded, stopEventIn, sessionEventWatcher, readSessionEvents, runningSubagentsIn, pendingAsyncAgents, lastTurnText, phaseMarkerIn, SOFT_END_SIGNALS, MCP_CATALOG_PATH, MCP_DEFAULT, MCP_FALLBACK, mcpCatalogUsable, mcpDerivedPath, mcpFallbackPath, readMcpCatalog, mcpServersFor, resolveMcpConfig } from '../lib/runner.mjs';
+import { pointerName } from '../lib/state-files.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cli = join(here, '..', 'bin', 'forja.mjs');
 const fakeBg = join(here, 'fixtures', 'fake-claude-bg.mjs');
+// O fecho de um run corre o sync da Central de Projetos do Sponsor
+// (lib/obsidian-sync.mjs, D12/D13). Apontado aqui para uma pasta que não
+// existe — e herdado por todos os processos filhos destes testes —, o passo
+// salta com motivo e nenhum teste lê ou toca na Central real.
+process.env.FORJA_OBSIDIAN_SYNC_DIR = join(tmpdir(), 'forja-sem-central-runner-test');
 
 describe('usage-limit detection and reset time', () => {
   test('recognises the session/weekly/model variants and reads the reset moment', () => {
@@ -64,19 +70,39 @@ describe('prompts and args', () => {
     const opus = buildPrompt('task', { run: { ...run, model_floor: 'opus', fallbacks: [{ id: 'F1' }] }, forja: 'C:\\f', task: { id: 'T1', title: 'x', owner: 'fundidor' } });
     assert.match(opus, /Piso: opus — fallback F1/);
   });
-  test('the run\'s forjalvl decides every role in the prompts (max: the default)', () => {
+  test('the run\'s forjalvl decides every role in the prompts (high: the default)', () => {
     const t = { id: 'T1', title: 'x', owner: 'fundidor', complexity: 'medium' };
     const plan = buildPrompt('plan', { run, forja: 'C:\\f' });
-    assert.match(plan, /Forjalvl \(nível de modelos\): max \(máximo — Architect em Fable/);
-    assert.match(plan, /subagent_type: "architect", model: "fable"/);
+    assert.match(plan, /Forjalvl \(nível de modelos\): high \(alto — Architect em Opus/);
+    assert.match(plan, /subagent_type: "architect", model: "opus"/);
     assert.match(plan, /subagent_type: "product-manager", model: "opus"/);
-    assert.match(plan, /subagent_type: "technology-scout", model: "opus"/);
+    assert.match(plan, /subagent_type: "technology-scout", model: "sonnet"/);
     const task = buildPrompt('task', { run, forja: 'C:\\f', task: t });
     assert.match(task, /subagent_type: "backend-dev", model: "sonnet"/, 'medium task, first attempt');
     assert.match(task, /subagent_type: "reviewer", model: "opus"/);
     assert.match(task, /subagent_type: "security-reviewer", model: "opus"/);
     assert.match(buildPrompt('task', { run, forja: 'C:\\f', task, attempt: 2 }), /subagent_type: "backend-dev", model: "opus"/, 'second attempt');
-    assert.match(buildPrompt('close', { run, forja: 'C:\\f' }), /subagent_type: "qa", model: "opus"/);
+    assert.match(buildPrompt('close', { run, forja: 'C:\\f' }), /subagent_type: "qa", model: "sonnet"/);
+    // "fable" still appears in the boilerplate sentence about the model floor
+    // mechanic (it only ever moves the Architect, and only at max) — what must
+    // never happen at the default is an actual `model: "fable"` on a role.
+    assert.equal(/model: "fable"/.test(plan), false, 'fable only exists at max, never at the default');
+    assert.equal(/model: "fable"/.test(task), false);
+  });
+  test('forjalvl max (explicit): Architect on Fable while the floor holds, everyone else opus', () => {
+    const r = { ...run, forjalvl: 'max' };
+    const t = { id: 'T1', title: 'x', owner: 'fundidor', complexity: 'medium' };
+    const plan = buildPrompt('plan', { run: r, forja: 'C:\\f' });
+    assert.match(plan, /Forjalvl \(nível de modelos\): max \(máximo — Architect em Fable/);
+    assert.match(plan, /subagent_type: "architect", model: "fable"/);
+    assert.match(plan, /subagent_type: "product-manager", model: "opus"/);
+    assert.match(plan, /subagent_type: "technology-scout", model: "opus"/);
+    const task = buildPrompt('task', { run: r, forja: 'C:\\f', task: t });
+    assert.match(task, /subagent_type: "backend-dev", model: "sonnet"/, 'medium task, first attempt');
+    assert.match(task, /subagent_type: "reviewer", model: "opus"/);
+    assert.match(task, /subagent_type: "security-reviewer", model: "opus"/);
+    assert.match(buildPrompt('task', { run: r, forja: 'C:\\f', task: t, attempt: 2 }), /subagent_type: "backend-dev", model: "opus"/, 'second attempt');
+    assert.match(buildPrompt('close', { run: r, forja: 'C:\\f' }), /subagent_type: "qa", model: "opus"/);
     // The one fable call inside a task session at max is the Architect of step 5
     // (replanning) - written `model "fable"`, without the colon. Every other role
     // is asserted by name so the check cannot pass by accident.
@@ -112,7 +138,7 @@ describe('prompts and args', () => {
   test('the session effort comes from the forjalvl and appears in the prompt and in the claude args', () => {
     const eco = { ...run, forjalvl: 'eco' };
     assert.match(buildPrompt('plan', { run: eco, forja: 'C:\\f' }), /Effort of this session: medium/);
-    assert.match(buildPrompt('plan', { run, forja: 'C:\\f' }), /Effort of this session: max/, 'max plans on max effort');
+    assert.match(buildPrompt('plan', { run, forja: 'C:\\f' }), /Effort of this session: high/, 'high (the default) plans on high effort');
     const easy = buildPrompt('task', { run, forja: 'C:\\f', task: { id: 'T1', title: 'x', owner: 'fundidor', complexity: 'easy' } });
     assert.match(easy, /Effort of this session: medium/);
     assert.match(easy, /Modelo: sonnet\. Effort: medium\./, 'the Agent prompts state the session effort');
@@ -121,12 +147,283 @@ describe('prompts and args', () => {
     assert.match(buildPrompt('task', { run, forja: 'C:\\f', effort: 'low', task: { id: 'T1', title: 'x', owner: 'fundidor' } }), /Effort of this session: low/, 'an explicit effort wins');
     assert.deepEqual(claudeArgs({ sessionId: 'sid', effort: 'medium' }).slice(0, 7), ['-p', '--model', 'opus', '--effort', 'medium', '--permission-mode', 'auto']);
   });
-  test('claude args: print mode, model, effort, auto permissions, session id, every disallowed pattern', () => {
+  test('claude args: print mode, model, effort, auto permissions, MCP whitelist, native-tools ceiling, session id, every disallowed pattern', () => {
     const a = claudeArgs({ sessionId: 'sid' });
-    assert.deepEqual(a.slice(0, 11), ['-p', '--model', 'opus', '--effort', 'high', '--permission-mode', 'auto', '--output-format', 'text', '--session-id', 'sid']);
-    assert.equal(a[11], '--disallowedTools');
+    assert.deepEqual(a.slice(0, 16), ['-p', '--model', 'opus', '--effort', 'high', '--permission-mode', 'auto', '--strict-mcp-config', '--mcp-config', MCP_CATALOG_PATH, '--tools', TOOLS, '--output-format', 'text', '--session-id', 'sid']);
+    assert.equal(a[16], '--disallowedTools');
     for (const d of DISALLOWED) assert.ok(a.includes(d));
     assert.ok(DISALLOWED.includes('Bash(git push:*)') && DISALLOWED.includes('Bash(rm -rf:*)') && DISALLOWED.includes('Bash(Remove-Item:*)'));
+  });
+  // D27 (Product Manager) / S5 (Technology Scout, docs/forja/TECHNOLOGY.md): the
+  // Lead's native tools are capped to exactly this list, WebSearch/WebFetch
+  // included on purpose because S5 proved `--tools` on the parent session is a
+  // ceiling for every subagent it launches — without them no Technology Scout
+  // could search the web from inside a run.
+  test('--tools carries exactly the D27 list, and it is a superset of what the reviewer roles declare', () => {
+    assert.equal(TOOLS, 'Bash,PowerShell,Read,Write,Edit,Grep,Glob,Agent,Skill,TodoWrite,TaskOutput,WebSearch,WebFetch');
+    const list = TOOLS.split(',');
+    assert.deepEqual(list, [...new Set(list)], 'no duplicate tool names');
+    for (const must of ['WebSearch', 'WebFetch', 'Bash', 'PowerShell', 'Agent', 'Skill']) assert.ok(list.includes(must), must);
+    assert.equal(list.includes('NotebookEdit'), false, 'D27: NotebookEdit stays out');
+    const a = claudeArgs({ sessionId: 'sid' });
+    assert.equal(a[a.indexOf('--tools') + 1], TOOLS, 'a single comma-joined argument, never a variadic list');
+  });
+});
+
+// Decision S4 / D26: a session only sees the MCP servers this repo declares.
+describe('the MCP whitelist of a session', () => {
+  const tmpRoots = [];
+  after(() => { for (const r of tmpRoots) rmSync(r, { recursive: true, force: true }); });
+  const tmpRoot = () => { const r = mkdtempSync(join(tmpdir(), 'forja-mcp-')); tmpRoots.push(r); return r; };
+
+  test('the catalogue is the real declaration of this machine, versioned in config/', () => {
+    assert.equal(MCP_CATALOG_PATH, join(here, '..', 'config', 'mcp-forja.json'), 'resolved from forjaRoot, never from the cwd');
+    assert.ok(existsSync(MCP_CATALOG_PATH));
+    assert.deepEqual(JSON.parse(readFileSync(MCP_CATALOG_PATH, 'utf8')), {
+      mcpServers: { playwright: { type: 'stdio', command: 'npx', args: ['@playwright/mcp@latest'], env: {} } },
+    }, '`claude mcp get playwright`: stdio, npx, @playwright/mcp@latest, no env');
+    assert.deepEqual(Object.keys(readMcpCatalog()), ['playwright']);
+    assert.deepEqual(MCP_DEFAULT.slice(), ['playwright'], 'the default is playwright and only it');
+    assert.deepEqual(readMcpCatalog(join(tmpRoot(), 'nao-existe.json')), {}, 'a missing or broken catalogue never throws');
+    // A missing `mcp` key hands over the catalogue FILE, so "the default" and
+    // "the whole catalogue" have to be the same set. The day a Scout decision
+    // adds a second server (S4 "Limites (b)") this assertion goes red on
+    // purpose: whoever adds it has to decide what a project with no `mcp` key
+    // gets, instead of silently getting the new server too (Reviewer nit 1 /
+    // Security Reviewer nit 3, T2 attempt 2).
+    assert.deepEqual(Object.keys(readMcpCatalog()).sort(), MCP_DEFAULT.slice().sort(),
+      'catálogo e omissão são o mesmo conjunto — ao acrescentar um servidor, tratar primeiro o caminho "sem chave mcp"');
+    // The embedded emergency list must never drift from the versioned catalogue.
+    assert.deepEqual(MCP_FALLBACK.mcpServers.playwright, readMcpCatalog().playwright,
+      'MCP_FALLBACK é a mesma declaração do catálogo, para a degradação não inventar uma forma de arranque');
+    assert.deepEqual(Object.keys(MCP_FALLBACK.mcpServers), ['playwright']);
+  });
+
+  test('no `mcp` key, an unreadable SETTINGS.json or nonsense in it all mean the default', () => {
+    assert.deepEqual(resolveMcpConfig({ settings: {}, dir: tmpRoot() }), { path: MCP_CATALOG_PATH, source: 'default', unknown: [] });
+    assert.equal(resolveMcpConfig({ settings: { forjalvl: 'eco' }, dir: tmpRoot() }).path, MCP_CATALOG_PATH);
+    assert.equal(resolveMcpConfig({ settings: { mcp: ['playwright'] }, dir: tmpRoot() }).source, 'default', 'the default written out is still the default: no derived file');
+    for (const bad of [42, 'playwright', true, null]) {
+      const r = resolveMcpConfig({ settings: { mcp: bad }, dir: tmpRoot() });
+      assert.equal(r.path, MCP_CATALOG_PATH, `mcp: ${JSON.stringify(bad)}`);
+    }
+    // The real read from disk: no file at all, and a file that cannot be parsed.
+    const before = process.env.FORJA_PROJECT_ROOT;
+    try {
+      const proj = tmpRoot();
+      process.env.FORJA_PROJECT_ROOT = proj;
+      assert.equal(resolveMcpConfig({ dir: tmpRoot() }).path, MCP_CATALOG_PATH, 'no SETTINGS.json');
+      mkdirSync(join(proj, 'docs', 'forja'), { recursive: true });
+      writeFileSync(join(proj, 'docs', 'forja', 'SETTINGS.json'), '{ isto não é json');
+      const broken = resolveMcpConfig({ dir: tmpRoot() });
+      assert.equal(broken.path, MCP_CATALOG_PATH, 'an unreadable SETTINGS.json never stops a session');
+      assert.match(broken.note, /SETTINGS\.json ilegível/);
+      writeFileSync(join(proj, 'docs', 'forja', 'SETTINGS.json'), JSON.stringify({ mcp: [] }));
+      const dir = tmpRoot();
+      assert.equal(resolveMcpConfig({ dir }).path, mcpDerivedPath(dir), 'the key is read from the project on disk');
+    } finally {
+      if (before === undefined) delete process.env.FORJA_PROJECT_ROOT; else process.env.FORJA_PROJECT_ROOT = before;
+    }
+  });
+
+  test('a different `mcp` key writes the derived file under data/ and the session points at it', () => {
+    // A catalogue of this test's own with two entries: the repo one has exactly
+    // one, so asking for anything but `playwright` could never reach a derived
+    // file through it.
+    const mobile = { type: 'stdio', command: 'npx', args: ['@mobilenext/mobile-mcp@latest'], env: {} };
+    const play = readMcpCatalog().playwright;
+    const catalogPath = join(tmpRoot(), 'cat.json');
+    writeFileSync(catalogPath, JSON.stringify({ mcpServers: { playwright: play, 'mobile-mcp': mobile } }, null, 2));
+    const dir = tmpRoot();
+    const r = resolveMcpConfig({ settings: { mcp: ['playwright', 'mobile-mcp'] }, catalogPath, dir });
+    assert.equal(r.source, 'derived');
+    assert.equal(r.path, mcpDerivedPath(dir));
+    assert.deepEqual(JSON.parse(readFileSync(r.path, 'utf8')), {
+      mcpServers: { playwright: play, 'mobile-mcp': mobile },
+    }, 'each name carries the declaration the catalogue gives it');
+    assert.deepEqual(r.servers, ['playwright', 'mobile-mcp']);
+    // The map form is the same selection written differently: only the KEYS are
+    // read. This is the blocker the Security Reviewer raised on attempt 2 — a
+    // declaration inside the value used to be copied verbatim, which turned
+    // "anything that can write docs/forja/SETTINGS.json" into "anything that can
+    // make `claude` launch a process, with that env, in every session of every
+    // future run of that project, outside --disallowedTools and with no event".
+    const smuggled = { type: 'stdio', command: 'node', args: ['-e', 'require("fs").writeFileSync("PROOF.txt","x")'], env: { SEGREDO: 'abc' } };
+    const asMap = resolveMcpConfig({ settings: { mcp: { playwright: smuggled, 'mobile-mcp': true } }, catalogPath, dir: tmpRoot() });
+    assert.equal(asMap.source, 'derived');
+    const mapBody = readFileSync(asMap.path, 'utf8');
+    assert.deepEqual(JSON.parse(mapBody), { mcpServers: { playwright: play, 'mobile-mcp': mobile } },
+      'a whole declaration in the value is read for its key and nothing else');
+    for (const forbidden of ['node', '-e', 'PROOF.txt', 'SEGREDO', 'abc']) {
+      assert.equal(mapBody.includes(forbidden), false, `nada de "${forbidden}" do SETTINGS.json chega ao ficheiro do MCP`);
+    }
+    // And a name the catalogue does not declare cannot be launched, however
+    // complete the declaration next to it looks: it is dropped and named.
+    const inlineOnly = resolveMcpConfig({ settings: { mcp: { 'servidor-novo': smuggled } }, catalogPath, dir: tmpRoot() });
+    assert.deepEqual(inlineOnly.unknown, ['servidor-novo']);
+    assert.deepEqual(JSON.parse(readFileSync(inlineOnly.path, 'utf8')), { mcpServers: {} },
+      'um servidor novo exige uma entrada no catálogo versionado (S4), nunca uma declaração no projeto');
+    // An empty list is a real answer: strict mode with no server at all.
+    const none = tmpRoot();
+    const empty = resolveMcpConfig({ settings: { mcp: [] }, dir: none });
+    assert.equal(empty.source, 'derived');
+    assert.deepEqual(JSON.parse(readFileSync(empty.path, 'utf8')), { mcpServers: {} });
+    // A name nobody declares cannot be launched: it is dropped and named.
+    const unknown = resolveMcpConfig({ settings: { mcp: ['playwright', 'inventado'] }, dir: tmpRoot() });
+    assert.deepEqual(unknown.unknown, ['inventado']);
+    assert.equal(unknown.path, MCP_CATALOG_PATH, 'what is left is the default, so no derived file');
+    // And a data/ that cannot be written falls back to the catalogue instead of failing.
+    const blocked = join(tmpRoot(), 'ficheiro');
+    writeFileSync(blocked, 'não sou uma pasta');
+    const fell = resolveMcpConfig({ settings: { mcp: [] }, dir: blocked });
+    assert.equal(fell.path, MCP_CATALOG_PATH);
+    assert.match(fell.note, /não consegui escrever/);
+    // Both command-line shapes carry whatever path was resolved.
+    const derived = mcpDerivedPath(dir);
+    for (const visible of [false, true]) {
+      const a = claudeArgs({ sessionId: 'sid', visible, name: 'forja R-1 task-T1-a1', mcpConfig: derived });
+      assert.equal(a[a.indexOf('--mcp-config') + 1], derived);
+      assert.ok(a.includes('--strict-mcp-config'));
+      assert.ok(a.includes('--disallowedTools'), 'the disallowed list stays exactly as it was');
+    }
+  });
+
+  // Two facts decide this whole test. (a) The blocker of attempt 1 (Reviewer,
+  // 20 set 2026): `claude` does not degrade on a `--mcp-config` it cannot read —
+  // it exits 1 with no session at all —, so a file that is missing or broken must
+  // never reach the command line. (b) Blocker 2 of the Security Reviewer (attempt
+  // 2): "catalogue broken ⇒ no flags" was failing open — one bad write gave an
+  // unattended `--permission-mode auto` session the Sponsor's whole personal MCP
+  // environment back (Binance with order creation, Gmail, Supabase, Notion,
+  // Linear, Figma), in silence outside the runner log. So the degradation has a
+  // middle step: the embedded minimum list, written to data/ and used with both
+  // flags. `path: null` survives only as the third and last step.
+  test('a broken catalogue degrades to the embedded minimum list, and only drops both flags when even that cannot be written', () => {
+    const root = tmpRoot();
+    const missing = join(root, 'nao-existe.json');
+    assert.equal(mcpCatalogUsable(MCP_CATALOG_PATH), true, 'the repo catalogue is usable');
+    assert.equal(mcpCatalogUsable(missing), false);
+
+    // Step 2: still a whitelist, still `playwright`, still nothing personal.
+    const gone = resolveMcpConfig({ settings: {}, catalogPath: missing, dir: root });
+    assert.equal(gone.source, 'fallback');
+    assert.equal(gone.path, mcpFallbackPath(root), 'data/mcp/fallback.json, not the catalogue and not nothing');
+    assert.deepEqual(JSON.parse(readFileSync(gone.path, 'utf8')), MCP_FALLBACK, 'the declaration embedded in the code');
+    assert.deepEqual(Object.keys(JSON.parse(readFileSync(gone.path, 'utf8')).mcpServers), ['playwright'],
+      'exactamente um servidor: nenhum da conta pessoal do Sponsor volta à sessão');
+    assert.match(gone.note, /em falta ou ilegível/, 'and the runner logs why');
+    assert.equal(mcpCatalogUsable(gone.path), true, 'measured usable before it can reach the command line');
+    for (const visible of [false, true]) {
+      const a = claudeArgs({ sessionId: 'sid', visible, name: 'forja R-1 task-T1-a1', mcpConfig: gone.path });
+      assert.ok(a.includes('--strict-mcp-config'), `${visible ? '--bg' : '-p'}: a lista branca continua imposta`);
+      assert.equal(a[a.indexOf('--mcp-config') + 1], gone.path);
+    }
+
+    // Every shape `claude` refuses: no file, broken JSON, JSON that is not an
+    // object, and an object with no `mcpServers` map — all the same step.
+    for (const [name, text] of [['partido', '{ "mcpServers": '], ['lista', '[1,2]'], ['sem-mcpservers', '{"servers":{}}'], ['vazio', '']]) {
+      const bad = join(root, `${name}.json`);
+      writeFileSync(bad, text);
+      assert.equal(mcpCatalogUsable(bad), false, name);
+      const r = resolveMcpConfig({ settings: {}, catalogPath: bad, dir: root });
+      assert.equal(r.path, mcpFallbackPath(root), name);
+      assert.equal(r.source, 'fallback', name);
+    }
+    // A UTF-8 BOM is NOT a broken file (measured: `claude` accepts it, exit 0).
+    const bom = join(root, 'com-bom.json');
+    writeFileSync(bom, '\uFEFF' + readFileSync(MCP_CATALOG_PATH, 'utf8'));
+    assert.equal(mcpCatalogUsable(bom), true);
+    assert.equal(resolveMcpConfig({ settings: {}, catalogPath: bom, dir: root }).path, bom);
+
+    // The other roads to the default degrade the same way, keeping their note.
+    const nonsense = resolveMcpConfig({ settings: { mcp: 42 }, catalogPath: missing, dir: root });
+    assert.equal(nonsense.path, mcpFallbackPath(root));
+    assert.match(nonsense.note, /não é lista nem objeto/);
+    assert.match(nonsense.note, /em falta ou ilegível/);
+    // Names with no catalogue to read them from: nothing can be selected, so the
+    // fallback answers — and it is the one that still has `playwright` in it.
+    const byName = resolveMcpConfig({ settings: { mcp: ['playwright'] }, catalogPath: missing, dir: root });
+    assert.equal(byName.path, mcpFallbackPath(root), 'names with no catalogue to read them from');
+    assert.deepEqual(byName.unknown, ['playwright']);
+    // Same for `mcp: []`: a project that asked for no MCP at all gets one server
+    // it did not ask for. That is deliberate — the alternative in this state is
+    // the whole personal environment — and the runner logs the degradation.
+    assert.equal(resolveMcpConfig({ settings: { mcp: [] }, catalogPath: missing, dir: root }).source, 'fallback');
+    // An inline declaration is not a declaration: with no catalogue there is
+    // nothing to select, and `claude` is never handed a process to launch.
+    const smuggled = { type: 'stdio', command: 'node', args: ['-e', 'process.exit(0)'], env: {} };
+    const inlineOnly = resolveMcpConfig({ settings: { mcp: { 'servidor-novo': smuggled } }, catalogPath: missing, dir: root });
+    assert.equal(inlineOnly.source, 'fallback');
+    assert.deepEqual(inlineOnly.unknown, ['servidor-novo']);
+    assert.deepEqual(JSON.parse(readFileSync(inlineOnly.path, 'utf8')), MCP_FALLBACK);
+
+    // Step 3, the last resort: nothing to read AND nowhere to write.
+    const blocked = join(tmpRoot(), 'ficheiro');
+    writeFileSync(blocked, 'não sou uma pasta');
+    const dead = resolveMcpConfig({ settings: {}, catalogPath: missing, dir: blocked });
+    assert.equal(dead.path, null, 'nowhere to write and nothing to read');
+    assert.equal(dead.source, 'none');
+    assert.match(dead.note, /em falta ou ilegível/);
+    assert.match(dead.note, /não consegui escrever/, 'the runner logs both facts');
+    assert.equal(resolveMcpConfig({ settings: { mcp: [] }, catalogPath: missing, dir: blocked }).path, null);
+
+    // And the command line built from it: both flags gone, everything else in place.
+    for (const visible of [false, true]) {
+      const a = claudeArgs({ sessionId: 'sid', visible, name: 'forja R-1 task-T1-a1', mcpConfig: dead.path });
+      assert.equal(a.includes('--mcp-config'), false, `${visible ? '--bg' : '-p'}: sem ficheiro não vai caminho nenhum`);
+      assert.equal(a.includes('--strict-mcp-config'), false, 'nor strict mode alone, which would leave the session with no playwright');
+      assert.deepEqual(a, visible
+        ? ['--bg', '--model', 'opus', '--effort', 'high', '--permission-mode', 'auto', '--tools', TOOLS, '--disallowedTools', ...DISALLOWED, '--name', 'forja R-1 task-T1-a1']
+        : ['-p', '--model', 'opus', '--effort', 'high', '--permission-mode', 'auto', '--tools', TOOLS, '--output-format', 'text', '--session-id', 'sid', '--disallowedTools', ...DISALLOWED],
+        'no MCP flags reach the command line, but the native-tools ceiling (S5) still does: it costs no session, it is a plain CLI flag');
+    }
+  });
+
+  test('the derived file is named per project: two runners never write over each other', () => {
+    const dir = tmpRoot();
+    const a = mcpDerivedPath(dir, 'C:/repos/projeto-a');
+    const b = mcpDerivedPath(dir, 'C:/repos/projeto-b');
+    assert.notEqual(a, b, 'the same data/ dir, two projects, two files');
+    assert.equal(dirname(a), join(dir, 'mcp'));
+    assert.equal(basename(a), pointerName('C:/repos/projeto-a'), 'the same key the session pointers use');
+    const r = resolveMcpConfig({ settings: { mcp: [] }, dir, project: 'C:/repos/projeto-a' });
+    assert.equal(r.path, a);
+    assert.deepEqual(JSON.parse(readFileSync(r.path, 'utf8')), { mcpServers: {} });
+    assert.equal(readFileSync(r.path, 'utf8').endsWith('}'+String.fromCharCode(10)), true, 'written by writeJson (tmp+rename), newline at the end and all');
+  });
+
+  test('the config path is never followed by a bare word: `--mcp-config` is variadic', () => {
+    // Measured on 2.1.276: `claude --mcp-config <file> mcp list` tries to open
+    // files called "mcp" and "list". Whatever comes after the path must be a flag.
+    for (const visible of [false, true]) {
+      const a = claudeArgs({ sessionId: 'sid', visible, name: 'forja R-1 task-T1-a1' });
+      const next = a[a.indexOf('--mcp-config') + 2];
+      assert.ok(String(next).startsWith('-'), `${visible ? '--bg' : '-p'}: depois do caminho vem "${next}"`);
+    }
+  });
+
+  test('mcpServersFor: the pure pick is a selection of NAMES from the catalogue, never a declaration', () => {
+    const catalog = { playwright: { type: 'stdio', command: 'npx', args: ['@playwright/mcp@latest'], env: {} } };
+    assert.deepEqual(mcpServersFor(['playwright'], catalog), { servers: catalog, unknown: [] });
+    assert.deepEqual(mcpServersFor([], catalog), { servers: {}, unknown: [] });
+    assert.deepEqual(mcpServersFor(['x'], catalog), { servers: {}, unknown: ['x'] });
+    assert.deepEqual(mcpServersFor([' playwright ', 7, ''], catalog), { servers: catalog, unknown: [] }, 'whitespace trimmed, non-strings ignored');
+    assert.deepEqual(mcpServersFor({ playwright: 1 }, catalog), { servers: catalog, unknown: [] }, 'a known name takes the catalogue declaration');
+    assert.deepEqual(mcpServersFor({ x: 1 }, catalog), { servers: {}, unknown: ['x'] });
+    assert.equal(mcpServersFor(undefined, catalog), null);
+    assert.equal(mcpServersFor('playwright', catalog), null, 'a string is not a list of servers');
+    // Blocker 1, Security Reviewer, T2 attempt 2: the value of a key is never a
+    // declaration. A full {command, args, env} block in a project's SETTINGS.json
+    // used to be copied verbatim into the file `claude` reads, which made that
+    // file able to launch a process in every session of every future run of that
+    // project — outside the permission classifier, outside --disallowedTools and
+    // with no event. Only the key is read now, and an unknown key is dropped.
+    const evil = { type: 'stdio', command: 'node', args: ['-e', 'console.log(1)'], env: { TOKEN: 'x' } };
+    assert.deepEqual(mcpServersFor({ playwright: evil }, catalog), { servers: catalog, unknown: [] },
+      'a known name ignores the declaration next to it and keeps the catalogue one');
+    assert.deepEqual(mcpServersFor({ 'servidor-novo': evil }, catalog), { servers: {}, unknown: ['servidor-novo'] },
+      'um nome que o catálogo não declara não se lança, por completa que seja a declaração ao lado');
+    assert.deepEqual(mcpServersFor({ playwright: evil, outro: evil }, catalog).servers, catalog);
   });
 });
 
@@ -148,20 +445,20 @@ describe('the per-task time budget scales with complexity', () => {
 });
 
 describe('a corrupted forjalvl on disk', () => {
-  test('RUN.json with a nonsense forjalvl: the prompt is built at max instead of throwing, and it is logged', () => {
+  test('RUN.json with a nonsense forjalvl: the prompt is built at high instead of throwing, and it is logged', () => {
     const lines = [];
-    assert.equal(levelFromDisk({ forjalvl: 'turbo' }, l => lines.push(l)), 'max');
-    assert.match(lines[0], /forjalvl desconhecido: "turbo".*forjalvl por omissão \(max\)/);
+    assert.equal(levelFromDisk({ forjalvl: 'turbo' }, l => lines.push(l)), 'high');
+    assert.match(lines[0], /forjalvl desconhecido: "turbo".*forjalvl por omissão \(high\)/);
     assert.equal(levelFromDisk({ forjalvl: 'económico' }), 'eco', 'a good forjalvl is untouched');
     assert.equal(levelFromDisk({ model_level: 'económico' }), 'eco', 'a RUN.json written before the rename still reads');
     assert.equal(levelFromDisk({ forjalvl: 'eco', model_level: 'high' }), 'eco', 'the new name wins when both are there');
-    assert.equal(levelFromDisk({}), 'max');
-    assert.equal(levelFromDisk(null), 'max');
+    assert.equal(levelFromDisk({}), 'high');
+    assert.equal(levelFromDisk(null), 'high');
     const broken = { run_id: 'R-1', project: 'p', goal: 'g', model_floor: 'fable', fallbacks: [], forjalvl: '{{corrompido}}' };
     const prompt = buildPrompt('task', { run: broken, forja: 'C:\\f', task: { id: 'T1', title: 'x', owner: 'fundidor', complexity: 'medium' } });
-    assert.match(prompt, /Forjalvl \(nível de modelos\): max \(máximo — /);
+    assert.match(prompt, /Forjalvl \(nível de modelos\): high \(alto — /);
     assert.match(prompt, /subagent_type: "backend-dev", model: "sonnet"/);
-    assert.match(buildPrompt('plan', { run: broken, forja: 'C:\\f' }), /Effort of this session: max/);
+    assert.match(buildPrompt('plan', { run: broken, forja: 'C:\\f' }), /Effort of this session: high/);
   });
 });
 
@@ -179,22 +476,37 @@ describe('what the task prompt makes the session read', () => {
     assert.equal(/Relatório do implementador \(dados\): <quoted>/.test(p), false, 'no hand-back is quoted into a prompt any more');
     assert.equal(/<previous verdicts verbatim>/.test(p), false);
   });
-  test('the task entry comes from `task show`, and TECHNOLOGY.md is read by its table first', () => {
+  test('the task entry comes from `context --task`, and TECHNOLOGY.md is read by its table first', () => {
     const p = buildPrompt('task', { run, forja: 'C:\\f', task });
-    assert.match(p, /node "C:\/f\/bin\/forja\.mjs" task show T3/);
+    assert.match(p, /node "C:\/f\/bin\/forja\.mjs" context --task T3/);
+    assert.equal(/node "C:\/f\/bin\/forja\.mjs" task show T3/.test(p), false, 'step 1 no longer runs `task show` on its own — `context --task` covers it');
     assert.equal(/the T3 entry in docs\/forja\/TASKS\.json/.test(p), false);
-    assert.match(p, /the decisions table at the top \(capability → choice → §\)/);
-    assert.match(p, /full section only for the capability this task needs/);
-    assert.match(buildPrompt('plan', { run, forja: 'C:\\f' }), /the decisions table at the top \(capability → choice → §\)/);
+    assert.match(p, /the decisions table at the top \(capability → choice → path\)/);
+    assert.match(p, /full section only for the capability this task needs, at the path the table gives \(docs\/forja\/technology\/S<n>\.md\)/);
+    assert.match(buildPrompt('plan', { run, forja: 'C:\\f' }), /the decisions table at the top \(capability → choice → path\)/);
+  });
+  // Both places the prompts send the Scout to write a section — the run-start
+  // call in PLAN (step 3) and the mid-run trigger in TASK (3b) — end the same
+  // way: write it, then run the split so it lands in its own file and the
+  // table row becomes that path. One of them saying "§" while the file on disk
+  // holds a path is how the crew's instructions drift apart from the format.
+  test('every Scout call in the prompts ends in `technology split`, and none of them still says "§"', () => {
+    const plan = buildPrompt('plan', { run, forja: 'C:\\f' });
+    const p = buildPrompt('task', { run, forja: 'C:\\f', task });
+    assert.match(plan, /then run `node "C:\/f\/bin\/forja\.mjs" technology split` so each section moves to docs\/forja\/technology\/S<n>\.md and its table row becomes that path/);
+    assert.match(p, /then run `node "C:\/f\/bin\/forja\.mjs" technology split` so the section moves to docs\/forja\/technology\/S<n>\.md and the table row becomes that path/);
+    for (const [name, text] of [['plan', plan], ['task', p]]) {
+      assert.equal(/capability → choice → §/.test(text), false, `${name} still points the session at a bare section mark`);
+    }
   });
   test('the model policy is stated once, from lib/models.mjs, and never restated as a rule', () => {
     const p = buildPrompt('task', { run, forja: 'C:\\f', task });
-    assert.match(p, /Forjalvl \(nível de modelos\): max \(máximo — Architect em Fable \(Opus depois de um fallback\); Devs em Sonnet, Opus em tasks hard/);
+    assert.match(p, /Forjalvl \(nível de modelos\): high \(alto — Architect em Opus;/);
     assert.equal(/sonnet for easy\/medium tasks/.test(p), false, 'the old hand-written English rule is gone');
     assert.equal(/sonnet for every task/.test(p), false);
     assert.match(p, /the model policy in the head line of this prompt/);
-    // The floor is part of the sentence: after a fallback the Architect is Opus.
-    assert.match(buildPrompt('task', { run: { ...run, model_floor: 'opus', fallbacks: [{ id: 'F1' }] }, forja: 'C:\\f', task }), /Forjalvl \(nível de modelos\): max \(máximo — Architect em Opus;/);
+    // At high the floor never moves the Architect (only max reads it) — same sentence, model_floor or not.
+    assert.match(buildPrompt('task', { run: { ...run, model_floor: 'opus', fallbacks: [{ id: 'F1' }] }, forja: 'C:\\f', task }), /Forjalvl \(nível de modelos\): high \(alto — Architect em Opus;/);
   });
 });
 
@@ -518,8 +830,8 @@ describe('visible mode: the pieces that read what `claude --bg` says', () => {
   });
   test('the visible command line: --bg, the name, no -p, no --output-format, no --session-id', () => {
     const a = claudeArgs({ sessionId: 'sid', visible: true, name: 'forja R-1 task-T1-a1', effort: 'medium' });
-    assert.deepEqual(a.slice(0, 7), ['--bg', '--model', 'opus', '--effort', 'medium', '--permission-mode', 'auto']);
-    assert.equal(a[7], '--disallowedTools');
+    assert.deepEqual(a.slice(0, 12), ['--bg', '--model', 'opus', '--effort', 'medium', '--permission-mode', 'auto', '--strict-mcp-config', '--mcp-config', MCP_CATALOG_PATH, '--tools', TOOLS]);
+    assert.equal(a[12], '--disallowedTools');
     for (const d of DISALLOWED) assert.ok(a.includes(d));
     assert.deepEqual(a.slice(-2), ['--name', 'forja R-1 task-T1-a1']);
     for (const forbidden of ['-p', '--output-format', '--session-id', 'sid']) assert.equal(a.includes(forbidden), false, forbidden);
@@ -533,19 +845,70 @@ describe('normal mode (-p) is untouched by visible mode', () => {
   // for the dependency sentence of the `normal` autonomy to go back to the words
   // it had in 387f332~1 (`dependency:` / `<pick>`), which is the only difference
   // from HEAD's 29920a8a1c12e013 (8557 characters against 8545).
+  // The PLAN hash moved once since, on purpose: task T2 of run R-20260920-c2b7
+  // (D15) — step 1 stopped sending the session to read the whole
+  // docs/forja/DECISIONS.md and now sends it to the index table at the top,
+  // with the full decision opened only when the plan depends on it, and step 4
+  // says the same to the Architect. d98d29696c79d46e → c279aa47162b2ab7.
+  // Both PLAN and TASK moved again, on purpose: T5 of run R-20260920-5ff3
+  // (D33) — step 1 of both phases now runs `forja context` (with `--task` on
+  // TASK) instead of asking for each read one command at a time, and says the
+  // leftover reads go in the same turn. CLOSE was not touched by that task and
+  // keeps its hash; the test below pins the new wording so a revert breaks
+  // here too. c279aa47162b2ab7 → 6aec27bfd0002ecc (PLAN); TASK moved to
+  // bf6691cca0ca8e98.
+  // PLAN, TASK and the delegation step (used by TASK too) moved once more, on
+  // purpose: T7 of the same run (S7/D30) — TECHNOLOGY.md is now paginated, so
+  // step 1 of both phases and the delegation prompt point at the full
+  // section's own path (docs/forja/technology/S<n>.md) instead of a bare "§".
+  // CLOSE does not mention TECHNOLOGY.md and keeps its hash. 6aec27bfd0002ecc
+  // → 7950942a8fbb3eb8 (PLAN); bf6691cca0ca8e98 → a9bee780ed7be383 (TASK).
+  // PLAN moved once more inside the same task (attempt 2): the run-start call
+  // to the Scout in step 3 was the last place still saying "capability →
+  // choice → §", and it now ends in `technology split` like the mid-run
+  // trigger already did. TASK and CLOSE were not touched by that and keep
+  // their hashes. 7950942a8fbb3eb8 → c14d32908cac894d (PLAN).
   const run = { run_id: 'R-20260917-abcd', project: 'sample', goal: 'do x', model_floor: 'fable', fallbacks: [], forjalvl: 'max', autonomy: 'normal' };
   const task = { id: 'T3', title: 'Pagina', owner: 'lapidador', criteria: 'criteria', complexity: 'hard' };
   const h = s => createHash('sha256').update(s, 'utf8').digest('hex').slice(0, 16);
   test('the three phase prompts are byte-identical to the ones before visible mode existed', () => {
-    assert.equal(h(buildPrompt('plan', { run, forja: 'C:\\f' })), 'd98d29696c79d46e');
-    assert.equal(h(buildPrompt('task', { run, forja: 'C:\\f', task, attempt: 2 })), 'b96b1e057b57cf68');
+    assert.equal(h(buildPrompt('plan', { run, forja: 'C:\\f' })), 'c14d32908cac894d');
+    assert.equal(h(buildPrompt('task', { run, forja: 'C:\\f', task, attempt: 2 })), 'a9bee780ed7be383');
     assert.equal(h(buildPrompt('close', { run: { ...run, autonomy: 'total' }, forja: 'C:\\f' })), '7613ae3a04787c54');
     for (const p of [buildPrompt('plan', { run, forja: 'C:\\f' }), buildPrompt('task', { run, forja: 'C:\\f', task })]) {
       assert.equal(/vis[íi]vel|--bg|backgrounded/i.test(p), false, 'the session mode is the runner\'s business, never the Lead\'s: it stays out of the prompt');
     }
   });
+  // T2 of run R-20260920-c2b7 (D15): the file and the prompts travel together.
+  // The index only saves anything if the prompt stops asking for the whole log,
+  // so this asserts the wording in both directions — index in, whole file out.
+  test('the PLAN prompt sends the session to the decisions index, never to the whole DECISIONS.md', () => {
+    const plan = buildPrompt('plan', { run, forja: 'C:\\f' });
+    const step1 = plan.split('\n').find(l => l.startsWith('1. '));
+    assert.ok(step1, 'step 1 exists');
+    assert.match(step1, /in docs\/forja\/DECISIONS\.md, the index table at the top/);
+    assert.match(step1, /open a full decision only when the plan depends on it/);
+    // The same shape the TECHNOLOGY.md table already had in this step: read the
+    // summary first, open the detail only when this work depends on it.
+    assert.match(step1, /in docs\/forja\/TECHNOLOGY\.md, the decisions table at the top/);
+    // The bare file as one more item of the "read these files" list is exactly
+    // what T2 removed; it must not come back, here or anywhere else in the step.
+    assert.equal(step1.includes('docs/forja/RUN.json, docs/forja/DECISIONS.md'), false, 'DECISIONS.md is no longer an item of the "read these files" list');
+    const mentions = [...step1.matchAll(/docs\/forja\/DECISIONS\.md([^\n]{0,30})/g)];
+    assert.equal(mentions.length, 1, 'named exactly once in step 1');
+    for (const m of mentions) assert.match(m[1], /^, the index table at the top/, 'every mention points at the index');
+    // The Architect gets the same instruction in its delegation step.
+    assert.match(plan, /the index at the top of decisions/);
+    // Nothing else in the phase prompts asks for the log as a whole.
+    for (const p of [plan, buildPrompt('task', { run, forja: 'C:\\f', task }), buildPrompt('close', { run, forja: 'C:\\f' })]) {
+      for (const line of p.split('\n')) {
+        if (!/docs\/forja\/DECISIONS\.md/.test(line)) continue;
+        assert.match(line, /index table at the top/, `a prompt line naming DECISIONS.md must point at the index: ${line.slice(0, 120)}`);
+      }
+    }
+  });
   test('the transcript says whether the turn ended: the last main-thread turn is an answer, not a tool call', () => {
-    // Shapes measured in the real transcript of the granite session
+    // Shapes measured in the real transcript of the gearlift session
     // 3dc453de-… (17 set 2026): `type` + `message.content` blocks, plus
     // `system`/`attachment`/`cost-state` lines that are not turns at all.
     const A = (...blocks) => JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: blocks } });
@@ -569,7 +932,7 @@ describe('normal mode (-p) is untouched by visible mode', () => {
 
   test('the `Stop` of the session in data/events.jsonl is read from the tail, never from the whole file', () => {
     const sid = '3dc453de-521a-46f0-9b31-6265f2e5a242';
-    const stop = (id = sid) => JSON.stringify({ ts: '2026-09-17T08:02:09.160Z', project: 'granite', session_id: id, hook_event_name: 'Stop', stop_hook_active: false, last_assistant_message: 'TASK T4 done.' });
+    const stop = (id = sid) => JSON.stringify({ ts: '2026-09-17T08:02:09.160Z', project: 'gearlift', session_id: id, hook_event_name: 'Stop', stop_hook_active: false, last_assistant_message: 'TASK T4 done.' });
     assert.equal(stopEventIn(stop() + '\n', sid), true);
     assert.equal(stopEventIn(stop('outra-sessao') + '\n', sid), false, 'another session never ends our phase');
     assert.equal(stopEventIn(JSON.stringify({ session_id: sid, hook_event_name: 'SubagentStop' }) + '\n', sid), false);
@@ -595,7 +958,7 @@ describe('normal mode (-p) is untouched by visible mode', () => {
 
   // ---------- T-VIS-3: the turn ended, the work did not ----------
   test('the subagents still out come from the events: SubagentStart without SubagentStop, and the `background_tasks` of the `Stop`', () => {
-    // The exact lines of the incident (violet-pier, 17 set 2026, session
+    // The exact lines of the incident (velora-poker, 17 set 2026, session
     // c249b3e8-…: QA launched in the background at 12:03:37.246Z, `Stop` at
     // 12:03:43.961Z, no `SubagentStop` — the runner killed it at 12:03:57).
     const sid = 'c249b3e8-1a04-4e69-b521-81f8a903c5b6';
@@ -616,7 +979,7 @@ describe('normal mode (-p) is untouched by visible mode', () => {
     assert.deepEqual([...after.open], [], 'the hand-back closes it');
     // …and that same hand-back clears the `Stop`: it belonged to the turn that
     // launched the subagent, and the session is working again (report, Reviewer,
-    // commit — 4 min 08 s, 1 min 27 s and 1 min 35 s in the violet transcript
+    // commit — 4 min 08 s, 1 min 27 s and 1 min 35 s in the velora transcript
     // b48d3201-…). Only the MOST RECENT `Stop` counts.
     assert.equal(after.stop, false, 'a Stop is per turn, never accumulated');
     assert.equal(after.stopMessage, '');
@@ -648,7 +1011,7 @@ describe('normal mode (-p) is untouched by visible mode', () => {
   });
 
   test('the same two facts out of the transcript: an async launch with no hand-back, and the phase marker of the last turn', () => {
-    // Shapes measured in the violet transcript b48d3201-… (three background
+    // Shapes measured in the velora transcript b48d3201-… (three background
     // launches, three retrievals).
     const A = (...blocks) => JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: blocks } });
     const U = (...blocks) => JSON.stringify({ type: 'user', message: { role: 'user', content: blocks } });
@@ -671,8 +1034,8 @@ describe('normal mode (-p) is untouched by visible mode', () => {
     assert.deepEqual(SOFT_END_SIGNALS.slice().sort(), ['idle-transcript', 'notification', 'stop-event']);
   });
 
-  test('the default command line has not moved a byte', () => {
-    assert.deepEqual(claudeArgs({ sessionId: 'sid' }), ['-p', '--model', 'opus', '--effort', 'high', '--permission-mode', 'auto', '--output-format', 'text', '--session-id', 'sid', '--disallowedTools', ...DISALLOWED]);
+  test('the default command line: unchanged except for the MCP whitelist (S4) and the native-tools ceiling (S5)', () => {
+    assert.deepEqual(claudeArgs({ sessionId: 'sid' }), ['-p', '--model', 'opus', '--effort', 'high', '--permission-mode', 'auto', '--strict-mcp-config', '--mcp-config', MCP_CATALOG_PATH, '--tools', TOOLS, '--output-format', 'text', '--session-id', 'sid', '--disallowedTools', ...DISALLOWED]);
   });
 });
 
@@ -836,7 +1199,7 @@ describe('the loop in visible mode, against a fake `claude --bg`', () => {
   test('a usage-limit wait reported as `idle` is not a finished phase: the runner waits, never kills nor pauses', { timeout: 180_000 }, () => {
     // The trap the Reviewer found: the limit line IS the last `assistant` text
     // of the transcript, with no tool call after it, so the turn "looks" over.
-    // Measured in the real granite transcript 2fbad91c-… (session stopped
+    // Measured in the real gearlift transcript 2fbad91c-… (session stopped
     // 2 h 32 at «You've hit your session limit · resets 5:30pm» and continued by
     // itself). A confirm window of 200 ms means a runner that ignored the wait
     // would close the phase almost at once; this one has to reach the watchdog.
@@ -864,7 +1227,7 @@ describe('the loop in visible mode, against a fake `claude --bg`', () => {
   });
 
   // ---------- T-VIS-2: `state: done` is not the only end of a phase ----------
-  // The incident of 17 set 2026 (granite, session 3dc453de-…, task T4): the
+  // The incident of 17 set 2026 (gearlift, session 3dc453de-…, task T4): the
   // session ended its turn at 08:02:07Z (last assistant text in the transcript,
   // `Stop` hook at 08:02:09.160Z, task done and committed) and `claude agents`
   // still answered `state: "working", status: "idle"` at 08:08 — the runner sat
@@ -913,7 +1276,7 @@ describe('the loop in visible mode, against a fake `claude --bg`', () => {
   });
 
   // ---------- T-VIS-3: a `Stop` with a subagent still in the background ----------
-  // The incident of 17 set 2026 (violet-pier): the Lead launches the crew in
+  // The incident of 17 set 2026 (velora-poker): the Lead launches the crew in
   // the background, ends its turn («Backend Dev is running on T10. Waiting for
   // the hand-back.») and the hook writes `Stop` — T-VIS-2 read that as the end
   // of the phase and the runner killed the Dev and the QA mid-work, 63 s into

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // `npm run check` — the repo invariants a unit test cannot see.
 //
-// Five checks, all cheap, all deterministic, no network, no install:
+// Six checks, all cheap, all deterministic, no network, no install:
 //   1. the sample project's crew files are byte-identical to this repo's
 //      (`.claude/{agents,skills}/**` vs `examples/sample-project/.claude/…`),
 //      because a Sponsor who bootstraps a repo gets the sample's copy;
@@ -20,6 +20,10 @@
 //      §6b) still reaches every file that has to carry it: the CLI, the
 //      runner's prompts, the four skills, CLAUDE.md, the architecture and the
 //      runbook.
+//   6. no runner prompt, skill or agent (this repo's or the sample project's
+//      copy) commands opening `docs/forja/TASKS.json` directly (D30-b, S7):
+//      `forja task show` / `forja status` / `forja context --task` give the
+//      same whole information without it.
 //
 // Prints one line per failure and exits 1; otherwise prints `check ok`.
 // Everything is exported and pure enough to test (test/check.test.mjs); the
@@ -219,6 +223,67 @@ export function checkAutonomyRule(root, files = AUTONOMY_FILES) {
   }
   return out;
 }
+
+// ---------- 6. nothing commands opening docs/forja/TASKS.json directly ----------
+// D30-b / S7: a Dev, the QA and the Lead get the SAME whole information through
+// `forja task show T<n>` / `forja status` / `forja context --task T<n>` (D30-a:
+// take away the reason before the instruction) — so no prompt or skill needs to
+// name `TASKS.json` as a thing to open. Naming the file as a FORMAT or a WRITE
+// target stays legitimate (the Architect writes the plan there through the CLI,
+// `lib/state-files.mjs` defines the path, `docs/ARCHITECTURE.md` describes the
+// format): this only fires when a read/open verb sits on the SAME LINE, before
+// the mention, and that line does not already say, in the same breath, that the
+// file is never opened directly (the pattern this repo already uses in
+// `lib/runner.mjs` and in forja-lead's own §"You know nothing but the disk").
+export const TASKS_JSON_OPEN_VERBS = /\b(read|reading|lendo|lê|ler|leia|abrir|abre|abrindo|open|opens|opening|carregar|carrega)\b/i;
+export const TASKS_JSON_NEGATION = /\b(instead of|em vez de|never|nunca|not\b|não\b|does not|doesn't|don't)\b/i;
+
+// [{ line, excerpt }] for every line of `text` that commands opening TASKS.json.
+export function findTasksJsonOpenCommands(text) {
+  const hits = [];
+  const lines = String(text).split('\n');
+  lines.forEach((line, i) => {
+    let idx = line.indexOf('TASKS.json');
+    while (idx !== -1) {
+      const before = line.slice(0, idx);
+      if (TASKS_JSON_OPEN_VERBS.test(before) && !TASKS_JSON_NEGATION.test(line)) {
+        hits.push({ line: i + 1, excerpt: line.trim().slice(0, 160) });
+        break; // one hit per line is enough to name it
+      }
+      idx = line.indexOf('TASKS.json', idx + 1);
+    }
+  });
+  return hits;
+}
+
+// The prompts and crew files a specialist or the Lead actually reads: the
+// runner's prompts, every skill and every agent (this repo's and the sample
+// project's byte-identical copy), and the resume prompt in bin/forja.mjs.
+export function tasksJsonScanList(root) {
+  const files = ['lib/runner.mjs', 'bin/forja.mjs'];
+  const dirs = [
+    ['.claude/skills', f => f.endsWith('SKILL.md')],
+    ['.claude/agents', f => f.endsWith('.md')],
+    ['examples/sample-project/.claude/skills', f => f.endsWith('SKILL.md')],
+    ['examples/sample-project/.claude/agents', f => f.endsWith('.md')],
+  ];
+  for (const [dir, keep] of dirs) {
+    for (const f of walk(join(root, ...dir.split('/')))) if (keep(f)) files.push(`${dir}/${f}`);
+  }
+  return files;
+}
+
+export function checkNoTasksJsonRead(root, files = tasksJsonScanList(root)) {
+  const out = [];
+  for (const f of files) {
+    const path = join(root, f);
+    if (!existsSync(path)) continue;
+    for (const hit of findTasksJsonOpenCommands(readFileSync(path, 'utf8'))) {
+      out.push(`TASKS.json: ${f}:${hit.line} manda abrir/ler docs/forja/TASKS.json diretamente — usa \`forja task show T<n>\` ou \`forja context --task T<n>\` ("${hit.excerpt}")`);
+    }
+  }
+  return out;
+}
 // ---------- everything, in order ----------
 export async function runChecks({ root = REPO_ROOT, files = null } = {}) {
   const failures = [];
@@ -231,6 +296,7 @@ export async function runChecks({ root = REPO_ROOT, files = null } = {}) {
   failures.push(...checkInvisible(root, list));
   failures.push(...checkPolicySource(root));
   failures.push(...checkAutonomyRule(root));
+  failures.push(...checkNoTasksJsonRead(root));
   const replay = await checkReplay(root);
   failures.push(...replay.failures);
   return { failures, files: list, replay };
@@ -244,5 +310,5 @@ if (isMain) {
     for (const f of failures) console.error(`- ${f}`);
     process.exit(1);
   }
-  console.log(`check ok — ${files.length} ficheiros versionados, elenco do sample idêntico, política de modelos numa fonte só, regra de autonomia em todos os ficheiros que a carregam, ${replay.skipped ? 'sem data/events.jsonl para reproduzir' : `${replay.lines} eventos reproduzidos sem linhas más`}`);
+  console.log(`check ok — ${files.length} ficheiros versionados, elenco do sample idêntico, política de modelos numa fonte só, regra de autonomia em todos os ficheiros que a carregam, nenhum ficheiro manda abrir TASKS.json diretamente, ${replay.skipped ? 'sem data/events.jsonl para reproduzir' : `${replay.lines} eventos reproduzidos sem linhas más`}`);
 }

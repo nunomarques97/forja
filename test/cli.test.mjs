@@ -9,13 +9,18 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, appendFileSync, existsSyn
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isReplanBlock, isSupersededBlock } from '../lib/state-files.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cli = join(here, '..', 'bin', 'forja.mjs');
 const root = mkdtempSync(join(tmpdir(), 'forja-cli-'));
 const proj = join(root, 'proj'); mkdirSync(proj);
 const dataDir = join(root, 'data');
-const env = { ...process.env, FORJA_DATA_DIR: dataDir, FORJA_NTFY_SERVER: 'http://127.0.0.1:9', CLAUDE_CODE_SESSION_ID: 'sess-test-1' };
+// O fecho de um run corre o sync da Central de Projetos do Sponsor
+// (lib/obsidian-sync.mjs, D12/D13). Apontado para uma pasta que não existe, o
+// passo salta com motivo e estes testes nunca leem nem tocam na Central real.
+process.env.FORJA_OBSIDIAN_SYNC_DIR = join(root, 'central-que-nao-existe');
+const env = { ...process.env, FORJA_DATA_DIR: dataDir, FORJA_NTFY_SERVER: 'http://127.0.0.1:9', FORJA_NTFY_TOPIC: 'fixture-cli', CLAUDE_CODE_SESSION_ID: 'sess-test-1' };
 const forja = (...args) => { const r = spawnSync(process.execPath, [cli, ...args], { cwd: proj, env, encoding: 'utf8' }); return { code: r.status, out: r.stdout, err: r.stderr, json: (() => { try { return JSON.parse(r.stdout); } catch { return null; } })() }; };
 const state = () => ({ run: JSON.parse(readFileSync(join(proj, 'docs/forja/RUN.json'), 'utf8')), tasks: JSON.parse(readFileSync(join(proj, 'docs/forja/TASKS.json'), 'utf8')) });
 const events = () => readFileSync(join(dataDir, 'events.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l));
@@ -65,6 +70,41 @@ describe('tasks and the 3-strike rule', () => {
     assert.equal(forja('task', 'block', 'T3', '--why', 'permissão negada').json.status, 'blocked');
     assert.equal(state().tasks[2].why, 'permissão negada');
     assert.equal(forja('task', 'start', 'T2').code, 2, 'a done task cannot be restarted');
+  });
+});
+
+describe('re-plan blocks do not notify the phone', () => {
+  // Own project + data dir, so the task ids and notify.log here touch no other test.
+  const rproj = join(root, 'replan'); mkdirSync(rproj);
+  const rdata = join(root, 'replan-data');
+  const renv = { ...env, FORJA_DATA_DIR: rdata };
+  const rforja = (...args) => { const r = spawnSync(process.execPath, [cli, ...args], { cwd: rproj, env: renv, encoding: 'utf8' }); return { code: r.status, json: (() => { try { return JSON.parse(r.stdout); } catch { return null; } })() }; };
+  const notified = () => { try { return readFileSync(join(rdata, 'notify.log'), 'utf8').trim().split('\n').map(l => JSON.parse(l).message); } catch { return []; } };
+  const sent = id => notified().filter(m => m.includes(`task ${id} bloqueada`)).length;
+  test('a re-plan block and a cascade from one stay silent; real blocks and their cascades still notify', () => {
+    assert.equal(rforja('run', 'start', '--goal', 'Replanear').code, 0);
+    for (const [id, after] of [['T1'], ['T2', 'T1'], ['T3', 'T2'], ['T4'], ['T5', 'T4']]) rforja('task', 'add', '--id', id, '--owner', 'fundidor', '--title', id, ...(after ? ['--after', after] : []));
+    rforja('task', 'start', 'T1');
+    assert.equal(rforja('task', 'block', 'T1', '--why', 'replaneada: T1a, T1b').json.status, 'blocked');
+    assert.equal(rforja('task', 'block', 'T2', '--why', 'Replaneada: ver T1 (substituída por T1b)').json.status, 'blocked');
+    assert.equal(rforja('task', 'block', 'T3', '--why', 'dependência T2 está bloqueada').json.status, 'blocked');
+    assert.equal(rforja('task', 'block', 'T4', '--why', 'permissão negada').json.status, 'blocked');
+    assert.equal(rforja('task', 'block', 'T5', '--why', 'dependência T4 está bloqueada').json.status, 'blocked');
+    const tasks = JSON.parse(readFileSync(join(rproj, 'docs/forja/TASKS.json'), 'utf8'));
+    assert.equal(tasks.find(t => t.id === 'T1').why, 'replaneada: T1a, T1b', 'the reason is still recorded');
+    const ev = readFileSync(join(rdata, 'events.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l));
+    assert.equal(ev.filter(e => e.forja && e.forja.kind === 'task.block').length, 5, 'every block still emits its event');
+    for (const id of ['T1', 'T2', 'T3']) assert.equal(sent(id), 0, `${id} is a supersession, not a problem`);
+    assert.equal(sent('T4'), 1, 'a real block still notifies');
+    assert.equal(sent('T5'), 1, 'a cascade from a real block still notifies');
+  });
+  test('isReplanBlock / isSupersededBlock', () => {
+    for (const w of ['replaneada: T9a', 'Replaneada: ver T3', 'REPLANEADO', 'replanned: T2a', 'Re-planned into T4a']) assert.equal(isReplanBlock(w), true, w);
+    for (const w of ['permissão negada', 'dependência T1 falhou', 'plan broken', '', undefined, 'não replaneada']) assert.equal(isReplanBlock(w), false, String(w));
+    const tasks = [{ id: 'T1', status: 'blocked', why: 'replaneada: T1a' }, { id: 'T2', status: 'blocked', why: 'precisa do Sponsor' }];
+    assert.equal(isSupersededBlock('dependência T1 está bloqueada', tasks), true);
+    assert.equal(isSupersededBlock('dependência T2 está bloqueada', tasks), false);
+    assert.equal(isSupersededBlock('dependência T9 está bloqueada', tasks), false);
   });
 });
 
@@ -207,17 +247,17 @@ describe('run start after a closed run', () => {
 });
 
 describe('forjalvl per run (forja forjalvl / run start --forjalvl)', () => {
-  test('default max; --forjalvl writes RUN.json and the run.start event; the handover and status say the forjalvl', () => {
+  test('default high; --forjalvl writes RUN.json and the run.start event; the handover and status say the forjalvl', () => {
     const r = forja('run', 'start', '--goal', 'nível por omissão', '--force');
     assert.equal(r.code, 0, r.err);
-    assert.equal(r.json.forjalvl, 'max');
-    assert.equal(state().run.forjalvl, 'max');
+    assert.equal(r.json.forjalvl, 'high');
+    assert.equal(state().run.forjalvl, 'high');
     assert.equal(state().run.model_level, undefined, 'the old key is not written any more');
     const ev = events().at(-1);
-    assert.equal(ev.forja.kind, 'run.start'); assert.equal(ev.forja.forjalvl, 'max');
-    assert.equal(ev.forja.model_level, 'max', 'the event keeps the old name too, for older readers');
-    assert.match(forja('status').out, /forjalvl: máximo \(max\)/);
-    assert.match(readFileSync(join(proj, 'docs/forja/HANDOVER.md'), 'utf8'), /forjalvl \(nível de modelos\): \*\*máximo\*\* \(`max`\)/);
+    assert.equal(ev.forja.kind, 'run.start'); assert.equal(ev.forja.forjalvl, 'high');
+    assert.equal(ev.forja.model_level, 'high', 'the event keeps the old name too, for older readers');
+    assert.match(forja('status').out, /forjalvl: alto \(high\)/);
+    assert.match(readFileSync(join(proj, 'docs/forja/HANDOVER.md'), 'utf8'), /forjalvl \(nível de modelos\): \*\*alto\*\* \(`high`\)/);
     const eco = forja('run', 'start', '--goal', 'agora barato', '--forjalvl', 'eco', '--force');
     assert.equal(eco.json.forjalvl, 'eco');
     assert.equal(state().run.forjalvl, 'eco');
@@ -293,7 +333,7 @@ describe('forjalvl per run (forja forjalvl / run start --forjalvl)', () => {
     assert.match(show.err, /SETTINGS\.json ilegível: .*corrige-o à mão/s);
     assert.equal(/sem SETTINGS\.json/.test(show.out), false, 'never announced as a missing file');
     const start = forja('run', 'start', '--goal', 'não pode arrancar às cegas', '--force');
-    assert.equal(start.code, 2, 'run start refuses instead of falling back to max');
+    assert.equal(start.code, 2, 'run start refuses instead of falling back to the default');
     assert.match(start.err, /SETTINGS\.json ilegível/);
     assert.deepEqual(readFileSync(join(proj, 'docs/forja/RUN.json')), runBefore, 'the refused start left RUN.json byte for byte as it was');
     assert.equal(existsSync(join(proj, 'docs/forja', `RUN-${JSON.parse(runBefore).run_id}.json`)), false, 'and did not archive the run it refused to replace');
@@ -313,7 +353,7 @@ describe('forjalvl per run (forja forjalvl / run start --forjalvl)', () => {
     const noKey = forja('forjalvl', 'show');
     assert.equal(noKey.code, 0, noKey.err);
     assert.match(noKey.out, /por omissão do Forja; .*SETTINGS\.json existe mas não define forjalvl/);
-    assert.match(noKey.out, /forjalvl por omissão: máximo \(max\)/);
+    assert.match(noKey.out, /forjalvl por omissão: alto \(high\)/);
   });
   test('a RUN.json written before the rename is read by its old key, and reading it never rewrites it', () => {
     const runPath = join(proj, 'docs/forja/RUN.json');
@@ -468,6 +508,168 @@ describe('autonomy per run (forja autonomy / run start --autonomy)', () => {
       assert.match(show.stdout, /autonomia por omissão: total/);
       assert.match(show.stdout, /Sem run neste projeto/);
     } finally { rmSync(solo, { recursive: true, force: true }); }
+  });
+});
+
+// `forja context [--task T<n>]` — D33: one output with the nine blocks that
+// step 1 of a phase used to fetch in eight separate turns. Its own project and
+// its own data dir: these tests write files by hand and count events.
+describe('forja context (uma só saída, D33)', () => {
+  const cproj = join(root, 'context'); mkdirSync(cproj, { recursive: true });
+  const cdata = join(root, 'context-data');
+  const cenv = { ...env, FORJA_DATA_DIR: cdata };
+  const run = (dir, ...args) => { const r = spawnSync(process.execPath, [cli, ...args], { cwd: dir, env: cenv, encoding: 'utf8' }); return { code: r.status, out: r.stdout, err: r.stderr }; };
+  const c = (...args) => run(cproj, ...args);
+  const stateFile = f => join(cproj, 'docs/forja', f);
+  const eventLines = () => { try { return readFileSync(join(cdata, 'events.jsonl'), 'utf8').split('\n').length; } catch { return 0; } };
+  const snapshot = () => Object.fromEntries(['RUN.json', 'TASKS.json', 'HANDOVER.md', 'DECISIONS.md', 'SPONSOR-QUEUE.md', 'PRODUCT-PROFILE.md', 'TECHNOLOGY.md']
+    .map(f => [f, existsSync(stateFile(f)) ? readFileSync(stateFile(f), 'utf8') : null]));
+  // Long on purpose: the criteria and the verdict are what must never be clipped.
+  const criteria = `Critério longo com acentuação, «aspas» e uma lista:\n1. ${'a'.repeat(400)}\n2. ${'b'.repeat(400)}`;
+  const why = `REJECT detalhado: ${'c'.repeat(600)}`;
+
+  before(() => {
+    assert.equal(c('run', 'start', '--goal', 'Testar o context').code, 0);
+    assert.equal(c('task', 'add', '--id', 'T1', '--owner', 'backend-dev', '--complexity', 'hard', '--title', 'Primeira', '--criteria', criteria).code, 0);
+    assert.equal(c('task', 'add', '--id', 'T2', '--owner', 'frontend-dev', '--title', 'Segunda', '--after', 'T1').code, 0);
+    c('task', 'start', 'T1'); c('task', 'fail', 'T1', '--why', why); c('task', 'start', 'T1');
+    c('decide', 'JSON em disco', '--why', 'simples', '--reversible', 'yes');
+    c('ask', 'Publicar?', '--default', 'não publicar', '--why', 'publicação é do Sponsor');
+    writeFileSync(stateFile('PRODUCT-PROFILE.md'), '# Perfil de produto\n\nPara quem: o Sponsor.\n');
+    writeFileSync(stateFile('TECHNOLOGY.md'), [
+      '# TECHNOLOGY', '', '## Decisões em vigor', '',
+      '| Capacidade | Escolha | Secção |', '|---|---|---|', '| Gráficos | sem biblioteca | S1 |', '',
+      '## Gráficos — sem biblioteca (S1, 2026-09-20)', '', 'CORPO-DA-SECCAO-COMPLETA que só se abre quando a task depende dela.', '',
+    ].join('\n'));
+  });
+
+  test('imprime os nove blocos, por esta ordem, numa só saída', () => {
+    const r = c('context', '--task', 'T1');
+    assert.equal(r.code, 0, r.err);
+    const headers = r.out.split('\n').filter(l => l.startsWith('=== '));
+    assert.equal(headers.length, 9);
+    for (const [i, h] of headers.entries()) assert.ok(h.startsWith(`=== ${i + 1}/9 · `), h);
+    assert.match(headers[0], /Estado do run/); assert.match(headers[1], /Respostas do Sponsor/);
+    assert.match(headers[2], /^=== 3\/9 · Task T1 /); assert.match(headers[3], /HANDOVER\.md/);
+    assert.match(headers[4], /PRODUCT-PROFILE\.md/); assert.match(headers[5], /TECHNOLOGY\.md/);
+    assert.match(headers[6], /DECISIONS\.md/); assert.equal(headers[7], '=== 8/9 · git status --short ===');
+    assert.equal(headers[8], '=== 9/9 · git diff --stat ===');
+    // Block 1 is what `run resume` prints, read from disk — and says so.
+    const runJson = JSON.parse(readFileSync(stateFile('RUN.json'), 'utf8'));
+    assert.ok(r.out.includes(JSON.stringify({ ok: true, run_id: runJson.run_id, status: runJson.status, sessions: runJson.sessions }, null, 2)), 'o estado do run');
+    assert.match(r.out, /NÃO liga a sessão ao run/);
+    // Block 2: what `forja answers` prints (applied + open) and the queue whole.
+    assert.match(r.out, /"applied": 0/); assert.match(r.out, /"open": \[\n\s+"Q1"\n\s+\]/);
+    assert.ok(r.out.includes(readFileSync(stateFile('SPONSOR-QUEUE.md'), 'utf8').replace(/\n+$/, '')), 'a fila inteira');
+    // Blocks 4 and 5: the files whole.
+    for (const f of ['HANDOVER.md', 'PRODUCT-PROFILE.md']) assert.ok(r.out.includes(readFileSync(stateFile(f), 'utf8').replace(/\n+$/, '')), f);
+    // Block 6: the decisions table at the top, never the full section.
+    assert.ok(r.out.includes('| Gráficos | sem biblioteca | S1 |'));
+    assert.equal(r.out.includes('CORPO-DA-SECCAO-COMPLETA'), false, 'a secção completa só se abre quando a task depende dela');
+    // Block 7: the index block of DECISIONS.md, exactly as it is on disk.
+    const index = readFileSync(stateFile('DECISIONS.md'), 'utf8').match(/<!-- forja:index -->[\s\S]*?<!-- \/forja:index -->/)[0];
+    assert.ok(r.out.includes(index), 'o índice de decisões');
+    // Only the index: the corpo of DECISIONS.md stays in the file (the handover,
+    // block 4, carries the last five decision lines of its own accord).
+    const block7 = r.out.slice(r.out.indexOf('=== 7/9'), r.out.indexOf('=== 8/9'));
+    assert.equal(block7.includes('Porquê: simples'), false, 'o corpo do DECISIONS.md não entra, só o índice');
+  });
+
+  test('a saída contém a do `task show T1` inteira, byte a byte (nada truncado)', () => {
+    const show = c('task', 'show', 'T1');
+    const ctx = c('context', '--task', 'T1');
+    assert.equal(show.code, 0, show.err); assert.equal(ctx.code, 0, ctx.err);
+    assert.ok(show.out.length > 1000, 'o caso de teste tem de ser grande para a prova valer');
+    assert.ok(ctx.out.includes(show.out), 'byte a byte, incluindo o fim de linha final');
+    // And the pieces that a summary would have eaten.
+    assert.ok(ctx.out.includes(criteria), 'critérios na íntegra');
+    assert.ok(ctx.out.includes(why), 'veredicto na íntegra');
+    assert.equal(/…|\.\.\.\)?$/m.test(ctx.out.slice(ctx.out.indexOf('=== 3/9'), ctx.out.indexOf('=== 4/9'))), false, 'sem reticências no bloco da task');
+    assert.match(ctx.out, /Depende de: nada/);
+    assert.ok(c('context', '--task', 'T2').out.includes('Depende de: T1 (doing)'), 'a dependência e o estado dela');
+  });
+
+  test('só de leitura: não escreve ficheiros, não emite eventos, não muda o run nem o responsável', () => {
+    c('run', 'block', '--why', 'à espera do Sponsor'); // `run resume` would move it back to running
+    const before = snapshot(); const evBefore = eventLines();
+    const r = c('context', '--task', 'T1');
+    assert.equal(r.code, 0, r.err);
+    assert.deepEqual(snapshot(), before, 'nenhum ficheiro de estado mudou um byte');
+    assert.equal(eventLines(), evBefore, 'nenhuma linha nova em data/events.jsonl');
+    assert.match(r.out, /"status": "blocked"/, 'o run continua bloqueado: o context não faz o que o `run resume` faz');
+    assert.equal(JSON.parse(readFileSync(stateFile('RUN.json'), 'utf8')).driver, JSON.parse(before['RUN.json']).driver);
+    c('run', 'resume'); // and the real command still works, once per session
+    assert.equal(JSON.parse(readFileSync(stateFile('RUN.json'), 'utf8')).status, 'running');
+  });
+
+  test('um id de task que não existe é uma linha, e o resto da saída sai na mesma', () => {
+    const r = c('context', '--task', 'T9');
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /a task T9 não existe no plano deste projeto — ids no plano: T1, T2/);
+    assert.equal(r.out.split('\n').filter(l => l.startsWith('=== ')).length, 9, 'os nove blocos saem na mesma');
+    assert.ok(r.out.includes(readFileSync(stateFile('PRODUCT-PROFILE.md'), 'utf8').replace(/\n+$/, '')));
+    // No `--task` at all, and `--task` with no value: one line each, still exit 0.
+    const none = c('context');
+    assert.equal(none.code, 0, none.err);
+    assert.match(none.out, /sem `--task`: nenhuma task pedida/);
+    assert.equal(none.out.split('\n').filter(l => l.startsWith('=== ')).length, 9);
+    const naked = run(cproj, 'context', '--task');
+    assert.equal(naked.code, 0, naked.err);
+    assert.match(naked.out, /`--task` precisa de um id/);
+  });
+
+  test('degrada em silêncio registado: sem run, sem HANDOVER, sem PRODUCT-PROFILE, sem TECHNOLOGY, sem DECISIONS, sem git → uma linha por bloco e saída 0', () => {
+    const empty = mkdtempSync(join(tmpdir(), 'forja-context-vazio-'));
+    try {
+      const r = run(empty, 'context', '--task', 'T1');
+      assert.equal(r.code, 0, r.err);
+      assert.equal(r.out.split('\n').filter(l => l.startsWith('=== ')).length, 9);
+      assert.match(r.out, /sem run neste projeto: docs\/forja\/RUN\.json não existe — bloco sem origem/);
+      for (const f of ['SPONSOR-QUEUE', 'HANDOVER', 'PRODUCT-PROFILE', 'TECHNOLOGY', 'DECISIONS']) {
+        assert.match(r.out, new RegExp(`docs/forja/${f}\\.md não existe neste projeto — bloco sem origem`), f);
+      }
+      assert.match(r.out, /a task T1 não existe no plano deste projeto — ids no plano: nenhum/);
+      // A temp folder is no git repository: both git blocks degrade to one line.
+      assert.match(r.out, /=== 8\/9 · git status --short ===\n\(`git status --short`[^\n]*bloco sem origem\)/);
+      assert.match(r.out, /=== 9\/9 · git diff --stat ===\n\(`git diff --stat`[^\n]*bloco sem origem\)/);
+      assert.equal(existsSync(join(empty, 'docs')), false, 'um comando só de leitura não cria a pasta de estado');
+      // Ficheiro que existe mas não tem o bloco que o contexto quer: também é
+      // uma linha, nunca o ficheiro inteiro por engano.
+      mkdirSync(join(empty, 'docs/forja'), { recursive: true });
+      writeFileSync(join(empty, 'docs/forja/TECHNOLOGY.md'), '# TECHNOLOGY\n\n## Gráficos — sem biblioteca (S1)\n\nCORPO-SEM-TABELA\n');
+      writeFileSync(join(empty, 'docs/forja/DECISIONS.md'), '# Decisões\n\n- **D1** · hoje · Product Manager · run R — algo. Reversível: sim.\n');
+      const r2 = run(empty, 'context');
+      assert.equal(r2.code, 0, r2.err);
+      assert.match(r2.out, /TECHNOLOGY\.md existe mas não tem a tabela «Decisões em vigor»[^\n]*bloco sem origem/);
+      assert.equal(r2.out.includes('CORPO-SEM-TABELA'), false, 'sem tabela não se despeja o ficheiro inteiro');
+      assert.match(r2.out, /DECISIONS\.md existe mas ainda não tem bloco de índice no topo[^\n]*forja decisions reindex/);
+      assert.equal(r2.out.includes('- **D1**'), false, 'sem índice não se despeja o corpo append-only');
+      // Um RUN.json ilegível não é um RUN.json que não existe.
+      writeFileSync(join(empty, 'docs/forja/RUN.json'), '{ "run_id": "R-2026');
+      const r3 = run(empty, 'context');
+      assert.equal(r3.code, 0, r3.err);
+      assert.match(r3.out, /RUN\.json existe mas não é JSON legível[^\n]*bloco sem origem/);
+    } finally { rmSync(empty, { recursive: true, force: true }); }
+  });
+
+  test('com git, os dois últimos blocos são a saída verbatim do git', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'forja-context-git-'));
+    try {
+      const git = (...args) => spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+      if (git('init', '-q').status !== 0) return; // no git on this machine: nothing to prove here
+      writeFileSync(join(repo, 'novo.txt'), 'olá\n');
+      const r = run(repo, 'context');
+      assert.equal(r.code, 0, r.err);
+      const block = r.out.slice(r.out.indexOf('=== 8/9'), r.out.indexOf('=== 9/9'));
+      assert.ok(block.includes(git('status', '--short').stdout.replace(/\n+$/, '')), 'git status --short verbatim');
+      assert.match(block, /\?\? novo\.txt/);
+      assert.match(r.out.slice(r.out.indexOf('=== 9/9')), /=== 9\/9 · git diff --stat ===\n\(`git diff --stat` não devolveu nenhuma linha\)/);
+    } finally { rmSync(repo, { recursive: true, force: true }); }
+  });
+
+  test('`context` aparece na linha de uso', () => {
+    const r = run(cproj, 'comando-que-nao-existe');
+    assert.match(r.out + r.err, /context \[--task T1\]/);
   });
 });
 

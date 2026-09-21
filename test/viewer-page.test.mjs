@@ -391,11 +391,11 @@ describe('render functions on a real snapshot (happy-path through the server)', 
     assert.match(V.renderCard({ ...run.roster[3], instances: [inst] }, run, snap, snap.generatedAt), /terminou \(inferido\)/);
   });
   test('the forjalvl (run.forja.forjalvl) shows right next to the floor, in the same item so the pair never wraps, in Portuguese', () => {
-    assert.equal(run.forja.forjalvl, 'max', 'happy-path run.start carries no forjalvl: the reducer defaults it to "max"');
+    assert.equal(run.forja.forjalvl, 'high', 'happy-path run.start carries no forjalvl: the reducer defaults it to "high"');
     const desk = V.renderHeader(run, snap, snap.generatedAt, 'desktop');
-    assert.match(desk, /<span>piso <b>fable<\/b> · <span class="nowrap">forjalvl <b>máximo<\/b><\/span><\/span>/, 'same meta item as the floor, no colon (coherent with "piso fable" / "permissões auto")');
+    assert.match(desk, /<span>piso <b>fable<\/b> · <span class="nowrap">forjalvl <b>alto<\/b><\/span><\/span>/, 'same meta item as the floor, no colon (coherent with "piso fable" / "permissões auto")');
     const phone = V.renderHeader(run, snap, snap.generatedAt, 'mobile');
-    assert.match(phone, /eventos · <span class="nowrap">forjalvl <b>máximo<\/b><\/span>/, 'same meta line as the phone header, wrapped so label and value never split');
+    assert.match(phone, /eventos · <span class="nowrap">forjalvl <b>alto<\/b><\/span>/, 'same meta line as the phone header, wrapped so label and value never split');
     assert.equal(V.levelLabel('max'), 'máximo'); assert.equal(V.levelLabel('high'), 'alto'); assert.equal(V.levelLabel('eco'), 'económico');
     // "constructor" and friends must never resolve through the prototype chain to a function
     assert.equal(V.levelLabel('constructor'), 'constructor');
@@ -1077,7 +1077,7 @@ describe('seletor de run: runs verdadeiros, sessões soltas dobradas e nó está
   let V; let snap; let run;
   const lines = readFileSync(join(here, 'fixtures', 'loose-sessions.jsonl'), 'utf8').split('\n');
   const NOW = BASE + 28820_000;
-  const ID = { gear: 'R-20260917-1c81', job: 'R-20260917-f054', violet: 'R-20260917-e583',
+  const ID = { gear: 'R-20260917-1c81', job: 'R-20260917-f054', velora: 'R-20260917-e583',
     ler: 'forj-ler0-aaaa-bbbb-cccc-000000000016', vs: 'forj-vsc0-aaaa-bbbb-cccc-000000000015' };
   before(async () => {
     V = await import(pathToFileURL(join(here, '..', 'viewer', 'assets', 'viewer.js')).href);
@@ -1091,11 +1091,11 @@ describe('seletor de run: runs verdadeiros, sessões soltas dobradas e nó está
 
   test('o modelo agrupa por projeto, ordena pelo evento mais recente e só leva runs verdadeiros', () => {
     const m = model();
-    assert.deepEqual(m.groups.map(g => g.project), ['granite', 'juniper-hill', 'violet-pier', 'forja'].slice(0, 3).concat([]), 'os projetos com run, o do evento mais recente primeiro');
+    assert.deepEqual(m.groups.map(g => g.project), ['gearlift', 'job-hunter', 'velora-poker', 'forja'].slice(0, 3).concat([]), 'os projetos com run, o do evento mais recente primeiro');
     assert.deepEqual(m.groups.flatMap(g => g.options.map(o => o.label)), [
-      'granite · R-20260917-1c81 · a trabalhar',
-      'juniper-hill · R-20260917-f054 · a trabalhar',
-      'violet-pier · R-20260917-e583 · a trabalhar',
+      'gearlift · R-20260917-1c81 · a trabalhar',
+      'job-hunter · R-20260917-f054 · a trabalhar',
+      'velora-poker · R-20260917-e583 · a trabalhar',
     ], '«<projeto> · R-… · <estado>»');
     assert.deepEqual(m.loose.map(s => s.label), [
       'forja · sessão sem run · terminado',
@@ -1104,7 +1104,7 @@ describe('seletor de run: runs verdadeiros, sessões soltas dobradas e nó está
     assert.equal(m.loose.length, 2);
     // a 390 a caixa corta o texto: abrevia-se o id, nunca a palavra de estado
     assert.deepEqual(model(ID.gear, { compact: true }).groups[0].options.map(o => o.label),
-      ['granite · R-…1c81 · a trabalhar']);
+      ['gearlift · R-…1c81 · a trabalhar']);
   });
 
   test('a escolha por omissão é a do instantâneo; só a escolha do Sponsor se fixa, e sobrevive ao fim do run', () => {
@@ -1121,7 +1121,7 @@ describe('seletor de run: runs verdadeiros, sessões soltas dobradas e nó está
     const doc = new FakeDocument(); const h = host(doc);
     V.patchRunSelector(h, doc, model(), { looseOpen: false });
     const sel = h.querySelector('select[data-action="run"]');
-    assert.deepEqual(Array.from(sel.children).map(g => g.getAttribute('label')), ['granite', 'juniper-hill', 'violet-pier'], 'um <optgroup> por projeto');
+    assert.deepEqual(Array.from(sel.children).map(g => g.getAttribute('label')), ['gearlift', 'job-hunter', 'velora-poker'], 'um <optgroup> por projeto');
     assert.equal(opts(h).length, 3);
     assert.equal(sel.value, ID.gear);
     for (const o of opts(h)) assert.ok(!/sessão/.test(o.textContent), 'nenhuma sessão solta no seletor por omissão');
@@ -1155,18 +1155,18 @@ describe('seletor de run: runs verdadeiros, sessões soltas dobradas e nó está
     V.patchRunSelector(h, doc, V.runSelectorModel(moved, ID.gear), {});
     assert.equal(h.querySelector('select[data-action="run"]'), sel, 'o mesmo <select>');
     assert.equal(opts(h)[0], firstOption, 'a mesma <option>');
-    assert.equal(firstOption.textContent, 'granite · R-20260917-1c81 · terminado');
+    assert.equal(firstOption.textContent, 'gearlift · R-20260917-1c81 · terminado');
     sel.focus();
     const back = { ...snap, runs: snap.runs.map(r => r.id === ID.gear ? { ...r, status: 'a trabalhar' } : r) };
     const res = V.patchRunSelector(h, doc, V.runSelectorModel(back, ID.gear), {});
     assert.deepEqual([res.applied, res.pending], [false, true], 'a atualização fica pendente');
     assert.equal(opts(h)[0], firstOption);
-    assert.equal(firstOption.textContent, 'granite · R-20260917-1c81 · terminado', 'o texto da opção não mudou debaixo do dedo');
+    assert.equal(firstOption.textContent, 'gearlift · R-20260917-1c81 · terminado', 'o texto da opção não mudou debaixo do dedo');
     assert.equal(opts(h).length, 3, 'nem opções novas, nem opções removidas');
     const res2 = V.patchRunSelector(h, doc, V.runSelectorModel(back, ID.gear), { force: true });
     assert.deepEqual([res2.applied, res2.pending], [true, false]);
     assert.equal(opts(h)[0], firstOption);
-    assert.equal(firstOption.textContent, 'granite · R-20260917-1c81 · a trabalhar');
+    assert.equal(firstOption.textContent, 'gearlift · R-20260917-1c81 · a trabalhar');
   });
 
   test('pausa das atualizações: botão com aria-pressed, a hora em palavras nas duas larguras, e o instantâneo guardado entra na retoma', () => {

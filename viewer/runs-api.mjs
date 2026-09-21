@@ -29,6 +29,7 @@
 // Auth (token in ?k= / cookie forja_k) and the Host allow-list are applied by
 // viewer/server.mjs BEFORE this handler runs.
 import { existsSync } from 'node:fs';
+import { coreObservation } from '../lib/core/observe.mjs';
 import { listProjectsWithStatus, loadProjects, runSummary, runnerAlive } from '../lib/projects.mjs';
 // The launch itself lives in lib/spawn-runner.mjs since the guard (lib/guard.mjs)
 // became a second caller: viewer and guard start a runner the same way, or only
@@ -166,6 +167,7 @@ function handleRuns(req, res, ctx) {
 
       if (runnerAlive(project.path, ctx.dataDir)) return send(res, 409, { error: 'já há um runner vivo neste projeto' });
       const run = runSummary(project.path, ctx.dataDir);
+      if (run?.driver === 'core' || (!run && coreObservation(project.path))) return send(res, 409, { error: 'projeto Core: usa forja core resume ou forja start no terminal; acompanha em /core' });
       const running = !!run && run.status === 'running';
       if (v.resume && !running) return send(res, 409, { error: 'não há run em curso para relançar' });
       // Only a runner-driven run is relaunched (docs/ARCHITECTURE.md §3c): a run

@@ -122,7 +122,7 @@ function newRun(id, rec, t) {
     main: { lastEventAt: t, lastAction: null, turnEndedAt: null, turnEndedMessage: null, turnEndedByRunner: false, permission: null, stopFailure: null, quotaWait: null, compactions: 0, lastPromptAt: null, calls: 0, effort: null, sessionId: rec.session_id || null, refused: 0, pendingTools: new Map() },
     instances: new Map(), latestByAgentId: new Map(), pending: [],
     tasks: new Map(), decisions: [], queue: [], reviews: [], fallbacks: [], modelSwitches: [], progress: null,
-    forja: { status: null, runId: null, modelFloor: 'fable', forjalvl: 'max', modelLevel: 'max', autonomy: 'normal', checkpoints: 0, lastCheckpointAt: null, phase: null, fallbackReviewed: [], pause: null, runner: null, runnerSession: null },
+    forja: { status: null, runId: null, modelFloor: 'fable', forjalvl: 'high', modelLevel: 'high', autonomy: 'normal', checkpoints: 0, lastCheckpointAt: null, phase: null, fallbackReviewed: [], pause: null, runner: null, runnerSession: null },
     timeline: [], counts: { events: 0, errors: 0, denied: 0 },
   };
 }
@@ -308,11 +308,12 @@ function setTask(run, id, patch, t) {
 // da mudança reproduzir na mesma. O snapshot expõe os dois — `modelLevel` é só
 // um alias do `forjalvl`.
 // `keepWhenMissing`: um evento que não traz nenhum dos dois não apaga o que já
-// se sabia (só o `run.start` decide o valor por omissão, `max`).
+// se sabia (só o `run.start` decide o valor por omissão, `high` — regra do
+// Sponsor, 18 set 2026; lib/models.mjs é a fonte, isto só espelha o mesmo default).
 function setForjalvl(run, f, { keepWhenMissing = false } = {}) {
   const v = str(f.forjalvl) || str(f.model_level);
   if (!v && keepWhenMissing) return;
-  run.forja.forjalvl = v || 'max';
+  run.forja.forjalvl = v || 'high';
   run.forja.modelLevel = run.forja.forjalvl;
 }
 
@@ -705,7 +706,7 @@ export function instanceState(inst, now) {
 // `runner.session` elsewhere in the stream that named THIS session as the one it
 // launched (`forja.session_id`; the runner emits it from the session it is
 // replacing, so the event and the session it describes can land in different
-// run objects). Measured on the granite run of 17 set 2026.
+// run objects). Measured on the gearlift run of 17 set 2026.
 function runnerOf(run) {
   return run.forja.runner || run.forja.runnerSession || null;
 }

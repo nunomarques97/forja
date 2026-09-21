@@ -1,0 +1,10 @@
+{
+  "maxSessions": 12,
+  "maxCloudSessions": 12,
+  "maxAttempts": 2,
+  "maxMinutes": 10,
+  "provider": {
+    "models": { "fast": "haiku", "normal": "sonnet", "strong": "opus", "critical": "opus" },
+    "efforts": { "normal": "medium", "strong": "high", "critical": "high" }
+  }
+}

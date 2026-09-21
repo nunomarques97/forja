@@ -14,9 +14,12 @@
 //   without the cookie is 401. The token lives in data/viewer-token.txt.
 // - Host allow-list (loopback + hostnames from data/tunnel.json) against DNS
 //   rebinding, kept from v1.
-// - Watchdog: every 30 s, notifies (ntfy) on dead instances, an unresponsive
-//   main session and "needs Sponsor" — once per episode, persisted in
-//   data/watchdog.json so a restart does not re-notify.
+// - Watchdog: every 30 s, notifies (ntfy) only what needs the Sponsor's
+//   response — a dead instance, a dead main session, "needs Sponsor" and a
+//   pending permission — once per episode, persisted in data/watchdog.json
+//   so a restart does not re-notify. A main session that is merely
+//   unresponsive, or a run waiting on quota, is not (both can still recover
+//   on their own).
 // - Answers from the phone: POST /answers writes data/answers/<project>.jsonl
 //   and emits a Forja `answer.pending` event; the lead picks it up with
 //   `forja answers`. The server never writes outside <forja>/data.
@@ -33,6 +36,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createState, applyLine, snapshot, STATES, THRESHOLDS } from './lib/state.mjs';
 import { createFeed, feedApply, feedSnapshot } from './lib/feed.mjs';
 import { handleRunsApi, crossSite } from './runs-api.mjs';
+import { coreSnapshot } from './core-api.mjs';
 import { notify, sanitizeClick } from '../lib/notify.mjs';
 // A outra metade da supervisão mútua (docs/ARCHITECTURE.md §12): a guarda vigia
 // o viewer, e o viewer vigia a guarda. Regras, constantes e predicados de vida
@@ -52,9 +56,9 @@ export function watchdogPlan(snap, now = Date.now(), thresholds = THRESHOLDS) {
     const main = run.roster[0];
     const add = (key, message, priority = 'high') => out.push({ key, message, priority });
     if (main.state === STATES.SPONSOR) add(`${run.id}|sponsor|${main.since}`, `Forja precisa de ti (${run.project}): ${main.detail || 'a sessão principal parou'}`);
-    if (main.state === STATES.SEM_RESPOSTA) add(`${run.id}|main-silent|${main.since}`, `Forja: sessão principal em ${run.project} sem resposta (${main.detail})`);
+    // SEM_RESPOSTA (ainda pode recuperar sozinha) e ESPERA_QUOTA (retoma sozinho) não avisam o
+    // telemóvel — nada espera pelo Sponsor ainda. MORTO continua a avisar: nada a relança sozinha.
     if (main.state === STATES.MORTO) add(`${run.id}|main-dead|${main.since}`, `Forja: sessão principal em ${run.project} parece morta (${main.detail})`, 'urgent');
-    if (main.state === STATES.ESPERA_QUOTA) add(`${run.id}|quota|${main.since}`, `Forja: run em ${run.project} à espera de quota (${main.detail})`, 'default');
     // Under the runner a dead subagent is handled by the per-session watchdog (the session is
     // killed and the task redone): only the runner/main session dying is worth a notification.
     const underRunner = !!(run.forja && run.forja.runner && !run.forja.runner.exited && ['running', 'blocked'].includes(run.forja.status));
@@ -337,6 +341,7 @@ export function startServer(opts = {}) {
   // form sends the visitor back to). Anything else → 401.
   function entryTarget(pathname) {
     if (pathname === '/') return '/';
+    if (pathname === '/core') return '/core';
     if (pathname === '/m' || pathname === '/m/') return '/m';
     return null;
   }
@@ -487,6 +492,12 @@ export function startServer(opts = {}) {
 
     // Run API (viewer/runs-api.mjs): /projects and /runs, authenticated above.
     if (handleRunsApi(req, res, runsCtx)) return;
+
+    if (req.method === 'GET' && url.pathname === '/api/core') {
+      const snapshot = coreSnapshot(dataDir);
+      return json(res, snapshot.ok ? 200 : 500, snapshot);
+    }
+    if (req.method === 'GET' && url.pathname === '/core') return sendFile(res, join(here, 'core.html'));
 
     if (req.method === 'GET' && url.pathname === '/') return sendFile(res, join(here, 'index.html'));
     if (req.method === 'GET' && (url.pathname === '/m' || url.pathname === '/m/')) return sendFile(res, join(here, 'mobile.html'));

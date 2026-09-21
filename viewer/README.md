@@ -56,3 +56,8 @@ Timeline `kind` values: `run.start`, `run.resume`, `checkpoint`, `run.finish`, `
 ## Fixtures for building the UI
 
 `node test/fixtures/build-fixtures.mjs` writes `test/fixtures/*.jsonl`; serve one with `EVENTS_FILE=test/fixtures/all-states.jsonl FORJA_DATA_DIR=<tmp> node viewer/server.mjs` to see every roster state at once (states are evaluated against the real clock, so the fixture's absolute times matter: `all-states.jsonl` is dated 2026-09-17 09:00Z — instances become `sem resposta`/`morto` as that date recedes; use `viewer/lib/state.mjs` `reduceLines(lines, now)` in a script, or regenerate fixtures with a base time near "now", for live-looking screenshots).
+
+
+## Core
+
+Open `/core` for the new read-only project/run/task/session view. `core init` and `start` register projects; native usage is shown with measurement coverage and optional USD estimates, never presented as a subscription invoice. Authentication and host checks are shared with the existing viewer. Recovery stays in `core resume` / `core retry`; the guard only resumes interrupted running jobs. Restart an already-running viewer/guard to load this implementation. See [Core runbook](../docs/CORE-RUNBOOK.md).

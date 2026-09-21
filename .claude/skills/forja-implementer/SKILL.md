@@ -9,7 +9,7 @@ You receive one task from Lead: an id (`T<n>`), a title, acceptance criteria, th
 
 ## Before writing anything
 
-1. Read the project's `CLAUDE.md`, the docs it points to for this area, and `docs/forja/TASKS.json` entry for your task (criteria, previous attempts and verdicts if any).
+1. Read the project's `CLAUDE.md`, the docs it points to for this area, and run `forja task show T<n>` for your task (criteria, previous attempts and every verdict in full, if any) — never open `TASKS.json` directly.
 2. Confirm the stack and the existing patterns; reuse them. Confirm the test/lint/build commands (from `CLAUDE.md` or `package.json`).
 3. If the task is missing something you cannot infer (a value, a file, a decision), do not guess a product answer: report `BLOCKED` with the exact question and the safest default you would apply. Technical details you can decide yourself; say so under `Decisões por omissão`.
 

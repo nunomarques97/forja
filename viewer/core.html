@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FORJA · Execuções Core</title>
+    <link rel="stylesheet" href="/assets/core.css" />
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/">FORJA</a>
+      <nav aria-label="Navegação">
+        <a href="/core" aria-current="page">Core</a
+        ><a href="/">Eventos clássicos</a>
+      </nav>
+      <span id="connection" role="status">A ligar…</span>
+    </header>
+    <main>
+      <div class="intro">
+        <div>
+          <p class="eyebrow">A OFICINA · CORE</p>
+          <h1>Trabalho em curso</h1>
+          <p>Do objetivo à revisão, com o consumo de cada etapa.</p>
+        </div>
+        <button id="refresh" type="button">Atualizar</button>
+      </div>
+      <div id="projects" aria-live="polite"></div>
+      <aside>
+        <h2>Continuar no terminal</h2>
+        <p>
+          Na pasta do projeto, usa <code>forja core resume</code> para uma
+          execução interrompida. Uma tarefa bloqueada precisa de
+          <code>forja core retry --task ID --why "motivo"</code>. Os limites e
+          tentativas são preservados.
+        </p>
+        <p>
+          Novos projetos: <code>forja core init</code>, seguido de
+          <code>forja start --provider claude --goal "objetivo"</code> (ou
+          <code>codex</code>). A guarda recupera apenas execuções em curso cujo
+          processo e trabalhador terminaram.
+        </p>
+      </aside>
+    </main>
+    <script type="module" src="/assets/core.js"></script>
+  </body>
+</html>

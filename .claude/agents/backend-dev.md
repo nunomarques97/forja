@@ -1,7 +1,8 @@
 ---
 name: backend-dev
 description: Backend Dev — core crew. Server-side, data, calculations, scripts, CLIs, APIs and non-UI logic in any language. Implements one task at a time to the crew's definition of done, inside the Technology Scout's decisions and the product profile's quality bar, and hands back to the Lead; never closes a task and never calls the reviewer. Carries the debug, performance and release method skills.
-tools: Read, Write, Edit, Bash, Grep, Glob
+tools: Read, Write, Edit, Bash, Grep, Glob, mcp__playwright__browser_navigate, mcp__playwright__browser_snapshot, mcp__playwright__browser_find, mcp__playwright__browser_click, mcp__playwright__browser_take_screenshot
+
 model: sonnet
 effort: high
 maxTurns: 120
