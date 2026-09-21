@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { greet, greetAll } from '../lib/greet.mjs';
 
 test('greet names the person and ends with an exclamation mark', () => {
-  assert.equal(greet('Rita'), 'Olá, Rita!');
+  assert.equal(greet('Nuno'), 'Olá, Nuno!');
   assert.equal(greet('  Ana '), 'Olá, Ana!');
 });
 

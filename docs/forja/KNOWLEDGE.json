@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "documents": [
+    { "path": "docs/forja/CORE-CONVENTIONS.md", "required": true },
+    "docs/CORE-RUNBOOK.md",
+    "docs/RESEARCH.md",
+    "docs/RELEASE.md",
+    "docs/design/DESIGN.md"
+  ]
+}

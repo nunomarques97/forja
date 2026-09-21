@@ -1,40 +1,7 @@
-# Forja — project rules
+# FORJA: Claude adapter
 
-Forja automates the Sponsor → Product Manager → Devs → Reviewer loop on top of Claude Code, with a live viewer (desktop + phone) and ntfy notifications. Source of truth: `docs/ARCHITECTURE.md` (design), `docs/design/DESIGN.md` (UI), `docs/FORJA-POC-LOG.md` (what happened and why), `docs/RUNBOOK-UNATTENDED.md` (how the Sponsor runs it), `docs/SPONSOR-ROADMAP.md` (what only the Sponsor can do), `docs/forja/TECHNOLOGY.md` (the Technology Scout's binding decisions for this repo).
+Read AGENTS.md for repository development instructions and docs/CORE.md for the shared FORJA execution contract.
 
-## Stack & commands
-- Node 24, zero dependencies, ES modules. Static HTML viewer (no framework, no build step). Windows 11, Git Bash for hooks.
-- Run viewer: `node bin/forja.mjs serve` · viewer + tunnel + notify: `node bin/forja.mjs up` · stop: `node bin/forja.mjs down`
-- Guarda dos runners (processo à parte que relança um runner morto a meio de um run, `docs/ARCHITECTURE.md` §12): `node bin/forja.mjs guard run` · parar: `guard stop` (escreve `data/guard/guard.stop`, nunca mata nada) · ver o que faria agora sem lançar nada: `guard status` (inclui o bloco `viewer`). `node bin/forja.mjs autostart install` passou a instalar **os dois** arranques automáticos (viewer+túnel e guarda), em ciclos independentes.
-- **Supervisão mútua** (`lib/supervise.mjs`, `docs/ARCHITECTURE.md` §12): os dois processos de vida longa vigiam-se **um ao outro** — a guarda relança o `forja up` que morreu (volta de 60 s) e o `forja up` relança a guarda que morreu (volta de 30 s). Regras iguais dos dois lados, numa fonte só: 2 min de graça contados **do arranque do próprio vigia**, 3 tentativas a 15 min, contador só a zero com 30 min de saúde observada, e na dúvida (linha de comandos ilegível) o par conta como **vivo**. Os ficheiros de paragem mandam mais: com `data/up.stop` a guarda nunca relança o viewer, com `data/guard/guard.stop` o viewer nunca relança a guarda — `down` e `guard stop` continuam a querer dizer «parado».
-- Unattended run on a project (run from that project's folder): `node "<this repo>/bin/forja.mjs" runner --goal "…"` (one fresh `claude -p` session per phase; state in the project's `docs/forja/`)
-- Tests: `npm test` (pipeline fixtures + reducer + viewer transport + CLI + runner + bootstrap + up) · Repo invariants: `npm run check` (sample crew byte-identical, no invisible characters, event replay, one model-policy source) · Screenshots: `node tools/shot.mjs <url> <out.png> --width 1440`
-- Bootstrap another repo: `node bin/forja.mjs bootstrap <path>` (validated on `examples/sample-project`)
+New runs: node bin/forja.mjs start --goal "..." --provider claude. Core state is in .forja/, with native provider usage in each run's usage.jsonl. No legacy crew is needed.
 
-## Invariants
-- All UI work follows `docs/design/DESIGN.md`. Every UI change is verified with real screenshots at 1440 and 390 during the build (skill `forja-visual-check`). The viewer scene is SVG + CSS, no library (Scout decision S1 in `docs/forja/TECHNOLOGY.md`).
-- Crew: ten roles with plain English names, never metaphors. Core (every run): Lead, Architect, Frontend Dev, Backend Dev, Reviewer. On demand (trigger table, `docs/ARCHITECTURE.md` §2b): Product Manager, Product Designer, Technology Scout, QA, Security Reviewer. Native Claude Code subagents are "ferramentas nativas", never named. UI labels in Portuguese; role names always English.
-- Nobody reviews their own work: every task goes through the Reviewer (skill `forja-review`), on a model never weaker than the implementer; the Security Reviewer is a second gate for auth/secrets/network/dependencies. Every `Agent` call passes `model` explicitly and carries a plan + effort line in the prompt. **Which model each role gets: see `docs/ARCHITECTURE.md` §6 — the table is generated from `lib/models.mjs` (`policyText`), which is the only place the policy is written; `npm run check` refuses a second copy.** `node bin/forja.mjs forjalvl show` prints the forjalvl (nível de modelos) in force for this project and run, and the policy it implies (`models` is still accepted as an alias).
-- **Autonomia do run** (`docs/forja/SETTINGS.json` → `RUN.json.autonomy`, `forja autonomy show|set`, `docs/ARCHITECTURE.md` §6b): em `total` as dependências gratuitas (sem conta, licença permissiva) e as escolhas de produto e de design com default razoável decidem-se dentro do run e ficam em `DECISIONS.md` como «decidido em autonomia total»; dinheiro do Sponsor, contas em nome dele, envios a terceiros, apagar dados e publicar/push vão à fila em qualquer autonomia. `normal` é o comportamento de sempre.
-- **Modo visível do runner** (`forja runner --visivel`, alias `--visible`, desligado por omissão; `RUN.json.visible`, `docs/ARCHITECTURE.md` §3b e decisão S2 em `docs/forja/TECHNOLOGY.md`): cada fase corre como sessão de fundo `claude --bg` (visível na app do Claude), com o id real da sessão no evento `runner.session`, a resposta do modelo lida do transcript e `claude stop`/`rm` no fim de cada sessão, na saída do processo e sobre as sessões órfãs quando se assume o lock de um runner morto. Sem o flag nada muda: `claude -p`, byte a byte.
-- **Quem conduz o run** (`RUN.json.driver`, `lib/driver.mjs`, `docs/ARCHITECTURE.md` §3c): `interactive` (uma conversa é o Lead) ou `runner` (`forja runner`); é outro eixo que não o `visible`. A guarda, o runner, a CLI (`run resume`, `task start`, `run start`) e o `POST /runs` só põem um runner num run `runner`; um run sem campo só é `runner` com evidência do MESMO `run_id` (lock deste projeto a nomeá-lo, ou `data/runner/<run_id>-NN-*.log`), senão é `unknown` e nada o executa. Transferência só com `forja run driver set interactive|runner` (com runner vivo é um pedido que ele honra entre sessões, com checkpoint).
-- No Dev introduces a technology without a Technology Scout decision in `docs/forja/TECHNOLOGY.md`; no design direction without the Product Designer's `DESIGN.md`; product trade-offs follow `docs/forja/PRODUCT-PROFILE.md`.
-- Liveness in the viewer is derived from event evidence (age of the last event), never from "saw Start, no Stop".
-- The hook (`hooks/log-event.mjs`) never blocks Claude Code: exit 0 always, errors to `data/hook-errors.log`, payload fields capped at 16 KB. Never put a field named `kind` in a Forja event payload.
-- `data/` is evidence and is git-ignored; run state for a project lives in that project's `docs/forja/` (a finished run's tasks are archived under `docs/forja/archive/` when the next run starts; each attempt's Dev hand-back and Reviewer verdict are written to `docs/forja/reports/T<id>-a<n>-{dev,review}.md` and later prompts carry the path, never the text).
-- Long-running execution state never depends on a conversation remembering it: the runner rebuilds each session from disk; one runner per project (lock in `data/runner/`).
-- $0 only, no installs without a recorded decision, no credentials, no destructive git, no push from automated runs, stay inside this repo.
-- Notifications (ntfy topic from the `FORJA_NTFY_TOPIC` environment variable; unset = no notifications) carry status only — never code, diffs, paths, tokens.
-
-## Where things live
-- Crew: `.claude/agents/*.md` · shared rules and methods: `.claude/skills/forja-*/` · hooks: `.claude/settings.json` + `hooks/`
-- CLI: `bin/forja.mjs` (+ `lib/`: `state-files`, `runner`, `guard`, `supervise`, `spawn-runner`, `up`, `serve`, `bootstrap`, `notify`) · viewer: `viewer/` (server, state reducer, pages) · tests: `test/` · fixtures: `test/fixtures/`
-- Evidência da guarda dos runners: `data/guard/` (`guard.log` uma linha por volta, `state.json` com o contador de tentativas por projeto **e a chave `up`, irmã de `projects`, com o do viewer**, `guard.lock.json`, `guard.stop`) — nunca em `data/events.jsonl`; os relançamentos aparecem como `via=guard` em `data/runner/spawn.log`.
-- Evidência da vigia que o viewer faz à guarda: `data/up-watch/` (`state.json` com a chave `guard`, `up-watch.log` uma linha por ação) e as linhas `peer=guard … via=viewer` em `data/runner/spawn.log`. `data/watchdog.json` é do watchdog do viewer, que é outra coisa (notifica sobre sessões, não relança nada) e ficou como estava.
-- Tooling configured here: none beyond the global baseline (plain Node + static HTML; visual checks use local Chrome headless over CDP via `tools/shot.mjs`).
-
-<!-- forja:begin -->
-## Forja
-- Forja repo: `C:\dev\forja`
-- Start an unattended run: see `docs/RUNBOOK-UNATTENDED.md` §2 (`forja runner --goal`); an interactive Lead session loads skill `forja-lead` and keeps run state in `docs/forja/`.
-<!-- forja:end -->
+For an existing legacy run through forja runner or the viewer, read docs/LEGACY-CLAUDE.md and docs/ARCHITECTURE.md. Legacy RUN.json.autonomy (normal or total) continues to apply through lib/autonomy.mjs. Do not migrate a live run implicitly.

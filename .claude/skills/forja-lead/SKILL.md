@@ -15,7 +15,7 @@ Two modes, same rules:
 
 ## 0. Start or resume (interactive)
 
-1. Read the project's `CLAUDE.md` and `docs/forja/` (`RUN.json`, `TASKS.json`, `DECISIONS.md`, `SPONSOR-QUEUE.md`, `HANDOVER.md`, `PRODUCT-PROFILE.md`, `TECHNOLOGY.md`) if they exist.
+1. Read the project's `CLAUDE.md` and `docs/forja/` (`RUN.json`, `SPONSOR-QUEUE.md`, `HANDOVER.md`, `PRODUCT-PROFILE.md`) if they exist; `forja status` gives every task's state, owner, attempts and title in one line each — never open `TASKS.json` directly. In `DECISIONS.md` read the index table at the top (id, date, role, short title, reversible, superseded) and open a full decision only when the work depends on it; in `TECHNOLOGY.md`, likewise, the decisions table at the top (capability → choice → path of the full section) and the full section only for the capability you need, at the path the table gives (`docs/forja/technology/S<n>.md`).
 2. If `RUN.json.status` is `running` and `HANDOVER.md` exists → this is a resume: `forja run resume`, then `forja status`, and continue from the exact next action in `HANDOVER.md` (the CLI ties this new session to the same run; the viewer shows one run). Otherwise: `forja run start --goal "<the Sponsor's goal, verbatim>"`.
    - **Who drives the run** (`RUN.json.driver`, `docs/ARCHITECTURE.md` §3c): a `run start` in this conversation records `interactive` — you are the Lead, and the guard never launches a runner on this run, across restarts and compactions. If `run resume` refuses because the run is the runner's (`driver: runner`) or its driver is unknown (a run from before the field), do not work around it: tell the Sponsor, and only on his word run `forja run driver set interactive` (with a live runner that is a request, honoured between two of its sessions — confirm with `forja run driver show` before you continue). To hand the run to the unattended runner: close or return the task in progress, then `forja run driver set runner`. Never start `forja runner` on a run this conversation drives.
 3. `forja answers` — pick up any answers the Sponsor gave from the phone.
@@ -26,7 +26,7 @@ Two modes, same rules:
 
 ## 1. One task at a time
 
-For each task in `TASKS.json` order (respect `after`):
+For each task, in the plan's order (respect `after`; `forja status` shows it):
 
 1. `forja task start T<n>` (increments the attempt; refuses a task already `failed` three times or `done` → skip it).
 2. **Triggers before delegating** — apply §1b deterministically: Product Designer, then Technology Scout, if they fire.
@@ -39,7 +39,7 @@ For each task in `TASKS.json` order (respect `after`):
      Plan: <3-6 steps you expect: read, implement, test, screenshots, report>.
      Critérios de aceitação: <list>.
      Âmbito: <files/area>. Fora de âmbito: <list>.
-     Contexto: ler CLAUDE.md, docs/forja/PRODUCT-PROFILE.md, docs/forja/TECHNOLOGY.md, <docs>, docs/forja/TASKS.json (T<n>).
+     Contexto: correr `forja task show T<n>` (ou `forja context --task T<n>`), ler CLAUDE.md, docs/forja/PRODUCT-PROFILE.md, docs/forja/TECHNOLOGY.md, <docs>.
      Trabalho já em disco da tentativa anterior: <git diff --stat, or "nenhum">.
      Tentativa <k> de 3. <If k>1: "Veredicto anterior do Reviewer: <blockers verbatim>">
      Entrega: relatório no formato forja-crew, primeira linha DONE/BLOCKED/FAILED T<n>.
@@ -129,7 +129,7 @@ Decide product, technology or design direction; review your own work; skip the R
 
 The runner (`forja runner`, `docs/ARCHITECTURE.md` §3b) is the Sponsor's unattended mode: a small Node loop that starts a fresh `claude -p --model opus --permission-mode auto` session per phase, with a list of disallowed irreversible commands, a per-session time limit, usage-limit pauses, an ownership lock (one runner per project) and a dead-session guard. Each session's prompt begins with `You are the Lead, in RUNNER MODE` and says the phase: `PHASE: PLAN`, `PHASE: TASK T<n> (attempt k of 3)` or `PHASE: CLOSE`. Rules that differ from interactive mode:
 
-- **You know nothing but the disk.** Start by `forja run resume` (ties this session to the run), `forja answers`, `forja task show T<n>` (the task in full: state, owner, complexity, criteria, attempts, every verdict — read it instead of opening `TASKS.json`), and reading `HANDOVER.md`, `PRODUCT-PROFILE.md` and, in `TECHNOLOGY.md`, the decisions table at the top (capability → choice → §); open a full section only for the capability this task needs. Uncommitted changes in `git status` are the previous session's leftovers for this task — never discard them; pass `git diff --stat` to the Dev as data.
+- **You know nothing but the disk.** Start by `forja run resume` (ties this session to the run), `forja answers`, `forja task show T<n>` (the task in full: state, owner, complexity, criteria, attempts, every verdict — read it instead of opening `TASKS.json`), and reading `HANDOVER.md`, `PRODUCT-PROFILE.md` and, in `TECHNOLOGY.md`, the decisions table at the top (capability → choice → path of the full section); open the full section only for the capability this task needs, at the path the table gives (`docs/forja/technology/S<n>.md`). Uncommitted changes in `git status` are the previous session's leftovers for this task — never discard them; pass `git diff --stat` to the Dev as data.
 - **Reports live on disk, not in prompts.** The Dev's hand-back goes to `docs/forja/reports/T<n>-a<k>-dev.md` and the Reviewer's verdict to `docs/forja/reports/T<n>-a<k>-review.md`, both verbatim and as data; the Reviewer, the Security Reviewer and the next attempt's Dev get the **path** and read it themselves. Committing the task also commits `docs/forja/`, so the next session finds them.
 - **Do exactly the phase in the prompt**, with the same delegation, triggers (§1b), review and security gate as §1, then end your turn with the exact summary line the prompt asks for (`PLAN OK <n> tasks`, `TASK T<n> done|failed|blocked`, `RUN REOPENED <n> tasks`, `RUN CLOSED`). Never start another task; never wait for anything; never ask anyone.
 - **Record every outcome through the CLI before ending the turn** (`task done|fail|block`, `run checkpoint`, commits of the task's files + `docs/forja`). What you do not record, the runner records as a failed attempt (a session that ends with the task still `doing`/`review`).

@@ -11,8 +11,8 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const BASE = Date.parse('2026-09-17T09:00:00.000Z');
-const CWD = 'C:\\dev\\examples\\sample-project';
-const CWD_LOWER = 'c:\\dev\\examples\\sample-project';
+const CWD = 'C:\\Fixtures\\User\\Desktop\\Repositorios\\examples\\sample-project';
+const CWD_LOWER = 'c:\\Fixtures\\User\\Desktop\\Repositorios\\examples\\sample-project';
 const S1 = 'run-0001-aaaa-bbbb-cccc-000000000001';
 const S2 = 'run-0002-aaaa-bbbb-cccc-000000000002';
 
@@ -256,15 +256,15 @@ fixtures['sequential-runs'] = [
 // 9. Two runs in parallel (two projects) interleaved in one file, with different cwd casing for the same project.
 fixtures['parallel-runs'] = [
   ev(0, { hook_event_name: 'SessionStart', source: 'startup' }),
-  ev(0.5, { hook_event_name: 'SessionStart', source: 'startup' }, { session: S2, cwd: 'C:\\dev\\indigo-cove' }),
+  ev(0.5, { hook_event_name: 'SessionStart', source: 'startup' }, { session: S2, cwd: 'C:\\Fixtures\\User\\Desktop\\Repositorios\\invest-calcs' }),
   forja(1, 'run.start', { run_id: S1, goal: 'sample: a' }),
   forja(1.5, 'run.start', { run_id: S2, goal: 'invest: b' }, S2),
   ...agentCall(2, { id: 'a-p1', type: 'fundidor', desc: 'T1 · Fundidor: sample', tu: toolUse(80) }),
   subStart(2.5, 'a-p1', 'fundidor'),
-  ev(3, { hook_event_name: 'PreToolUse', tool_name: 'Agent', tool_input: { subagent_type: 'fundidor', model: 'fable', description: 'T1 · Fundidor: invest' }, tool_use_id: toolUse(81) }, { session: S2, cwd: 'C:\\dev\\indigo-cove' }),
-  ev(3.5, { hook_event_name: 'SubagentStart', agent_id: 'a-p2', agent_type: 'fundidor' }, { session: S2, cwd: 'C:\\dev\\indigo-cove' }),
+  ev(3, { hook_event_name: 'PreToolUse', tool_name: 'Agent', tool_input: { subagent_type: 'fundidor', model: 'fable', description: 'T1 · Fundidor: invest' }, tool_use_id: toolUse(81) }, { session: S2, cwd: 'C:\\Fixtures\\User\\Desktop\\Repositorios\\invest-calcs' }),
+  ev(3.5, { hook_event_name: 'SubagentStart', agent_id: 'a-p2', agent_type: 'fundidor' }, { session: S2, cwd: 'C:\\Fixtures\\User\\Desktop\\Repositorios\\invest-calcs' }),
   ...subTool(10, 'a-p1', 'fundidor', 'Edit', { file_path: 'C:\\x\\a.mjs' }),
-  ev(11, { hook_event_name: 'PreToolUse', agent_id: 'a-p2', agent_type: 'fundidor', tool_name: 'Edit', tool_input: { file_path: 'C:\\y\\b.ts' }, tool_use_id: toolUse(82) }, { session: S2, cwd: 'C:\\dev\\indigo-cove' }),
+  ev(11, { hook_event_name: 'PreToolUse', agent_id: 'a-p2', agent_type: 'fundidor', tool_name: 'Edit', tool_input: { file_path: 'C:\\y\\b.ts' }, tool_use_id: toolUse(82) }, { session: S2, cwd: 'C:\\Fixtures\\User\\Desktop\\Repositorios\\invest-calcs' }),
   // same project S1 continues with lower-case drive letter in cwd (Windows quirk)
   ev(12, { hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { file_path: 'x' }, tool_use_id: toolUse(83) }, { cwd: CWD_LOWER }),
 ];
@@ -421,7 +421,7 @@ fixtures['all-roles'] = [
   forja(1610, 'run.pause', { reason: 'limite de utilização', resume_at: '2026-09-17T14:00:00.000Z', message: "You've hit your session limit, resets at 3pm", limit_kind: 'session', backoff: false }),
 ];
 
-// 13. Modo visível do runner (§3b) — o incidente real do run granite de 17 set
+// 13. Modo visível do runner (§3b) — o incidente real do run gearlift de 17 set
 // 2026, reduzido ao essencial e com o id de sessão e a última mensagem reais:
 // o runner (sessão anterior) anuncia a sessão de fundo que lançou, essa sessão
 // faz a task e TERMINA O TURNO (hook `Stop`) com o run ainda a correr. Nesse dia
@@ -430,7 +430,7 @@ fixtures['all-roles'] = [
 const VIS = '3dc453de-521a-46f0-9b31-6265f2e5a242';   // a sessão visível real
 const PREV = '4b7ef410-c98d-4807-ae8d-53881969a6e1'; // a sessão da fase anterior, de onde o runner emite
 fixtures['runner-visible-turn-end'] = [
-  forja(0, 'run.start', { run_id: S1, goal: 'Granite: fiabilidade e acessibilidade', model_floor: 'fable', visible: true, autonomy: 'total', forjalvl: 'high' }, PREV),
+  forja(0, 'run.start', { run_id: S1, goal: 'Gearlift: monetização e acessibilidade', model_floor: 'fable', visible: true, autonomy: 'total', forjalvl: 'high' }, PREV),
   // O evento que diz qual é a sessão da fase — emitido DA SESSÃO ANTERIOR, com o
   // id real da nova no payload (é o que o modo visível permite saber).
   forja(1, 'runner.session', { phase: 'task', task: 'T4', attempt: 1, session_id: VIS, visible: true, forjalvl: 'high', autonomy: 'total', effort: 'medium', minutes: 45 }, PREV),
@@ -454,34 +454,34 @@ fixtures['runner-visible-turn-end'] = [
 // os runs estavam parados — quando os dois runs verdadeiros tinham eventos há um
 // minuto. Uma sessão solta é uma sessão do Claude Code no mesmo projeto que
 // nunca correu `forja run start`/`run resume`.
-const GEAR = 'C:\\dev\\granite';
-const JOB = 'C:\\dev\\juniper-hill';
-const G_RUN = 'gran-run0-aaaa-bbbb-cccc-000000000010';   // a sessão do run vivo do granite
+const GEAR = 'C:\\Fixtures\\User\\Desktop\\Repositorios\\gearlift';
+const JOB = 'C:\\Fixtures\\User\\Desktop\\Repositorios\\job-hunter';
+const G_RUN = 'gear-run0-aaaa-bbbb-cccc-000000000010';   // a sessão do run vivo do gearlift
 const G_VS = 'gear-vsc0-aaaa-bbbb-cccc-000000000011';    // sessão interativa do Sponsor no VS Code
 const G_PHASE = 'gear-fase-aaaa-bbbb-cccc-000000000012'; // sessão de fase (modo visível) que nunca anunciou nada
-const J_RUN = 'jun-run00-aaaa-bbbb-cccc-000000000013';
+const J_RUN = 'job-run00-aaaa-bbbb-cccc-000000000013';
 const lev = (off, fields, session, cwd) => ev(off, fields, { session, cwd });
 const lforja = (off, kind, fields, session, cwd) => lev(off, { hook_event_name: 'Forja', forja: { kind, ...fields } }, session, cwd);
 const END = 28800; // 8 h de run; o último evento é o fim do ficheiro
 
 fixtures['loose-sessions'] = [
-  // --- run vivo A: granite ---
+  // --- run vivo A: gearlift ---
   lev(0, { hook_event_name: 'SessionStart', source: 'startup' }, G_RUN, GEAR),
-  lforja(1, 'run.start', { run_id: 'R-20260917-1c81', goal: 'Granite: fiabilidade e acessibilidade', model_floor: 'fable', forjalvl: 'high', autonomy: 'total' }, G_RUN, GEAR),
+  lforja(1, 'run.start', { run_id: 'R-20260917-1c81', goal: 'Gearlift: monetização e acessibilidade', model_floor: 'fable', forjalvl: 'high', autonomy: 'total' }, G_RUN, GEAR),
   lforja(20, 'task.add', { id: 'T1', title: 'Ecrã de definições', owner: 'frontend-dev' }, G_RUN, GEAR),
   lforja(30, 'task.start', { id: 'T1', attempts: 1 }, G_RUN, GEAR),
-  // --- run vivo B: juniper-hill ---
+  // --- run vivo B: job-hunter ---
   lev(600, { hook_event_name: 'SessionStart', source: 'startup' }, J_RUN, JOB),
-  lforja(601, 'run.start', { run_id: 'R-20260917-f054', goal: 'Juniper Hill: exportação e testes', model_floor: 'fable', forjalvl: 'max' }, J_RUN, JOB),
+  lforja(601, 'run.start', { run_id: 'R-20260917-f054', goal: 'Job Hunter: candidaturas automáticas', model_floor: 'fable', forjalvl: 'max' }, J_RUN, JOB),
   lforja(620, 'task.add', { id: 'T3', title: 'Importar ofertas', owner: 'backend-dev' }, J_RUN, JOB),
   lforja(630, 'task.start', { id: 'T3', attempts: 1 }, J_RUN, JOB),
-  // --- sessão solta 1 (granite): a sessão interativa do Sponsor no VS Code ---
+  // --- sessão solta 1 (gearlift): a sessão interativa do Sponsor no VS Code ---
   lev(100, { hook_event_name: 'SessionStart', source: 'startup' }, G_VS, GEAR),
   lev(120, { hook_event_name: 'UserPromptSubmit', prompt: 'explica-me porque é que a página diz que o run parou' }, G_VS, GEAR),
   lev(200, { hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { file_path: `${GEAR}\\docs\\forja\\RUN.json` }, tool_use_id: toolUse(940) }, G_VS, GEAR),
   lev(201, { hook_event_name: 'PostToolUse', tool_name: 'Read', tool_input: { file_path: `${GEAR}\\docs\\forja\\RUN.json` }, tool_response: { ok: true }, tool_use_id: toolUse(940), duration_ms: 12 }, G_VS, GEAR),
   lev(END - 14400, { hook_event_name: 'Stop', stop_hook_active: false, last_assistant_message: 'O run continua a correr: os eventos mais recentes são de há segundos.' }, G_VS, GEAR),
-  // --- sessão solta 2 (granite): sessão de fase do runner em modo visível, morta ---
+  // --- sessão solta 2 (gearlift): sessão de fase do runner em modo visível, morta ---
   lev(3000, { hook_event_name: 'SessionStart', source: 'startup' }, G_PHASE, GEAR),
   lev(3010, { hook_event_name: 'UserPromptSubmit', prompt: '[runner] PHASE: TASK T7 — fecha a task e entrega' }, G_PHASE, GEAR),
   lev(3100, { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'npm test', description: 'regressão' }, tool_use_id: toolUse(941) }, G_PHASE, GEAR),

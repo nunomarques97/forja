@@ -17,7 +17,7 @@ const fresh = () => mkdtempSync(join(tmpdir(), 'forja-hook-'));
 describe('hook contract', () => {
   test('a normal PostToolUse becomes one JSON line with ts and project; exit 0, silent', () => {
     const dir = fresh();
-    const payload = { session_id: 's1', cwd: 'C:\\dev\\forja', hook_event_name: 'PostToolUse', tool_name: 'Read', tool_input: { file_path: 'x' }, tool_response: { ok: 1 }, tool_use_id: 't1', duration_ms: 5 };
+    const payload = { session_id: 's1', cwd: 'C:\\Fixtures\\User\\Desktop\\Repositorios\\forja', hook_event_name: 'PostToolUse', tool_name: 'Read', tool_input: { file_path: 'x' }, tool_response: { ok: 1 }, tool_use_id: 't1', duration_ms: 5 };
     const r = run(JSON.stringify(payload), { FORJA_DATA_DIR: dir });
     assert.equal(r.status, 0); assert.equal(r.stdout, '');
     const lines = readFileSync(join(dir, 'events.jsonl'), 'utf8').trim().split('\n');
@@ -62,12 +62,12 @@ describe('hook contract', () => {
   });
   test('session pointer is written on session-level events with a case-insensitive key', () => {
     const dir = fresh();
-    run(JSON.stringify({ session_id: 'sess-9', cwd: 'c:\\dev\\forja', hook_event_name: 'UserPromptSubmit', prompt: 'go' }), { FORJA_DATA_DIR: dir });
+    run(JSON.stringify({ session_id: 'sess-9', cwd: 'c:\\Fixtures\\User\\Desktop\\Repositorios\\forja', hook_event_name: 'UserPromptSubmit', prompt: 'go' }), { FORJA_DATA_DIR: dir });
     const files = readdirSync(join(dir, 'sessions'));
-    assert.deepEqual(files, ['c-dev-forja.json']);
+    assert.deepEqual(files, ['c-fixtures-user-desktop-repositorios-forja.json']);
     const p = JSON.parse(readFileSync(join(dir, 'sessions', files[0]), 'utf8'));
     assert.equal(p.session_id, 'sess-9'); assert.equal(p.ended, false);
-    run(JSON.stringify({ session_id: 'sess-9', cwd: 'C:\\dev\\forja', hook_event_name: 'SessionEnd', reason: 'other' }), { FORJA_DATA_DIR: dir });
+    run(JSON.stringify({ session_id: 'sess-9', cwd: 'C:\\Fixtures\\User\\Desktop\\Repositorios\\forja', hook_event_name: 'SessionEnd', reason: 'other' }), { FORJA_DATA_DIR: dir });
     assert.equal(JSON.parse(readFileSync(join(dir, 'sessions', files[0]), 'utf8')).ended, true);
     run(JSON.stringify({ session_id: 'sess-9', cwd: 'C:\\x', hook_event_name: 'PreToolUse', tool_name: 'Read' }), { FORJA_DATA_DIR: dir });
     assert.equal(readdirSync(join(dir, 'sessions')).length, 1, 'tool events do not write pointers');

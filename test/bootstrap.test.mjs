@@ -49,7 +49,7 @@ function makeTarget(name) {
 
 describe('pure merge helpers', () => {
   test('hookCommand uses the forja path with forward slashes', () => {
-    assert.equal(hookCommand('C:\\Users\\x\\forja'), 'node "C:/Users/x/forja/hooks/log-event.mjs"');
+    assert.equal(hookCommand('C:\\Fixtures\\x\\forja'), 'node "C:/Fixtures/x/forja/hooks/log-event.mjs"');
   });
   test('mergeSettings keeps custom env/hooks/keys, forces the two Forja env values, adds fallbackModel only when absent, adds 17 hooks once', () => {
     const { settings: s, warnings } = mergeSettings(CUSTOM_SETTINGS, 'C:\\f');

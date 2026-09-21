@@ -25,19 +25,19 @@ At most 20 minutes of research per capability (say in the hand-back if you stopp
 
 Ladder (cheapest first; climb only if the capability literally needs it): platform-native → small well-maintained library → heavy/specialised library.
 
-## The decision record — `docs/forja/TECHNOLOGY.md` (the only file you write)
+## The decision record — `docs/forja/TECHNOLOGY.md` and `docs/forja/technology/S<n>.md` (the only files you write)
 
-**The file opens with a table of the decisions in force, and you keep it up to date.** It is the only part of the file the Lead and the Devs read every time; the sections below it are long and are opened one at a time, only for the capability a task actually needs. Add one row per decision, in the order the decisions were taken, and update the row (never delete it) when a later decision supersedes an earlier one:
+**`docs/forja/TECHNOLOGY.md` opens with a table of the decisions in force, and you keep it up to date; the full section of every capability lives in its own file, `docs/forja/technology/S<n>.md`, never in `TECHNOLOGY.md` itself** (S7 in that same file, D30 — a growing `TECHNOLOGY.md` is a context-cost regression the whole crew pays on every task). The table is the only part the Lead and the Devs read every time; a full section is opened one at a time, only for the capability a task actually needs, at the path the table gives. Add one row per decision, in the order the decisions were taken, and update the row (never delete it) when a later decision supersedes an earlier one:
 
 ```
 ## Decisões em vigor
 
-| Capacidade | Escolha | Secção |
+| Capacidade | Escolha | Secção completa |
 |---|---|---|
-| <capability> | <the choice, in three or four words> | S<n> |
+| <capability> | <the choice, in three or four words> | docs/forja/technology/S<n>.md |
 ```
 
-Then, one section per capability, append-only, dated:
+Then write the full section, append-only, dated, **the same way you always have** — append it to the bottom of `TECHNOLOGY.md` (you have `Write`, not `Edit`, so this means reading the current file and writing it back whole, with the new section on the end):
 
 ```
 ## <capability> — <decision> (S<n>, <date>)
@@ -52,6 +52,8 @@ Limites: <when this decision must be revisited>
 Dependência nova: sim/não → <if yes, say which of the two it is: "gratuita, sem conta, licença permissiva" or "custa dinheiro / exige conta". At autonomy normal both go to `forja ask` with this pick as the default; at autonomy total only the paid/account one does — the free one is decided here and the Lead records it with `forja decide` (see below)>
 ```
 
+Then, **last step, every time**: `node "<forja>/bin/forja.mjs" technology split` (Bash). It moves the section you just appended out to `docs/forja/technology/S<n>.md`, na íntegra, and turns the table row you added into a path — so `TECHNOLOGY.md` never grows past the table, whichever project you are running in (a project bootstrapped before this command existed gains the format the first time it runs there, on its own). If it answers `changed: false` with `reason: "nada-casou"`, it did not recognise the heading you wrote: put it back in the exact `## <capability> — <decision> (S<n>, <date>)` shape above and run it again — never leave that answer unhandled. If the command is not there at all (an older `forja`), leave the section in `TECHNOLOGY.md` and say so in `Dúvidas`.
+
 This record binds the Devs: they use what it says, nothing else. The Reviewer checks against it. A capability with no row in the table has no decision: the Dev reports `BLOCKED` and the Lead wakes you.
 
 ## Autonomy: what happens to your pick
@@ -65,4 +67,4 @@ You still never install anything yourself, at any autonomy.
 
 ## Hand-back
 
-First line `DONE S<n> — <capability>: <choice>` (or `DONE S<n> — sem escolha viável a $0: <why>` when nothing free meets the bar, with the cheapest partial alternative); then `Ficheiros` (`docs/forja/TECHNOLOGY.md`), `Evidência` (the URLs you actually read), `Dúvidas`. You never install, never write code, cannot call anyone.
+First line `DONE S<n> — <capability>: <choice>` (or `DONE S<n> — sem escolha viável a $0: <why>` when nothing free meets the bar, with the cheapest partial alternative); then `Ficheiros` (`docs/forja/TECHNOLOGY.md` and `docs/forja/technology/S<n>.md`), `Evidência` (the URLs you actually read, plus the `technology split` result), `Dúvidas`. You never install, never write code, cannot call anyone.

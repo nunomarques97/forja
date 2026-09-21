@@ -9,7 +9,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findInvisible, sampleDivergences, policyMarkersIn, checkPolicySource, stripPolicySection, checkInvisible, checkAutonomyRule, AUTONOMY_FILES, runChecks, TEXT_EXT, isTextFile, INVISIBLE_RANGES } from '../tools/check.mjs';
+import { findInvisible, sampleDivergences, policyMarkersIn, checkPolicySource, stripPolicySection, checkInvisible, checkAutonomyRule, AUTONOMY_FILES, findTasksJsonOpenCommands, checkNoTasksJsonRead, tasksJsonScanList, runChecks, TEXT_EXT, isTextFile, INVISIBLE_RANGES } from '../tools/check.mjs';
 import { policyText, LEVELS } from '../lib/models.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -137,6 +137,7 @@ describe('the whole check', () => {
     assert.equal(/^- invisíveis:/m.test(out), false, `no invisible characters in versioned files:\n${out}`);
     assert.equal(/^- política de modelos:/m.test(out), false, `the policy is written in one place only:\n${out}`);
     assert.equal(/^- replay:/m.test(out), false, `the event stream still replays:\n${out}`);
+    assert.equal(/^- TASKS\.json:/m.test(out), false, `nothing commands opening TASKS.json directly:\n${out}`);
     if (r.status === 0) assert.match(out, /check ok/);
     else assert.match(out, /^- sample:/m, 'the only failure a clean tree may have here is the sample copy waiting for a bootstrap');
   });
@@ -165,5 +166,56 @@ describe('the autonomy rule reaches every file that carries it', () => {
       assert.ok(AUTONOMY_FILES.includes(f), `${f} tem de estar na lista`);
     }
     assert.deepEqual(checkAutonomyRule(repo), [], 'this repo carries the rule everywhere it must');
+  });
+});
+
+describe('nothing commands opening docs/forja/TASKS.json directly (D30-b, S7)', () => {
+  test('a read/open verb on the same line as TASKS.json is caught, with the line and an excerpt', () => {
+    const hits = findTasksJsonOpenCommands('linha um\nRead CLAUDE.md, then docs/forja/TASKS.json, then go on\nmore text');
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0].line, 2);
+    assert.match(hits[0].excerpt, /^Read CLAUDE\.md, then docs\/forja\/TASKS\.json, then go on$/);
+  });
+  test('the Portuguese verbs are caught too (ler, abrir, abre)', () => {
+    for (const line of ['Contexto: ler CLAUDE.md, docs/forja/TASKS.json (T1).', 'manda abrir o docs/forja/TASKS.json inteiro', 'a sessão abre docs/forja/TASKS.json para ver o estado']) {
+      assert.equal(findTasksJsonOpenCommands(line).length, 1, line);
+    }
+  });
+  test('naming the file as a format or a write target is legitimate and is not caught', () => {
+    for (const line of [
+      'the plan lives in `docs/forja/TASKS.json` (3–10 small tasks, `forja task add`)',
+      'Decomposes a project or phase ONCE into the plan file docs/forja/TASKS.json',
+      'every task in `docs/forja/TASKS.json` must be small enough for one dev session',
+      'the owner comes from TASKS.json, so "constructor" needs Object.hasOwn',
+    ]) {
+      assert.deepEqual(findTasksJsonOpenCommands(line), [], line);
+    }
+  });
+  test('a line that says, in the same breath, that the file is never opened directly passes (the pattern already used in this repo)', () => {
+    for (const line of [
+      'task T<n> in full (id, state, criteria, verdicts — read it instead of opening TASKS.json)',
+      '// never has to read (and re-read into its context) the whole TASKS.json:',
+      'task state comes from `status` below, never from opening TASKS.json directly.',
+    ]) {
+      assert.deepEqual(findTasksJsonOpenCommands(line), [], line);
+    }
+  });
+  test('checkNoTasksJsonRead scans a file list and reports path:line; a clean file is silent', () => {
+    const r = join(root, 'tasksjson');
+    write(join(r, '.claude', 'skills', 'forja-bad', 'SKILL.md'), 'a\nb\n1. Read CLAUDE.md and docs/forja/TASKS.json for your task.\n');
+    write(join(r, '.claude', 'skills', 'forja-good', 'SKILL.md'), 'run `forja task show T<n>` for your task — never open TASKS.json directly.\n');
+    write(join(r, 'lib', 'runner.mjs'), 'export const x = 1; // TASKS.json is the plan file, written through the CLI\n');
+    const out = checkNoTasksJsonRead(r, ['.claude/skills/forja-bad/SKILL.md', '.claude/skills/forja-good/SKILL.md', 'lib/runner.mjs', 'nao-existe.md']);
+    assert.equal(out.length, 1);
+    assert.match(out[0], /^TASKS\.json: \.claude\/skills\/forja-bad\/SKILL\.md:3 manda abrir\/ler docs\/forja\/TASKS\.json diretamente/);
+  });
+  test('the scan list reaches the runner, every skill, every agent and the sample project\'s copies', () => {
+    const list = tasksJsonScanList(repo);
+    for (const f of ['lib/runner.mjs', 'bin/forja.mjs', '.claude/skills/forja-lead/SKILL.md', '.claude/agents/architect.md', 'examples/sample-project/.claude/skills/forja-lead/SKILL.md', 'examples/sample-project/.claude/agents/architect.md']) {
+      assert.ok(list.includes(f), `${f} tem de estar na lista`);
+    }
+  });
+  test('this repo has zero files that command opening TASKS.json directly', () => {
+    assert.deepEqual(checkNoTasksJsonRead(repo), [], 'D30-b: de N para 0');
   });
 });

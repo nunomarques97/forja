@@ -294,7 +294,7 @@ function fakes(pid = 4242) {
 }
 
 describe('runPeerCheckOnce (spawn, notify e relógio injetados; nada em disco)', () => {
-  test('relançar o viewer: argv fixo, via=guard, notificação low, contador a 1 — e NADA escrito em disco', async () => {
+  test('relançar o viewer: argv fixo, via=guard, contador a 1, sem notificação — e NADA escrito em disco', async () => {
     const dir = fresh('relanca');
     const f = fakes();
     const r = await runPeerCheckOnce({
@@ -313,7 +313,7 @@ describe('runPeerCheckOnce (spawn, notify e relógio injetados; nada em disco)',
     assert.equal(r.entry.failed_spawns, 0);
     assert.equal(r.entry.last_attempt_at, iso(T0));
     assert.equal(r.entry.dead_since, null, 'a graça recomeça a contar a partir do relançamento');
-    assert.deepEqual(f.sent, [{ message: peerRelaunchMessage('up', 1), priority: 'low', tags: ['arrows_counterclockwise'], dedup: false }]);
+    assert.deepEqual(f.sent, [], 'relançamento bem sucedido não avisa o telemóvel — nada espera pelo Sponsor');
     assert.deepEqual(readdirSync(dir), [], 'esta função não escreve estado nenhum: quem chama é que persiste');
   });
 
@@ -328,8 +328,7 @@ describe('runPeerCheckOnce (spawn, notify e relógio injetados; nada em disco)',
     assert.deepEqual(f.spawned[0].args, ['guard', 'run']);
     assert.equal(f.spawned[0].via, 'viewer');
     assert.match(f.spawned[0].logPath, /up-watch/, 'o arranque da guarda regista-se do lado de quem a lançou');
-    assert.equal(f.sent[0].message, peerRelaunchMessage('guard', 1));
-    assert.equal(f.sent[0].priority, 'low');
+    assert.deepEqual(f.sent, [], 'relançamento bem sucedido não avisa o telemóvel — nada espera pelo Sponsor');
   });
 
   test('um spawn sem pid (ou que rebenta) não gasta tentativa real, mas conta e carimba a hora', async () => {
@@ -380,16 +379,16 @@ describe('runPeerCheckOnce (spawn, notify e relógio injetados; nada em disco)',
     assert.deepEqual(f.sent, [{ message: peerGaveUpMessage('up'), priority: 'urgent', tags: ['rotating_light'], dedup: false }]);
   });
 
-  test('as duas notificações levam o link do telemóvel, e sem túnel não levam chave nenhuma', async () => {
+  test('a notificação de desistência leva o link do telemóvel, e sem túnel não leva chave nenhuma; um relançamento bem sucedido não notifica', async () => {
     const dir = fresh('click');
     const f = fakes();
     const uma = (entry, now) => runPeerCheckOnce({ peer: 'up', dataDir: dir, forjaRoot: 'C:\\forja', entry, now, selfStartedAt: T0 - 120 * MIN, alive: false, spawn: f.spawn, notify: f.notify });
     await uma(seen({ dead_since: iso(T0 - 10 * MIN) }), T0);
-    assert.equal('click' in f.sent[0], false, 'sem túnel a chave nem sequer vai');
+    assert.deepEqual(f.sent, [], 'relançamento bem sucedido não avisa o telemóvel — nada espera pelo Sponsor');
     writeFileSync(join(dir, 'tunnel.json'), JSON.stringify({ url: 'https://x.trycloudflare.com', mobileUrl: 'https://x.trycloudflare.com/m?k=segredo' }));
     await uma(seen({ attempts: 3, dead_since: iso(T0 - 60 * MIN), last_attempt_at: iso(T0 - 60 * MIN) }), T0 + PEER_RETRY_MS);
-    assert.equal(f.sent[1].message, peerGaveUpMessage('up'));
-    assert.equal(f.sent[1].click, 'https://x.trycloudflare.com/m?k=segredo', 'o `notify` é que limpa a query (sanitizeClick), como em todas as outras');
+    assert.equal(f.sent[0].message, peerGaveUpMessage('up'));
+    assert.equal(f.sent[0].click, 'https://x.trycloudflare.com/m?k=segredo', 'o `notify` é que limpa a query (sanitizeClick), como em todas as outras');
     rmSync(join(dir, 'tunnel.json'), { force: true });
   });
 
@@ -520,7 +519,7 @@ describe('supervisão mútua: provar que não oscila', () => {
       }
       assert.deepEqual(em, [2, 17, 32], `${lado.peer}: 2 min de graça e depois 15 em 15 min`);
       assert.equal(lado.urgent.length, 1, `${lado.peer}: uma desistência, uma notificação urgente, e mais nenhuma em 2 h`);
-      assert.equal(lado.low.length, PEER_MAX_ATTEMPTS);
+      assert.equal(lado.low.length, 0, `${lado.peer}: relançamento bem sucedido não avisa o telemóvel — nada espera pelo Sponsor`);
       assert.equal(lado.urgent[0].at, T0 + 47 * MIN, `${lado.peer}: a desistência sai 15 min depois da terceira tentativa`);
       assert.equal(lado.state.gave_up_at, iso(T0 + 47 * MIN));
     }
@@ -615,7 +614,7 @@ describe('o viewer vigia a guarda (startPeerWatch)', () => {
       assert.equal(estado.guard.attempts, 1);
       assert.equal(estado.guard.last_attempt_at, iso(T0));
       assert.match(readFileSync(upWatchPaths(dir).log, 'utf8'), /a guarda dos runners: relançada \(tentativa 1 de 3, pid 3131\)/);
-      assert.deepEqual(f.sent, [{ message: peerRelaunchMessage('guard', 1), priority: 'low', tags: ['arrows_counterclockwise'], dedup: false }]);
+      assert.deepEqual(f.sent, [], 'relançamento bem sucedido não avisa o telemóvel — nada espera pelo Sponsor');
       // A volta seguinte, 30 s depois, espera os 15 min: nunca um segundo arranque.
       await watch.peerCheck(T0 + 30_000);
       assert.equal(f.spawned.length, 1);
@@ -686,10 +685,14 @@ describe('o viewer vigia a guarda (startPeerWatch)', () => {
         assert.ok(assincrono < 150, `a volta do viewer parou o event loop ${assincrono} ms (síncrona: ${sincrono} ms) — o telemóvel paga isto a cada 30 s`);
         assert.ok(assincrono < sincrono / 2, `assíncrono ${assincrono} ms vs síncrono ${sincrono} ms`);
         // E a cache de curta duração responde sem gastar outro PowerShell.
-        const m3 = lagMeter();
-        assert.equal(await guardProcessAliveAsync(dir), true);
-        await sleep(30);
-        assert.ok(m3.stop() < 50, 'a segunda leitura dentro do TTL nem sequer arranca um processo');
+        // Event-loop lag cannot prove that no asynchronous process was started,
+        // and a busy Windows scheduler can exceed 50 ms even on a cache hit.
+        // Observe the cached reader directly: a miss would call this sentinel.
+        let extraReads = 0;
+        assert.equal(await peerAliveCachedAsync(g.pid, GUARD_CMD_RE, {
+          aliveAsync: async () => { extraReads += 1; return false; },
+        }), true);
+        assert.equal(extraReads, 0, 'a segunda leitura dentro do TTL nao inicia outra leitura do processo');
       } finally { watch.stop(); }
     } finally { g.kill(); resetPeerAliveCache(); }
   });
@@ -743,7 +746,7 @@ describe('o viewer vigia a guarda (startPeerWatch)', () => {
       assert.equal(r2.skipped, true); assert.equal(r2.act, null);
       assert.equal(r3.skipped, true);
       assert.equal(spawned.length, 1, `duas voltas sobrepostas lançaram ${spawned.length} processos`);
-      assert.equal(sent.length, 1);
+      assert.equal(sent.length, 0, 'relançamento bem sucedido não avisa o telemóvel — nada espera pelo Sponsor');
       // E o disco já tem a tentativa, antes de qualquer volta seguinte poder decidir.
       const estado = readUpWatchState(upWatchPaths(dir).state);
       assert.equal(estado.guard.attempts, 1);
@@ -776,10 +779,10 @@ describe('o viewer vigia a guarda (startPeerWatch)', () => {
     const dir = fresh('corrente');
     writeUpWatchState(upWatchPaths(dir).state, { version: 1, guard: seen() });
     const srv = await startViewer(dir);
-    let emCurso = 0; let maxEmCurso = 0; let voltas = 0;
+    let emCurso = 0; let maxEmCurso = 0; let voltas = 0; let iniciadas = 0;
     const watch = srv.startPeerWatch({
       forjaRoot: 'C:\\forja', everyMs: 40, now: () => T0, selfStartedAt: T0 - 60 * MIN,
-      alive: async () => { emCurso += 1; maxEmCurso = Math.max(maxEmCurso, emCurso); await sleep(120); emCurso -= 1; voltas += 1; return true; },
+      alive: async () => { iniciadas += 1; emCurso += 1; maxEmCurso = Math.max(maxEmCurso, emCurso); await sleep(120); emCurso -= 1; voltas += 1; return true; },
       spawn: () => { throw new Error('nada a relançar nesta volta'); },
       notify: async () => ({ ok: true }),
     });
@@ -788,9 +791,11 @@ describe('o viewer vigia a guarda (startPeerWatch)', () => {
       assert.ok(voltas >= 2, `deu ${voltas} voltas em 700 ms`);
       assert.equal(maxEmCurso, 1, 'com setInterval de 40 ms e voltas de 120 ms havia sempre 2 a 3 em voo ao mesmo tempo');
     } finally { watch.stop(); }
-    const depois = voltas;
+    // stop cancels future scheduling; an already running check may finish.
+    const depois = iniciadas;
     await sleep(200);
-    assert.equal(voltas, depois, 'stop() durante a corrente não deixa marcada mais nenhuma volta');
+    assert.equal(iniciadas, depois, 'stop() durante a corrente não deixa marcada mais nenhuma volta');
+    assert.equal(emCurso, 0, 'a volta em curso pode terminar depois de stop()');
   });
 
   test('FORJA_NO_PEER_WATCH=1 desliga só esta vigia; FORJA_NO_WATCHDOG=1 desliga-a também', async () => {

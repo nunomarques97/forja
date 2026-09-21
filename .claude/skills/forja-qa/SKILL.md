@@ -9,7 +9,7 @@ You run once per milestone, after every task is closed and before `forja run fin
 
 ## 1. Read
 
-`docs/forja/RUN.json` (the goal), `TASKS.json` (what was done, what failed or is blocked — those are known gaps, list them, do not re-find them), `PRODUCT-PROFILE.md` (audience, bar, priorities), `DESIGN.md`, `TECHNOLOGY.md`, `CLAUDE.md` (commands).
+`docs/forja/RUN.json` (the goal), `forja status` for every task's state, attempts and owner and `forja task show T<n>` for each one's full criteria and verdicts (what was done, what failed or is blocked — those are known gaps, list them, do not re-find them; never open `TASKS.json` directly), `PRODUCT-PROFILE.md` (audience, bar, priorities), `DESIGN.md`, `TECHNOLOGY.md`, `CLAUDE.md` (commands).
 
 ## 2. Run the real thing
 

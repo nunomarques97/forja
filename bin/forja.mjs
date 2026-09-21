@@ -11,14 +11,22 @@ import {
   forjaRoot, dataDir, projectRoot, stateDir, runPath, decisionsPath, queuePath, handoverPath,
   readRun, writeRun, readTasks, writeTasks, readQueue, markAnswered, emit, writeHandover, nextId, appendMd,
   DECISIONS_HEADER, QUEUE_HEADER, nowIso, fmtLocal, newRunId, currentSessionId, listAnswerFiles,
-  settingsPath, readSettings, writeSettings, reportsDir,
+  settingsPath, readSettings, writeSettings, reportsDir, isSupersededBlock, reindexDecisionsFile,
+  productProfilePath, technologyPath, splitTechnologyFile, extractDecisionsIndex, extractMarkdownSection, TECHNOLOGY_TABLE_TITLE,
 } from '../lib/state-files.mjs';
 import { normalizeLevel, levelOf, labelOf, detailOf, readForjalvl } from '../lib/models.mjs';
 import { normalizeAutonomy, autonomyOf, autonomyLabelOf, autonomyRule, readAutonomy, queueAlwaysLine, roadmapRule } from '../lib/autonomy.mjs';
 // One reading of a switch flag for the whole CLI and the runner (`--visivel`).
 import { flagOn } from '../lib/runner.mjs';
 import { notify } from '../lib/notify.mjs';
+// The close of a run runs the Sponsor's own Obsidian sync (D12/D13) — an
+// accessory step that never fails the run (lib/obsidian-sync.mjs).
+import { describeObsidianSync, obsidianSync, settingsOrError } from '../lib/obsidian-sync.mjs';
 import { DRIVER_LABEL, describeDriver, liveRunner, normalizeDriver, resolveDriver, withClaimMutex } from '../lib/driver.mjs';
+// Custo do run em tokens, lido das transcrições locais (S6 em
+// docs/forja/TECHNOLOGY.md) — passo acessório que nunca falha nem atrasa
+// `run checkpoint`/`run finish` (lib/run-cost.mjs).
+import { runTokenCostStep } from '../lib/run-cost.mjs';
 
 const MAX_ATTEMPTS = 3;
 
@@ -63,6 +71,11 @@ function checkedAutonomy(value, where, flag = '--autonomy') {
   try { return normalizeAutonomy(value); } catch (err) { fail(`${err.message}${where ? ` (${where})` : ''}`); }
 }
 const projectAutonomy = () => checkedAutonomy(readAutonomy(projectSettings()), `em ${settingsPath()}`);
+// O sync do Obsidian (D12/D13, lib/obsidian-sync.mjs) é o único sítio do CLI
+// onde um SETTINGS.json ilegível NÃO é recusa: um passo acessório que fizesse
+// falhar `run finish` seria exatamente o que o PRODUCT-PROFILE.md proíbe. O
+// erro vai para o plano, que o transforma em salto com motivo registado.
+const obsidianStep = (run = null) => obsidianSync({ projectRoot: projectRoot(), settings: settingsOrError(readSettings), run });
 // A switch flag (`--visivel`): present with no value = on, an explicit sim|não
 // accepted, anything else refused loudly (lib/runner.mjs `flagOn`).
 function checkedSwitch(value, flag) {
@@ -138,6 +151,18 @@ function startRunFiles(run, existing) {
   if (!existsSync(queuePath())) appendMd(queuePath(), QUEUE_HEADER, '');
 }
 
+// What `run resume` PRINTS, split from what it DOES (attach the session, move
+// the run out of `blocked`, emit `run.resume`, rewrite the handover): `forja
+// context` prints this same view, read from disk, with none of those effects
+// (D33, and gate R0 point 4 — the new command is additive, never a substitute).
+const resumeView = run => ({ ok: true, run_id: run.run_id, status: run.status, sessions: run.sessions || [] });
+// The same split for `answers`: the command applies what is pending and prints
+// how many it applied and which questions are still open. `forja context`
+// applies nothing, so it passes the answers ALREADY applied to this run plus
+// `pending`, the ones only `forja answers` may apply.
+const answersView = ({ applied, open, pending }) =>
+  (pending === undefined ? { ok: true, applied, open } : { ok: true, applied, pending, open });
+
 // ---------- run ----------
 const runCmds = {
   async start({ opt }) {
@@ -170,21 +195,29 @@ const runCmds = {
     // Check-and-write inside the claim mutex: two `run start` at once (a
     // conversation and a runner, a double tap) must not both see "no run".
     // A live runner on this project refuses any new run, even with --force.
-    withClaimMutex(projectRoot(), () => {
-      const cur = readRun();
-      const live = liveRunner(projectRoot(), dataDir());
-      if (live && !callerIsRunner()) refuse(`há um runner vivo neste projeto (pid ${live.pid}) — não arranco outro run por cima dele`);
-      if (cur && cur.status === 'running' && !opt.force) refuse(`já existe o run ${cur.run_id} a correr — usa \`forja run resume\` para continuar, ou \`forja run finish\`/\`run fail\` para o fechar`);
-      if (cur && cur.status === 'running' && opt.force) {
-        // Never lose a run silently: the forced-over run is archived next to RUN.json and recorded as abandoned.
-        writeJsonArchive(cur);
-        emit('run.fail', { why: 'abandonado por `run start --force`' }, { run: cur });
-      }
-      startRunFiles(run, cur);
-    });
+    const { lockProject, current: coreCurrent } = await import('../lib/core/engine.mjs');
+    const coreLock = lockProject(projectRoot());
+    try {
+      withClaimMutex(projectRoot(), () => {
+        if (existsSync(coreCurrent(projectRoot()))) {
+          const coreRun = JSON.parse(readFileSync(coreCurrent(projectRoot()), 'utf8'));
+          if (!['done', 'failed'].includes(coreRun.status)) refuse('An unfinished FORJA core run exists; use forja core resume.');
+        }
+        const cur = readRun();
+        const live = liveRunner(projectRoot(), dataDir());
+        if (live && !callerIsRunner()) refuse(`há um runner vivo neste projeto (pid ${live.pid}) — não arranco outro run por cima dele`);
+        if (cur && cur.status === 'running' && !opt.force) refuse(`já existe o run ${cur.run_id} a correr — usa \`forja run resume\` para continuar, ou \`forja run finish\`/\`run fail\` para o fechar`);
+        if (cur && cur.status === 'running' && opt.force) {
+          // Never lose a run silently: the forced-over run is archived next to RUN.json and recorded as abandoned.
+          writeJsonArchive(cur);
+          emit('run.fail', { why: 'abandonado por `run start --force`' }, { run: cur });
+        }
+        startRunFiles(run, cur);
+      });
+    } finally { coreLock.release(); }
     emit('run.start', { goal, model_floor: run.model_floor, forjalvl: run.forjalvl, model_level: run.forjalvl, autonomy: run.autonomy, visible: run.visible, driver: run.driver }, { run });
     writeHandover();
-    await ping(`Forja: run começou em ${run.project} — ${goal.slice(0, 120)}`, { tags: ['rocket'] });
+    // No phone ntfy here: a run starting needs nothing from the Sponsor (Sponsor rule, 18 set 2026 — ntfy só quando precisa de resposta dele).
     out({ ok: true, run_id: run.run_id, forjalvl: run.forjalvl, autonomy: run.autonomy, visible: run.visible, driver: run.driver, state: stateDir() });
   },
   // `run driver show|set <interactive|runner>` — who drives this run (§3c).
@@ -256,16 +289,24 @@ const runCmds = {
     writeRun(run);
     emit('run.resume', { note: `sessão ${sid.slice(0, 8)}` }, { run });
     writeHandover();
-    out({ ok: true, run_id: run.run_id, status: run.status, sessions: run.sessions });
+    out(resumeView(run));
   },
   async checkpoint({ opt }) {
     const run = requireRun();
     const note = typeof opt.note === 'string' ? opt.note : null;
     run.checkpoints.push({ ts: nowIso(), note });
+    // Passo acessório (lib/run-cost.mjs, S6): nunca atira e nunca faz o
+    // checkpoint falhar. O orçamento de tempo escrito no código é um prazo que a
+    // leitura vigia entre ficheiros e a cada 2000 linhas, mais 2 s de margem
+    // como cinto. Sem transcrições legíveis o campo fica a `null` — ou, se já
+    // houve uma medição boa, mantém-na com a hora e o motivo da falha
+    // (`failed_at`/`failed_reason`), para «nunca medido» e «falhou desta vez»
+    // não se confundirem. Nunca inventa um número.
+    run.token_usage = await runTokenCostStep({ run, projectRoot: projectRoot(), previous: run.token_usage });
     writeRun(run);
     emit('run.checkpoint', { note, n: run.checkpoints.length }, { run });
     writeHandover(note);
-    out({ ok: true, checkpoints: run.checkpoints.length, handover: handoverPath() });
+    out({ ok: true, checkpoints: run.checkpoints.length, handover: handoverPath(), token_usage: run.token_usage });
   },
   async finish({ opt }) {
     const run = requireRun();
@@ -273,12 +314,22 @@ const runCmds = {
     const openTasks = tasks.filter(t => ['todo', 'doing', 'review'].includes(t.status));
     if (openTasks.length && !opt.force) fail(`ainda há tasks abertas: ${openTasks.map(t => t.id).join(', ')} — fecha-as (done/fail/block) ou usa --force`);
     run.status = 'finished'; run.finished_at = nowIso();
+    // Mesmo passo acessório do checkpoint, no fecho — última leitura das
+    // transcrições da janela inteira do run, com as mesmas regras.
+    run.token_usage = await runTokenCostStep({ run, projectRoot: projectRoot(), previous: run.token_usage });
     writeRun(run);
     emit('run.finish', { note: opt.note || null }, { run });
     writeHandover();
     const done = tasks.filter(t => t.status === 'done').length;
-    await ping(`Forja: run terminou em ${run.project} — ${done}/${tasks.length} tasks aprovadas${readQueue().filter(q => q.status.startsWith('aberta')).length ? ', há perguntas na fila' : ''}`, { tags: ['white_check_mark'], priority: 'high' });
-    out({ ok: true, run_id: run.run_id, done, total: tasks.length });
+    // Last step, and only after RUN.json and HANDOVER.md are on disk: the
+    // Sponsor's own Obsidian sync for this project (D12/D13). It never throws,
+    // never changes this command's exit code and never sends ntfy — whatever
+    // happened comes back as a value, goes to the `obsidian.sync` event and is
+    // said here in one line.
+    const obsidian = obsidianStep(run);
+    // No phone ntfy here: a run finishing needs nothing from the Sponsor by itself — an open
+    // question already notified him when it was asked (`ask`, below).
+    out({ ok: true, run_id: run.run_id, done, total: tasks.length, obsidian: describeObsidianSync(obsidian), token_usage: run.token_usage });
   },
   async fail({ opt }) {
     const run = requireRun();
@@ -299,6 +350,33 @@ const runCmds = {
     out({ ok: true, run_id: run.run_id, status: 'blocked' });
   },
 };
+
+// The text `task show` prints, as a pure function (the plan and the task in,
+// the text out). `forja context` prints the SAME bytes by calling it, so there
+// is never a second rendering of a task to keep in sync with this one, and so
+// nothing here can shorten criteria or verdicts for one caller and not the
+// other (D33 «concatenação, nunca resumo»; gate R0 point 3).
+function taskShowText(tasks, task) {
+  const dep = task.after ? tasks.find(t => t.id === task.after) : null;
+  const lines = [
+    `${task.id} — ${task.title}`,
+    `Estado: ${task.status} · tentativas: ${task.attempts || 0}/${MAX_ATTEMPTS} · owner: ${task.owner || '(sem owner)'} · complexidade: ${task.complexity || 'medium'}`,
+    `Depende de: ${task.after ? `${task.after}${dep ? ` (${dep.status})` : ' (não existe neste plano)'}` : 'nada'}`,
+    '',
+    'Critérios de aceitação (definição de done):',
+    task.criteria ? String(task.criteria) : '(nenhum registado — o título é o critério)',
+  ];
+  if (task.why) lines.push('', `Último motivo registado: ${task.why}`);
+  if (task.evidence) lines.push('', `Evidência: ${task.evidence}`);
+  // A task written by an older Forja (or by hand) may have no `verdicts` at all:
+  // reading it must print "none", never crash the session that is reading it.
+  const verdicts = Array.isArray(task.verdicts) ? task.verdicts : [];
+  lines.push('', `Veredictos (${verdicts.length}):`);
+  if (!verdicts.length) lines.push('(nenhum ainda)');
+  // Verdicts in full, never clipped: on a retry they are the specification.
+  for (const [i, v] of verdicts.entries()) lines.push(`${i + 1}. ${fmtLocal(v.ts)} · ${v.verdict}${v.model_floor ? ` · piso ${v.model_floor}` : ''}${v.fallback_review ? ' · revisto em modelo de fallback' : ''}\n${v.text || '(sem texto)'}`);
+  return lines.join('\n');
+}
 
 // ---------- task ----------
 const taskCmds = {
@@ -321,25 +399,7 @@ const taskCmds = {
     requireRun();
     const id = need(pos[0], 'o id da task (ex.: task show T1)');
     const tasks = readTasks(); const task = tasks.find(t => t.id === id); if (!task) fail(`task ${id} não existe`);
-    const dep = task.after ? tasks.find(t => t.id === task.after) : null;
-    const lines = [
-      `${task.id} — ${task.title}`,
-      `Estado: ${task.status} · tentativas: ${task.attempts || 0}/${MAX_ATTEMPTS} · owner: ${task.owner || '(sem owner)'} · complexidade: ${task.complexity || 'medium'}`,
-      `Depende de: ${task.after ? `${task.after}${dep ? ` (${dep.status})` : ' (não existe neste plano)'}` : 'nada'}`,
-      '',
-      'Critérios de aceitação (definição de done):',
-      task.criteria ? String(task.criteria) : '(nenhum registado — o título é o critério)',
-    ];
-    if (task.why) lines.push('', `Último motivo registado: ${task.why}`);
-    if (task.evidence) lines.push('', `Evidência: ${task.evidence}`);
-    // A task written by an older Forja (or by hand) may have no `verdicts` at all:
-    // reading it must print "none", never crash the session that is reading it.
-    const verdicts = Array.isArray(task.verdicts) ? task.verdicts : [];
-    lines.push('', `Veredictos (${verdicts.length}):`);
-    if (!verdicts.length) lines.push('(nenhum ainda)');
-    // Verdicts in full, never clipped: on a retry they are the specification.
-    for (const [i, v] of verdicts.entries()) lines.push(`${i + 1}. ${fmtLocal(v.ts)} · ${v.verdict}${v.model_floor ? ` · piso ${v.model_floor}` : ''}${v.fallback_review ? ' · revisto em modelo de fallback' : ''}\n${v.text || '(sem texto)'}`);
-    out(lines.join('\n'));
+    out(taskShowText(tasks, task));
   },
   async start({ pos }) {
     const run = requireRun();
@@ -396,7 +456,8 @@ const taskCmds = {
     if (run.current_task === task.id) run.current_task = null; writeRun(run); writeTasks(tasks);
     emit('task.fail', { id: task.id, attempts: task.attempts, why, final }, { run });
     writeHandover();
-    if (final) await ping(`Forja: task ${task.id} falhou 3 vezes em ${run.project} e foi fechada — ${why.slice(0, 100)}`, { tags: ['warning'], priority: 'high' });
+    // No phone ntfy here: the task is closed and the run continues on its own; nothing is
+    // waiting on the Sponsor (Sponsor rule, 18 set 2026).
     out({ ok: true, id: task.id, status: task.status, attempts: task.attempts, final });
   },
   async block({ pos, opt }) {
@@ -406,12 +467,21 @@ const taskCmds = {
     if (run.current_task === task.id) run.current_task = null; writeRun(run); writeTasks(tasks);
     emit('task.block', { id: task.id, why: task.why }, { run });
     writeHandover();
-    await ping(`Forja: task ${task.id} bloqueada em ${run.project} — precisa de ti: ${task.why.slice(0, 110)}`, { tags: ['no_entry'], priority: 'high' });
+    // A re-plan (or a block cascading from one) is a supersession: nothing needs the Sponsor.
+    if (!isSupersededBlock(task.why, tasks)) await ping(`Forja: task ${task.id} bloqueada em ${run.project} — precisa de ti: ${task.why.slice(0, 110)}`, { tags: ['no_entry'], priority: 'high' });
     out({ ok: true, id: task.id, status: 'blocked' });
   },
 };
 
 // ---------- decisions & Sponsor queue ----------
+// The one place that regenerates the index block of DECISIONS.md and warns past
+// the D10 budget: `forja decide` (after the new line lands in the corpo) and
+// `forja decisions reindex` both go through it, so the two can never disagree.
+function reindexDecisions() {
+  const result = reindexDecisionsFile();
+  if (result.overBudget) console.error(`forja: índice de decisões acima do orçamento de ~10 000 caracteres (${result.size}) — sem paginação nesta versão (D10)`);
+  return result;
+}
 async function decide({ pos, opt }) {
   const run = requireRun();
   const text = need(pos[0], 'o texto da decisão');
@@ -420,10 +490,62 @@ async function decide({ pos, opt }) {
   const id = nextId(decisionsPath(), 'D');
   const by = opt.by || 'Product Manager';
   appendMd(decisionsPath(), DECISIONS_HEADER, `- **${id}** · ${fmtLocal()} · ${by} · run ${run.run_id} — ${text} Porquê: ${why} Reversível: ${reversible === null ? 'não indicado' : reversible ? 'sim' : 'não'}.${opt.supersedes ? ` Substitui ${opt.supersedes}.` : ''}\n`);
+  // T2 (D15): the index at the top is what a session reads first, so it is
+  // regenerated here, in the same command that appends the decision — the file
+  // and the prompts that point at it change together. The corpo above is
+  // already on disk and is never touched by this; the index is derived data, so
+  // a failure to rewrite it is reported and the decision stands (a decision is
+  // never lost because a derived block could not be written).
+  let index = null;
+  try { index = reindexDecisions().count; } catch (err) { console.error(`forja: decisão ${id} registada, índice não regenerado (${err.message}) — corre \`forja decisions reindex\``); }
   emit('decision', { id, text, why, reversible, by, supersedes: opt.supersedes || null }, { run });
   writeHandover();
-  out({ ok: true, id });
+  out({ ok: true, id, index });
 }
+// `decisions reindex` — generate/regenerate the DECISIONS.md index in place
+// (lib/state-files.mjs `reindexDecisionsFile`); never touches the corpo, works
+// with no run open, and is how a project written before T2 gets its index
+// without waiting for the next decision.
+const decisionsCmds = {
+  reindex() {
+    let result;
+    try { result = reindexDecisions(); } catch (err) { fail(err.message); }
+    out({ ok: true, path: result.path, decisions: result.count, size: result.size, overBudget: result.overBudget, changed: result.changed });
+  },
+};
+// `technology split` — move every tagged `## … (S<n>, <date>)` section out of
+// docs/forja/TECHNOLOGY.md into its own file under docs/forja/technology/, and
+// leave the header (title paragraph + the "Decisões em vigor" table, its last
+// column now a path) in place (lib/state-files.mjs `splitTechnologyFile`, S7,
+// D30). Works with no run open. A file already paginated — nothing left to
+// move — reports `changed: false` and touches nothing: this is how a project
+// bootstrapped before this command existed gains the format the first time
+// something here runs it, and how the Scout's own workflow ends after writing
+// a new section the old (single-file) way. `reason` says which nothing it
+// found (`ja-paginado`, `sem-seccoes`, `nada-casou`), because "no section
+// matched" and "no section left to move" are the same `changed: false` on
+// disk, and one of them means the caller should look: that one also prints a
+// sentence on stderr, so a person running this by hand cannot miss it.
+const technologyCmds = {
+  split() {
+    let result;
+    try { result = splitTechnologyFile(); } catch (err) { fail(err.message); }
+    if (result.warning) console.error(`forja: aviso — ${result.warning}`);
+    out({ ok: true, path: result.path, dir: result.outDir, sections: result.sections, changed: result.changed, reason: result.reason, ...(result.warning ? { warning: result.warning } : {}) });
+  },
+};
+// ---------- obsidian (a Central de Projetos do Sponsor, D12/D13) ----------
+// `forja obsidian sync` corre à mão exatamente o mesmo passo do fecho de um
+// run, para o projeto atual, e diz numa linha o que fez ou porque saltou.
+// Sai sempre a 0, como no fecho: o resultado lê-se na linha, não no código de
+// saída — um passo acessório nunca muda o código de saída de quem o chama.
+const obsidianCmds = {
+  sync() {
+    const result = obsidianStep(readRun());
+    out(describeObsidianSync(result));
+  },
+};
+
 async function ask({ pos, opt }) {
   const run = requireRun();
   const question = need(pos[0], 'a pergunta');
@@ -457,7 +579,7 @@ async function answers() {
   }
   run.answers_applied = [...applied]; writeRun(run);
   writeHandover();
-  out({ ok: true, applied: n, open: readQueue().filter(q => q.status.startsWith('aberta')).map(q => q.id) });
+  out(answersView({ applied: n, open: readQueue().filter(q => q.status.startsWith('aberta')).map(q => q.id) }));
 }
 async function fallback({ pos, opt }) {
   const run = requireRun();
@@ -477,7 +599,7 @@ async function fallback({ pos, opt }) {
   try { mkdirSync(dataDir(), { recursive: true }); appendFileSync(join(dataDir(), 'fallbacks.jsonl'), JSON.stringify(rec) + '\n'); } catch {}
   emit('fallback', { id, role, from, to, why }, { run });
   writeHandover();
-  await ping(`Forja: fallback de modelo em ${run.project} — ${role}: ${from} → ${to} (${why.slice(0, 80)}). Piso do run: ${run.model_floor}`, { tags: ['arrow_down'] });
+  // No phone ntfy here: a model fallback is already decided and applied — nothing waits on the Sponsor.
   out({ ok: true, id, model_floor: run.model_floor });
 }
 async function progress({ pos, opt }) {
@@ -581,6 +703,150 @@ const autonomyCmds = {
 };
 
 // ---------- status & resume ----------
+// ---------- context (D33: one output instead of eight turns) ----------
+// `forja context [--task T<n>]` prints, in ONE output and with one header per
+// block, what step 1 of a phase used to fetch in eight separate turns: the
+// state of the run, the Sponsor's answers already applied, the whole task,
+// docs/forja/HANDOVER.md, docs/forja/PRODUCT-PROFILE.md, the decisions table at
+// the top of docs/forja/TECHNOLOGY.md, the index table at the top of
+// docs/forja/DECISIONS.md, `git status --short` and `git diff --stat`.
+// Three rules, all from D33:
+//  1. CONCATENATION, NEVER A SUMMARY — every block is byte for byte what the
+//     command or the file already gives, and NOTHING is truncated: no ellipsis,
+//     no character limit, however big the output gets. What we are buying is
+//     fewer TURNS (a mid-session turn costs ~82 200 tokens of re-sent context),
+//     not less text.
+//  2. READ-ONLY — no event, no file written, no driver change, no session
+//     attached. It does NOT replace `forja run resume`, which still ties the
+//     session to the run exactly once per session.
+//  3. DEGRADES IN RECORDED SILENCE — a block whose source does not exist prints
+//     one line saying so and the command still exits 0; it never fails and
+//     never makes a phase fail.
+// And it is ADDITIVE, never substitutive (gate R0, D29 points 3 and 4): it
+// shortens no acceptance criterion and no verdict, and it is not offered to the
+// Reviewer, the Security Reviewer or the QA as a substitute for reading the
+// diff, the reports or the code.
+const CONTEXT_BLOCKS = 9;
+// A header that cannot be mistaken for a Markdown heading of the files below.
+const contextHeader = (n, title) => `=== ${n}/${CONTEXT_BLOCKS} · ${title} ===`;
+const trimBlankEnd = text => String(text).replace(/(?:\r?\n)+$/, '');
+const firstLine = text => String(text || '').split('\n').map(l => l.trim()).find(Boolean) || '';
+// A whole file, or the one line that says why it is not here.
+function contextFile(path, label) {
+  if (!existsSync(path)) return `(${label} não existe neste projeto — bloco sem origem)`;
+  try {
+    const text = trimBlankEnd(readFileSync(path, 'utf8'));
+    return text || `(${label} existe mas está vazio)`;
+  } catch (err) { return `(${label} não pôde ser lido: ${err.message} — bloco sem origem)`; }
+}
+// A git command, verbatim, or the one line that says why there is none. Git may
+// be missing, the project may not be a repository, git may be slow: none of
+// that is allowed to fail this command.
+function contextGit(args) {
+  const shown = `git ${args.join(' ')}`;
+  let r;
+  try { r = spawnSync('git', args, { cwd: projectRoot(), encoding: 'utf8', timeout: 15_000, windowsHide: true }); }
+  catch (err) { return `(\`${shown}\` não correu: ${err.message} — bloco sem origem)`; }
+  if (r.error) return `(\`${shown}\` não correu: ${r.error.code || r.error.message} — sem git nesta máquina ou fora de um repositório; bloco sem origem)`;
+  // The reason, first line only: outside a repository `git diff` answers with
+  // its entire usage screen (~150 lines), and a block that has no source has to
+  // stay ONE line. Nothing of the block's own content is ever cut this way —
+  // there is no content, which is exactly what the line says.
+  if (r.status !== 0) return `(\`${shown}\` saiu a ${r.status}: ${firstLine(r.stderr) || 'sem mensagem'} — bloco sem origem)`;
+  return trimBlankEnd(r.stdout || '') || `(\`${shown}\` não devolveu nenhuma linha)`;
+}
+// The Sponsor's answers, read-only: the summary `forja answers` prints (from
+// what is already applied to this run) plus SPONSOR-QUEUE.md whole — where the
+// answers actually live, in full, never re-parsed into something shorter.
+function contextAnswers(run) {
+  const applied = Array.isArray(run && run.answers_applied) ? run.answers_applied : [];
+  const open = readQueue().filter(q => q.status.startsWith('aberta'));
+  // Answers waiting that `forja answers` would apply — counted, never applied:
+  // applying them writes files and emits events, and that is the other command.
+  const seen = new Set(applied);
+  const project = basename(projectRoot());
+  let pending = 0;
+  for (const file of listAnswerFiles()) {
+    if (basename(file, '.jsonl') !== project) continue;
+    let text; try { text = readFileSync(file, 'utf8'); } catch { continue; }
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      let a; try { a = JSON.parse(line); } catch { continue; }
+      if (!a.id || !a.answer) continue;
+      const key = `${a.id}@${a.ts}`;
+      if (seen.has(key)) continue;
+      seen.add(key); pending += 1;
+    }
+  }
+  // An answer typed straight into SPONSOR-QUEUE.md is pending too (`answers`
+  // picks those up as well).
+  for (const q of open) if (q.answer) pending += 1;
+  const lines = [
+    '(`applied`: respostas do Sponsor já aplicadas a este run · `pending`: respostas à espera, que só o `forja answers` aplica · `open`: perguntas ainda sem resposta)',
+    JSON.stringify(answersView({ applied: applied.length, pending, open: open.map(q => q.id) }), null, 2),
+    '',
+    contextFile(queuePath(), 'docs/forja/SPONSOR-QUEUE.md'),
+  ];
+  return lines.join('\n');
+}
+// The task block: `task show` byte for byte, or one line saying why not.
+function contextTask(opt) {
+  const asked = opt.task;
+  if (asked === undefined) return '(sem `--task`: nenhuma task pedida — `forja context --task T<n>` acrescenta aqui tudo o que o `forja task show T<n>` imprime)';
+  if (asked === true || String(asked).trim() === '') return '(`--task` precisa de um id, por exemplo `--task T1` — bloco da task não impresso; o resto do contexto sai na mesma)';
+  const id = String(asked).trim();
+  const tasks = readTasks();
+  const task = tasks.find(t => t.id === id);
+  if (!task) return `(a task ${id} não existe no plano deste projeto — ids no plano: ${tasks.length ? tasks.map(t => t.id).join(', ') : 'nenhum'} — o resto do contexto sai na mesma)`;
+  return taskShowText(tasks, task);
+}
+function context({ opt }) {
+  const run = readRun();
+  const taskId = opt.task !== undefined && opt.task !== true ? String(opt.task).trim() : null;
+  const parts = [
+    `# forja context — ${basename(projectRoot())}${taskId ? ` · ${taskId}` : ''}`,
+    `${CONTEXT_BLOCKS} blocos numa só saída, cada um byte a byte o que o comando ou o ficheiro já dá; nada é truncado (D33). Só de leitura: não escreve nada, não emite eventos e não muda o run.`,
+  ];
+  const push = (n, title, body) => parts.push(`${contextHeader(n, title)}\n${body}`);
+  push(1, 'Estado do run (o mesmo que `forja run resume` imprime)', [
+    run ? JSON.stringify(resumeView(run), null, 2)
+      // Never "missing" when it is there and broken: a file that exists but
+      // cannot be read is a different problem, and the session has to be told
+      // which one it has.
+      : existsSync(runPath())
+        ? '(docs/forja/RUN.json existe mas não é JSON legível — corrige-o à mão; bloco sem origem)'
+        : '(sem run neste projeto: docs/forja/RUN.json não existe — bloco sem origem)',
+    '(só de leitura: este bloco NÃO liga a sessão ao run nem muda o responsável — `forja run resume` continua a ser preciso, uma vez por sessão)',
+  ].join('\n'));
+  push(2, 'Respostas do Sponsor já aplicadas (o mesmo que `forja answers` imprime)', contextAnswers(run));
+  push(3, `Task${taskId ? ` ${taskId}` : ''} (o mesmo que \`forja task show\` imprime: estado, owner, complexidade, critérios na íntegra, tentativas, veredictos na íntegra, dependência)`, contextTask(opt));
+  push(4, 'docs/forja/HANDOVER.md', contextFile(handoverPath(), 'docs/forja/HANDOVER.md'));
+  push(5, 'docs/forja/PRODUCT-PROFILE.md', contextFile(productProfilePath(), 'docs/forja/PRODUCT-PROFILE.md'));
+  const techLabel = `a tabela «${TECHNOLOGY_TABLE_TITLE}» no topo de docs/forja/TECHNOLOGY.md`;
+  let tech;
+  if (!existsSync(technologyPath())) tech = '(docs/forja/TECHNOLOGY.md não existe neste projeto — bloco sem origem)';
+  else {
+    let table = '';
+    try { table = extractMarkdownSection(readFileSync(technologyPath(), 'utf8'), TECHNOLOGY_TABLE_TITLE); }
+    catch (err) { table = ''; tech = `(docs/forja/TECHNOLOGY.md não pôde ser lido: ${err.message} — bloco sem origem)`; }
+    if (table) tech = table;
+    else if (!tech) tech = `(docs/forja/TECHNOLOGY.md existe mas não tem ${techLabel} — bloco sem origem)`;
+  }
+  push(6, `Tecnologia decidida — ${techLabel} (a secção completa só da capacidade desta task)`, tech);
+  let dec;
+  if (!existsSync(decisionsPath())) dec = '(docs/forja/DECISIONS.md não existe neste projeto — bloco sem origem)';
+  else {
+    try {
+      const index = extractDecisionsIndex(readFileSync(decisionsPath(), 'utf8'));
+      dec = index || '(docs/forja/DECISIONS.md existe mas ainda não tem bloco de índice no topo — gera-o com `forja decisions reindex`; bloco sem origem)';
+    } catch (err) { dec = `(docs/forja/DECISIONS.md não pôde ser lido: ${err.message} — bloco sem origem)`; }
+  }
+  push(7, 'Decisões do run — a tabela-índice no topo de docs/forja/DECISIONS.md (a decisão completa só quando este trabalho depender dela)', dec);
+  push(8, 'git status --short', contextGit(['status', '--short']));
+  push(9, 'git diff --stat', contextGit(['diff', '--stat']));
+  out(parts.join('\n\n'));
+}
+
 function status() {
   const run = readRun();
   if (!run) { out('Sem run neste projeto. `forja run start --goal "…"` para começar.'); return; }
@@ -615,7 +881,7 @@ function resume() {
   if (!run) { out(`Sem run neste projeto. Prompt de arranque: ver ${join(forja, 'docs', 'RUNBOOK-UNATTENDED.md')}.`); return; }
   const prompt = [
     `Continue the Forja run ${run.run_id} on this project (${run.project}).`,
-    `Load the skill forja-lead and follow it. Read CLAUDE.md, then docs/forja/HANDOVER.md, docs/forja/RUN.json, docs/forja/TASKS.json, docs/forja/SPONSOR-QUEUE.md.`,
+    `Load the skill forja-lead and follow it. Read CLAUDE.md, then docs/forja/HANDOVER.md, docs/forja/RUN.json, docs/forja/SPONSOR-QUEUE.md — task state comes from \`status\` below, never from opening TASKS.json directly.`,
     `Run: node "${join(forja, 'bin', 'forja.mjs')}" run resume — then node "${join(forja, 'bin', 'forja.mjs')}" status — then continue from the exact next action in HANDOVER.md.`,
     `Goal of the run: ${run.goal}`,
     `forjalvl (nível de modelos) for this run: ${levelOf(readForjalvl(run))} (${labelOf(readForjalvl(run))}) — ${detailOf(readForjalvl(run))}. It decides every role's model (forja-lead §1); it is in RUN.json.forjalvl and never in the agent files.`,
@@ -633,16 +899,31 @@ async function delegate(mod, fn, args) {
   return m[fn](args);
 }
 
-const usage = `forja — comandos (docs/ARCHITECTURE.md §7b)
+const usage = `FORJA core (docs/CORE-RUNBOOK.md)
+  start --goal "..." --provider claude|codex [--project <repo>] [--allow-dirty] [--config <json>] [--plan <json>]
+  core init | core resume | core status | core usage [--details]
+  core context --query "..."  (selected project knowledge with source references)
+  core retry --task T1 --why "..." [--max-attempts 3] [--max-sessions 40]
+  core abandon --why "..."
+  Budgets: --max-sessions 30 --max-attempts 2 --max-minutes 30 --max-rotations 2 --max-context-tokens 120000
+
+Observability: serve, then /core; guard supports Core and legacy runs.
+
+Legacy (existing runs):
+forja — comandos (docs/ARCHITECTURE.md §7b)
   run start --goal "…" [--forjalvl max|high|eco] [--autonomy normal|total] [--visivel] [--driver interactive|runner] | run resume | run checkpoint [--note "…"] | run finish [--note "…"] | run fail --why "…" | run block --why "…"
   run driver show | run driver set interactive|runner   (quem conduz o run: esta conversa ou o runner autónomo — a guarda só relança runs do runner; docs/ARCHITECTURE.md §3c)
   task add --id T1 --owner backend-dev|frontend-dev --title "…" [--complexity easy|medium|hard] [--criteria "…"] [--after T0]
   task show T1   (id, estado, owner, complexidade, critérios, tentativas, veredictos completos, dependência)
+  context [--task T1]   (numa só saída, com um cabeçalho por bloco: estado do run, respostas do Sponsor, a task inteira, HANDOVER.md, PRODUCT-PROFILE.md, a tabela de tecnologia, o índice de decisões, git status --short e git diff --stat — só de leitura, nada truncado; não substitui o \`run resume\`)
   task start T1 | task review T1 | task done T1 --verdict "…" [--evidence "…"] | task fail T1 --why "…" [--no-attempt] | task block T1 --why "…"
   runner [--goal "…"] [--forjalvl max|high|eco] [--autonomy normal|total] [--visivel] [--max-task-minutes 45] [--max-plan-minutes 90] [--max-sessions 60]   (uma sessão nova do Claude Code por fase; sem --goal retoma o run em curso; --visivel corre cada fase como sessão de fundo \`claude --bg\`, que aparece na app do Claude)
   forjalvl show | forjalvl set max|high|eco   (forjalvl, o nível de modelos: máximo · alto · económico — por run, com omissão por projeto em docs/forja/SETTINGS.json; \`models\` e \`--models\` continuam a funcionar como alias)
   autonomy show | autonomy set normal|total   (autonomia do run: \`total\` decide dentro do run dependências gratuitas e escolhas de produto/design em vez de as pôr na fila — dinheiro, contas, envios, apagar dados e publicar continuam sempre na fila)
   decide "…" --why "…" [--reversible yes|no] [--supersedes D1] [--by "Product Manager"]
+  decisions reindex   (gera ou regenera o bloco de índice no topo do DECISIONS.md do projeto atual, sem tocar no corpo; funciona sem run aberto)
+  technology split   (tira cada secção "## … (S<n>, <data>)" do TECHNOLOGY.md do projeto atual para docs/forja/technology/S<n>.md, na íntegra; fica só o cabeçalho e a tabela, cada linha com o caminho; sem secções por mover, não muda nada; funciona sem run aberto)
+  obsidian sync   (corre à mão o sync da Central de Projetos do Sponsor para este projeto — o mesmo passo que o \`run finish\` já faz sozinho; desliga-se com "obsidian_sync": false em docs/forja/SETTINGS.json)
   ask "…" --default "…" --why "…" | answers
   fallback <papel> <de> <para> --why "…" | progress "…" [--as papel] | notify "…" [--priority high] | status | resume
   report "…"   (sessão à mão, sem run: regista o fim e o relatório entregue ao Sponsor numa linha — o viewer mostra-o no feed; dentro de um run usa-se \`run finish\`)
@@ -671,6 +952,9 @@ async function main() {
       }
       case 'autonomy': if (!Object.hasOwn(autonomyCmds, sub)) fail(usage); return await autonomyCmds[sub](args);
       case 'decide': return await decide({ pos: [sub, ...rest], opt });
+      case 'decisions': if (!Object.hasOwn(decisionsCmds, sub)) fail(usage); return await decisionsCmds[sub](args);
+      case 'technology': if (!Object.hasOwn(technologyCmds, sub)) fail(usage); return await technologyCmds[sub](args);
+      case 'obsidian': if (!Object.hasOwn(obsidianCmds, sub)) fail(usage); return await obsidianCmds[sub](args);
       case 'ask': return await ask({ pos: [sub, ...rest], opt });
       case 'answers': return await answers();
       case 'fallback': return await fallback({ pos: [sub, ...rest], opt });
@@ -678,7 +962,10 @@ async function main() {
       case 'report': return await report({ pos: [sub, ...rest].filter(Boolean), opt });
       case 'notify': return await notifyCmd({ pos: [sub, ...rest].filter(Boolean), opt });
       case 'status': return await status();
+      case 'context': return context({ opt });
       case 'resume': return resume();
+      case 'start': return await delegate('core/engine.mjs', 'core', { pos: ['start'], opt });
+      case 'core': return await delegate('core/engine.mjs', 'core', { pos: [sub, ...rest], opt });
       case 'runner': return await delegate('runner.mjs', 'runner', { opt });
       case 'serve': return await delegate('serve.mjs', 'serve', { opt });
       case 'up': return await delegate('up.mjs', 'up', { opt });
