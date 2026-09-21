@@ -11,6 +11,15 @@ FORJA coordinates Claude Code and Codex through a small Node.js controller. It o
 
 The complete Core implementation is included here: scheduling, native executors, validation, independent review, recovery, context retrieval, metrics, and the viewer. Economy and local-model presets are optional extensions to that workflow.
 
+## Versions
+
+| Version | What it contains |
+|---|---|
+| [Core v0.1.0](https://github.com/nunomarques97/forja/tree/v0.1.0) | The Core baseline before the routing experiment: Claude/Codex adapters, executable checks, independent review, recovery, context retrieval, usage accounting, and the viewer. |
+| [Core v0.2.0](https://github.com/nunomarques97/forja/tree/v0.2.0) | The same foundation plus caller-defined final checks, explicit phase/model routing, and optional economy/Ollama presets. |
+
+Use the v0.1.0 tag to inspect the earlier implementation. This README describes the current Core; experimental presets remain disabled unless explicitly selected.
+
 ## Why this project
 
 Long coding-agent conversations accumulate context, mix implementation with self-review, and make interrupted work difficult to reconstruct. FORJA moves coordination into code: each phase starts a fresh session, relevant context is selected from files, and progress is persisted on disk.
