@@ -1,15 +1,66 @@
-# FORJA Core 0.2.0
+# FORJA
 
-FORJA transforma um objetivo em alterações de código, checks executados e uma revisão independente. O controlador é Node.js; Claude Code e Codex são executores substituíveis. Não precisa de uma conversa permanente, de um catálogo de agentes nem de relatórios escritos por outros agentes.
+**A development orchestrator that turns a goal into code changes, executable checks, and an independent review.**
 
-Na raiz Git do projeto, com Node 24, Git e o CLI escolhido já autenticado:
+FORJA coordinates Claude Code and Codex through a small Node.js controller. It owns task state, validation, retry budgets, and recovery; native coding agents handle implementation and review. The aim is to improve delivered software quality per unit of context, time, and model usage.
 
-```powershell
-$forja = 'C:\tools\forja\bin\forja.mjs'
-node $forja start --provider codex --goal "Implementar <objetivo e condições de sucesso>"
+[![Node.js 24](https://img.shields.io/badge/Node.js-24-339933?logo=nodedotjs&logoColor=white)](package.json)
+[![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-blue)](package.json)
+[![Core v0.2.0](https://img.shields.io/badge/Core-v0.2.0-blue)](CHANGELOG.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+The complete Core implementation is included here: scheduling, native executors, validation, independent review, recovery, context retrieval, metrics, and the viewer. Economy and local-model presets are optional extensions to that workflow.
+
+## Why this project
+
+Long coding-agent conversations accumulate context, mix implementation with self-review, and make interrupted work difficult to reconstruct. FORJA moves coordination into code: each phase starts a fresh session, relevant context is selected from files, and progress is persisted on disk.
+
+The current Core evolved from a larger role-based workflow. It uses a compact execution loop, with optional planning and no mandatory roster of specialist agents.
+
+## How it works
+
+```mermaid
+flowchart LR
+    Goal --> Plan[Structured plan]
+    Plan --> Develop[Developer session]
+    Develop --> Checks[Executable checks]
+    Checks --> Review[Independent review session]
+    Review --> Done[Next task or completion]
+    Checks -->|Failed, within budget| Develop
+    Review -->|Rejected, within budget| Develop
 ```
 
-Usa `--provider claude` para Claude Code. O projeto deve estar limpo; `--allow-dirty` autoriza trabalhar com alterações existentes, que são inventariadas e devem ser preservadas. O run altera ficheiros e executa os checks do projeto; não faz commits nem publica.
+The controller executes checks and records their output. Review runs in a separate session with read-only access. Caller-defined final acceptance checks run at integration, before approval. Authentication errors, timeouts, exhausted budgets, and invalid results leave the run blocked with its work preserved.
+
+## Engineering decisions
+
+| Concern | Implementation |
+|---|---|
+| Recoverable execution | Persisted JSON state, atomic state-file replacement, per-project locks, checkpoints, and explicit recovery commands. |
+| Executor boundaries | Native CLI adapters exchange structured results; scheduling and routing remain in the controller. |
+| Context management | Bounded repository maps and lexical Markdown retrieval with source paths, line references, and hashes. |
+| Quality gates | Executed checks, separate review sessions, and revalidation when later changes invalidate earlier evidence. |
+| Resource control | Invocation and retry limits, per-route time caps, and a persisted cloud-session budget. |
+| Observability | A local viewer and usage ledger attribute work by task, phase, provider, model, and attempt. Missing measurements remain unknown. |
+| Publication hygiene | Reviewed technical documentation is versioned; raw prompts, conversations, and run evidence stay in ignored local storage. A release checker inspects staged content. |
+
+The runtime uses Node's standard library. Native CLI integration reuses existing coding tools and authentication, while making CLI compatibility, sandbox behavior, and provider availability explicit operational dependencies. Session budgets are not token or currency ceilings.
+
+## Quick start
+
+Requirements: **Node.js 24**, **Git**, and an installed, authenticated **Codex or Claude Code CLI**. FORJA is developed and tested on Windows; several supervision and startup helpers are Windows-specific.
+
+```powershell
+git clone https://github.com/nunomarques97/forja.git
+Set-Location forja
+$forja = (Resolve-Path .\bin\forja.mjs).Path
+
+# Run from the Git root of the project you want to work on.
+Set-Location 'C:\path\to\your-project'
+node $forja start --provider codex --goal "Add name search, preserve existing filters, and test empty results"
+```
+
+Use `--provider claude` for Claude Code. Start from a clean working tree, or explicitly authorize existing changes with `--allow-dirty`. A run edits project files and executes commands; Core workers are instructed not to commit or publish.
 
 ```powershell
 node $forja core status
@@ -17,23 +68,54 @@ node $forja core usage
 node $forja core resume
 ```
 
-`core init` é opcional: acrescenta uma referência curta às regras comuns em `AGENTS.md` e `CLAUDE.md`, preservando o texto existente. O arranque direto já envia essas regras ao executor. Estado, resultados, logs e métricas ficam em `.forja/` dentro do projeto.
+State, logs, and results live in the project's `.forja/` directory, which should be Git-ignored. Optional `core init` adds that ignore rule and short workflow references to `AGENTS.md` and `CLAUDE.md`; review and commit those setup changes before starting a run that requires a clean tree.
 
-- [Manual do Core](docs/CORE-RUNBOOK.md): arquitetura, configuração, modelos/effort, recuperação, métricas e novos providers.
-- [Routing e qualidade](docs/ROUTING.md): modelos por fase, limites de sessões cloud, checks finais e piloto Ollama opcional.
-- [Conhecimento e pesquisa](docs/RESEARCH.md): Markdown, Obsidian e técnicas externas selecionadas.
-- [Entrega e privacidade](docs/RELEASE.md): o que versionar, revisão do staging e condições para publicar.
-- [Changelog](CHANGELOG.md): versões e alterações verificáveis.
+`node $forja serve` starts the local viewer; its `/core` page shows tasks, sessions, checks, and usage. The legacy `runner` workflow remains available for existing projects. Active legacy runs are not automatically migrated.
 
-O viewer apresenta os runs Core em `/core`, com tarefas, sessões, tentativas e consumo por provider/modelo. A guarda retoma runs Core interrompidos dentro dos limites existentes; bloqueios explícitos continuam a exigir recuperação pelo CLI. Reinicia serviços já abertos para carregarem estas alterações. O comando antigo `runner` e o bootstrap continuam disponíveis para runs antigos; não há migração automática de um run ativo. A operação anterior está no [runbook legado](docs/RUNBOOK-UNATTENDED.md) e em [viewer/README.md](viewer/README.md).
+## Testing
 
-Para desenvolver o FORJA: `npm test` e `npm run check`. Sem dependências de runtime adicionais.
+The v0.2.0 public validation run contained **782 tests: 780 passed, zero failed, and two skipped** because private historical evidence was unavailable. Coverage includes scheduler transitions, recovery, provider contracts, routing budgets, usage accounting, and viewer behavior.
 
-A versão 0.2 acrescenta checks de aceitação definidos por quem inicia o run, independentes dos checks propostos pelo planner. A revisão inclui transições de erro/recuperação, concorrência de pedidos e acessibilidade quando aplicáveis. Os presets permitem usar modelos económicos em tarefas simples e modelos mais capazes nas revisões; não alteram a configuração global dos teus CLIs. Ollama é uma opção experimental explícita, desligada por defeito.
+| Area | Examples covered | Tests |
+|---|---|---|
+| Scheduler and recovery | Failed checks, rejected reviews, interrupted work, exhausted budgets, and changes that invalidate earlier validation. | [Core](test/core.test.mjs) |
+| Context and accounting | Knowledge selection, required-source validation, provider-specific token normalization, and incomplete usage records. | [Knowledge](test/knowledge.test.mjs), [metrics](test/metrics.test.mjs) |
+| Provider routing | Local/cloud boundaries, model selection, preflight failures, and cloud-session limits. | [Routing](test/routing.test.mjs) |
+| Viewer and supervision | Event reduction, API behavior, process ownership, stale locks, and recovery coordination. | [State](test/state.test.mjs), [Core observation](test/core-observe.test.mjs), [guard](test/guard.test.mjs) |
+| Publication controls | Staged-content scanning and narrowly scoped synthetic-fixture approvals. | [Release checks](test/release-check.test.mjs) |
 
-Os presets económicos também são experimentais: o ensaio de uma tarefa UI atingiu o timeout de desenvolvimento e deixou defeitos no código parcial. Ainda não foi demonstrada qualidade equivalente num tempo semelhante. Os modelos anteriores continuam a ser o padrão; consulta os [resultados e limites](docs/ROUTING.md#validation-status) antes de escolher um preset.
+From the FORJA repository:
 
+```powershell
+npm test -- --test-concurrency=1
+npm run check
+npm run release:check
+```
 
-`core context --query "..."` mostra a seleção de conhecimento; o manifesto opcional `docs/forja/KNOWLEDGE.json` controla as fontes. Só documentação técnica revista pertence ao Git. Prompts, conversas, perguntas/respostas, handovers e evidência bruta ficam em armazenamento local ignorado. Obsidian pode abrir esse Markdown sem se tornar uma dependência do executor.
+The automated suite uses temporary repositories, fixtures, and simulated model executors. It exercises orchestration without consuming model quota. Native executor smoke tests and product-task evaluations are separate from this test count.
 
-O agente responsável pela entrega prepara uma lista explícita de ficheiros e revê o conteúdo antes de versionar. `npm run release:check` verifica o staging; `npm run release:check -- --tree` verifica o snapshot completo antes de uma publicação autorizada. Nenhum dos comandos faz commit ou push. Histórico legado com dados de execução exige revisão própria antes de ser publicado.
+## Current scope and limitations
+
+Core is the recommended workflow for new FORJA runs. Passing its tests does not establish the quality of every generated product: acceptance coverage, native executor behavior, and independent review still matter.
+
+The economy and Ollama presets are **opt-in experiments**. A medium UI trial reached its development timeout, and post-run evaluation found defects in the preserved partial output. A local Ollama smoke test demonstrated basic editing and check execution only. Existing native model defaults remain unchanged; equivalent quality at lower cost or similar completion time has not yet been demonstrated. See the [validation results and limitations](docs/ROUTING.md#validation-status).
+
+## Explore the code
+
+- [Scheduler and recovery](lib/core/engine.mjs) — task transitions, execution budgets, validation, and persisted state.
+- [Provider adapters](lib/core/providers.mjs) and [routing](lib/core/routing.mjs) — native execution and phase/model selection.
+- [Context assembly](lib/core/context.mjs), [knowledge retrieval](lib/core/knowledge.mjs), and [usage accounting](lib/core/metrics.mjs).
+- [Core regression tests](test/core.test.mjs) and [routing tests](test/routing.test.mjs).
+
+## Documentation
+
+- [Execution contract](docs/CORE.md)
+- [Routing, acceptance checks, and experimental presets](docs/ROUTING.md)
+- [Research and design trade-offs](docs/RESEARCH.md)
+- [Release and privacy policy](docs/RELEASE.md)
+- [Complete Core runbook — Portuguese](docs/CORE-RUNBOOK.md)
+- [Changelog](CHANGELOG.md)
+
+## License
+
+[MIT](LICENSE) · Copyright (c) 2026 Nuno Marques.
