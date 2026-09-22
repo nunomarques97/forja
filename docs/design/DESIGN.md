@@ -4,9 +4,9 @@ The viewer makes the current project, work in progress, blockers and completion 
 
 ## Core
 
-`/core` is a read-only view of projects, runs, tasks and execution sessions. Project and task names lead the hierarchy. Planning, implementation, checks and independent review remain distinguishable. Show only sessions that actually exist.
+`/core` presents projects, runs, tasks and execution sessions. Its sole mutation is an explicit Sponsor technology choice for a paused run: show alternatives, costs/uncertainty, tradeoffs and recommendation without preselecting an answer. Confirming records that choice and attempts bounded continuation after all decisions are answered; it never makes a payment. Project and task names lead the hierarchy. Planning, implementation, checks and independent review remain distinguishable. Show only sessions that actually exist.
 
-Provider, model, effort, attempts, token/cache usage and available cost estimates belong in expandable details. Mark incomplete measurement coverage explicitly. An estimate is not an invoice. Execution and explicit recovery remain CLI operations.
+Provider, model, effort, attempts, token/cache usage and available cost estimates belong in expandable details. Mark incomplete measurement coverage explicitly. An estimate is not an invoice. General execution/recovery remain CLI operations; the technology decision is the narrow exception above. Preserve an unsubmitted choice and keyboard focus across polling, handle stale/double submissions, and never treat a transport error as confirmation.
 
 Use the tokens in `viewer/assets/core.css`: dark background `#101210`, panel `#191c18`, text `#e4e7dc`. Keep tables inside a horizontally scrollable region on narrow screens, without making the whole page overflow. Preserve expanded details across refresh where the underlying session still exists.
 

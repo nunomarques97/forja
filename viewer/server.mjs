@@ -36,7 +36,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createState, applyLine, snapshot, STATES, THRESHOLDS } from './lib/state.mjs';
 import { createFeed, feedApply, feedSnapshot } from './lib/feed.mjs';
 import { handleRunsApi, crossSite } from './runs-api.mjs';
-import { coreSnapshot } from './core-api.mjs';
+import { coreSnapshot, handleCoreDecision } from './core-api.mjs';
 import { notify, sanitizeClick } from '../lib/notify.mjs';
 // A outra metade da supervisão mútua (docs/ARCHITECTURE.md §12): a guarda vigia
 // o viewer, e o viewer vigia a guarda. Regras, constantes e predicados de vida
@@ -492,6 +492,7 @@ export function startServer(opts = {}) {
 
     // Run API (viewer/runs-api.mjs): /projects and /runs, authenticated above.
     if (handleRunsApi(req, res, runsCtx)) return;
+    if (handleCoreDecision(req, res, runsCtx)) return;
 
     if (req.method === 'GET' && url.pathname === '/api/core') {
       const snapshot = coreSnapshot(dataDir);

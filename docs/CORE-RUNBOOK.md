@@ -13,7 +13,7 @@ node $forja core status
 node $forja core usage
 ```
 
-Claude só muda `--provider claude`. De outra pasta, acrescenta `--project 'C:\caminho\projeto'`. Com alterações pendentes, revê-as e usa `--allow-dirty` para autorizar a execução nesse estado. Os hashes iniciais não são um backup: o agente tem acesso de escrita e deve preservar trabalho existente. Core não faz commits, publica nem envia notificações.
+Claude só muda `--provider claude`. De outra pasta, acrescenta `--project 'C:\caminho\projeto'`. Com alterações pendentes, revê-as e usa `--allow-dirty` para autorizar a execução nesse estado. Os hashes iniciais não são um backup: o agente tem acesso de escrita e deve preservar trabalho existente. Core não faz commits nem publica. Uma decisão pendente sobre tecnologia paga ou custo incerto pode enviar uma notificação de estado ao Sponsor, se o transporte existente estiver configurado.
 
 `core init` é opcional: acrescenta uma referência a CORE.md em blocos geridos de AGENTS/CLAUDE e ignora `.forja/`. Preserva as regras existentes e recusa marcadores inválidos. O arranque direto já envia CORE.md; se dispensares init, acrescenta `.forja/` ao `.gitignore` para não versionar logs privados. Não copies o catálogo antigo de agentes para novos projetos.
 
@@ -35,6 +35,26 @@ Node controla dependências, tentativas e transições. Não há Lead a delegar 
 Ao fornecer um plano, começa pela menor unidade que entregue um comportamento completo e verificável. Cálculo e apresentação sobre os mesmos ficheiros podem pertencer à mesma tarefa quando cabem no contexto e no limite de execução. Sem reparações, passar de duas tarefas para uma reduz as sessões de desenvolvimento/revisão de quatro para duas, mantendo uma revisão independente e os checks finais. Divide quando houver critérios que possam ser aceites separadamente, riscos distintos ou trabalho que exceda os limites; partilhar ficheiros, por si só, não justifica fundir tarefas. O planner já recebe esta preferência por tarefas coesas; planos explícitos continuam sob controlo do autor.
 
 O planner faz a descoberta de código antes de devolver o plano e mantém os testes de aceitação na tarefa que implementa o comportamento. Quando dividir trabalho, deve explicar o motivo nas decisões. Os checks são executáveis e argumentos lançados diretamente, sem shell implícita: um comando interno como `Get-Content` não é um executável nem um teste de comportamento. Estas instruções orientam o modelo; não fundem tarefas nem certificam semanticamente os checks propostos.
+
+### Escolhas de tecnologia e custos
+
+Novos runs incluem `technology` no resultado estruturado. Trabalho corrente na stack aceite devolve `[]`. Uma capacidade nova, dependência material ou escolha consequente por resolver pede duas ou três alternativas viáveis, restrições, vantagens/limitações, evidência consultada e recomendação. A comparação acontece no planner existente, limitada a três referências primárias por escolha; não cria uma fase Scout nem uma sessão obrigatória adicional. Os limites de tempo/sessões mantêm-se. O modelo pode demorar mais a investigar uma escolha real; não existe uma garantia de latência igual.
+
+Cada opção indica `free`, `paid` ou `unknown` e a base desse custo. Um nível gratuito só conta como gratuito quando cobre os requisitos. Basta existir uma alternativa relevante paga ou incerta para o Core persistir o bloqueio, mesmo recomendando a gratuita. Opções todas gratuitas podem ser escolhidas automaticamente, com justificação. Custos já aprovados e o provider de execução configurado não são reavaliados a cada tarefa. Developer/reviewer que descobrem novos custos devolvem `blocked` e alternativas antes da adoção; o controlador também impede conclusão se um resultado `done`/`approve` trouxer essa decisão pendente.
+
+O Sponsor escolhe no painel autenticado `/core`, sem opção pré-selecionada, ou no terminal:
+
+```sh
+node bin/forja.mjs core status
+node bin/forja.mjs core decide --run F-1234567890000-abcdef --decision D1 --option local --why "Preferir manutenção local"
+node bin/forja.mjs core resume
+```
+
+O painel guarda a resposta e tenta iniciar a continuação depois da última decisão. O CLI apenas guarda; `resume` retoma. Respostas repetidas iguais são idempotentes; outra resposta para uma escolha resolvida é recusada. Run obsoleto, worker ativo, opção inexistente e pedido de outra origem são recusados. A decisão não aumenta budgets nem autoriza comprar, subscrever, aceder a credenciais ou pagar. Enquanto faltar uma resposta, `resume`, `retry`, guarda e passagem do tempo não escolhem pelo Sponsor. A espera não mantém um modelo ativo.
+
+A notificação usa `FORJA_NTFY_TOPIC` ou `data/notify-config.json`, conforme [RELEASE.md](RELEASE.md). Envia apenas estado e, quando disponível, link sanitizado para `/core`; nunca inclui alternativas, conteúdo de projeto ou token de acesso. A tentativa fica registada antes do envio, com teto de cinco segundos, e não se repete para o mesmo conjunto pendente. Transporte indisponível, configuração ausente ou interrupção durante o envio podem impedir a entrega; o bloqueio continua visível no painel/CLI. Reiniciar não garante reenviar uma tentativa interrompida.
+
+O gate é determinístico sobre custos **reportados**. Classificar custos, identificar alternativas e avaliar fontes continua a depender do modelo e da informação disponível; isto não é um detetor completo de serviços pagos nem um isolamento de rede/faturação. Os contratos e sandboxes existentes continuam a aplicar-se. Runs anteriores sem esta política continuam legíveis; não recebem retroativamente uma pesquisa nova. Estado limitado a oito decisões e 16.000 caracteres; contexto global continua limitado a 48.000.
 
 `.forja/current.json` guarda o estado corrente. `.forja/runs/<id>/state.json` conserva cada run, acompanhado por prompts, schemas, resultados, streams, patches e logs dos checks. `usage.jsonl` mede invocações; `recovery.jsonl` regista intervenções explícitas; `SUMMARY.md` é gerado por código. Os logs podem conter código/dados privados. Runs anteriores ficam preservados.
 
@@ -114,17 +134,17 @@ Não apagues um lock que indica processo vivo: inspeciona os PIDs em `.forja/loc
 
 `node $forja serve` abre o servidor local; usa o endereço apresentado e o caminho `/core`. A autenticação existente aplica-se também ao Core. A página mostra projeto, run, tarefas, sessões, provider/modelo/effort, tentativas, checks/revisão e consumo, incluindo cache e estimativas USD quando disponíveis. Abre os detalhes das sessões para identificar a origem do custo. `core init` e `start` registam o projeto automaticamente.
 
-A página é de consulta; recuperação usa os comandos acima. Reinicia viewer/guarda já em execução para carregarem o código atualizado. O encerramento do viewer preserva os executores Core e os seus subprocessos.
+A página permite responder a decisões de tecnologia pendentes; as restantes ações de recuperação usam os comandos acima. Reinicia viewer/guarda já em execução para carregarem o código atualizado. O encerramento do viewer preserva os executores Core e os seus subprocessos.
 
 ## Providers e extensão
 
 `lib/core/providers.mjs` é a fronteira: prompt em stdin, resultado segundo `PLAN_SCHEMA`/`RESULT_SCHEMA`, exit code, duração, usage quando disponível, sessão e erro. As transições do scheduler são comuns.
 
-- Claude: `-p`, stream JSON/schema; planner/reviewer só têm Read/Grep/Glob, developer tem edição/shell. MCP estrito vazio por defeito; `config.mcp` permite configuração explícita do projeto. Hooks e instruções nativas podem acrescentar comportamento/contexto: init preserva-os, não faz migração destrutiva.
-- Codex: `exec --json`, schema/ficheiro de resposta; sandbox `workspace-write` no developer, `read-only` nas outras fases. Mantém AGENTS hierárquicos e configuração nativa. Ferramentas/MCP continuam sob controlo do utilizador. Restrições incompatíveis com um teste bloqueiam com evidência.
+- Claude: `-p`, stream JSON/schema; planner/reviewer têm Read/Grep/Glob; novos planners também WebSearch/WebFetch para fontes primárias. Developer tem edição/shell. MCP estrito vazio por defeito; `config.mcp` permite configuração explícita do projeto. Hooks e instruções nativas podem acrescentar comportamento/contexto: init preserva-os, não faz migração destrutiva.
+- Codex: `exec --json`, schema/ficheiro de resposta; sandbox `workspace-write` no developer, `read-only` nas outras fases. Novos planners cloud recebem `--search`; Ollama não. Mantém AGENTS hierárquicos e configuração nativa. Ferramentas/MCP continuam sob controlo do utilizador. Restrições incompatíveis com um teste bloqueiam com evidência.
 - Futuro agente: `--provider custom`, `provider.command` executável e `provider.args` array. `{schema}`/`{result}` são substituídos nos argumentos. O wrapper recebe stdin e emite como última linha JSON `{"result": <objeto conforme schema>, "usage": <métricas opcionais>}`; exit não zero é falha. Usage custom fica no registo original, sem normalização inventada. Ferramentas/sandbox são responsabilidade do wrapper.
 
-Um plano é `{"decisions": [], "tasks": [...]}`. Cada tarefa tem `id`, `title`, `criteria` (array), `files` (paths relativos), `risks` (labels), `complexity` (`easy|medium|hard`), `checks` (`[{"command":"node","args":["--test"]}]`) e `after` (IDs). Resultado: `status`, `summary`, `findings`; developer usa `done|blocked|checkpoint`, revisão usa `approve|reject`. Novos providers normalizam eventos na fronteira; transições/testes pertencem ao Core. Não acrescentes outro catálogo de regras.
+Um plano é `{"decisions": [], "technology": [], "tasks": [...]}`. Cada tarefa tem `id`, `title`, `criteria` (array), `files` (paths relativos), `risks` (labels), `complexity` (`easy|medium|hard`), `checks` (`[{"command":"node","args":["--test"]}]`) e `after` (IDs). Resultado: `status`, `summary`, `findings`, `technology`; developer usa `done|blocked|checkpoint`, revisão usa `approve|reject|blocked`. O schema nativo exige `technology` em novos runs; planos fornecidos e estados antigos sem o campo continuam aceites. Novos providers normalizam eventos na fronteira; transições/testes pertencem ao Core. Não acrescentes outro catálogo de regras.
 
 ## Métricas e compatibilidade
 

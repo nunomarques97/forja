@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — Technology choices and Sponsor cost decisions
+
+- New runs compare material unresolved technology choices within the existing planner, with bounded alternatives, evidence, cost basis and recommendation. Routine work returns an empty assessment; there is no mandatory Scout session. Planner adapters enable primary-source research for cloud providers.
+- Any reported paid or unknown-cost alternative pauses the scheduler, including when the recommendation is free or the cost is discovered during implementation/review. Resume, retry and elapsed time cannot supply an answer. All-free choices are recorded automatically.
+- Explicit Sponsor choices are available through `core decide` and the authenticated `/core` panel. No option is preselected. Run identity, project locks, input bounds, same-origin checks and idempotent answers protect continuation; budgets remain unchanged.
+- Pending cost decisions attempt one status-only notification per pending set through the configured ntfy transport, with a five-second timeout and a credential-free panel link. Missing configuration or delivery failure leaves work blocked.
+- Desktop/mobile decision forms preserve pending selection and focus across polling, handle stale/network failures and distinguish recorded answers from launched continuation. Existing runs remain readable and no runtime dependency is added.
+
+The scheduler enforces reported decisions; technology discovery and cost classification still depend on model output and evidence. A choice never authorizes payment, subscriptions or credential access. Research can add time within existing limits; no general speed or product-quality improvement is claimed.
+
 ## 0.3.0 — Task boundaries and interruption diagnostics
 
 - Worker context identifies remaining task criteria, shared files, dependencies and whether final integration checks apply now. Scheduler and prompts share the same gate predicate, including repairs. Additional scope guidance is omitted when no other task remains.
