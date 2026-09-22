@@ -156,7 +156,7 @@ test('a Sponsor answer cannot corrupt state by exceeding the persisted decision 
   assert.deepEqual(readFileSync(current(root)), before);
 });
 
-for (const phase of ['develop', 'review']) test(`cost discovered during ${phase} prevents completion and preserves partial edits`, async t => {
+for (const [phase, status] of [['develop', 'blocked'], ['develop', 'ready_for_validation'], ['review', 'approve']]) test(`cost discovered during ${phase} with ${status} prevents completion and preserves partial edits`, async t => {
   const root = fixture(t), phases = [];
   createRun(root, { goal: 'Return two', plan: plan() });
   const stopped = await drive(root, { ...quiet, notifySponsor: async () => ({ skipped: 'unconfigured' }), providerCall: async (provider, opts) => {
@@ -164,7 +164,7 @@ for (const phase of ['develop', 'review']) test(`cost discovered during ${phase}
     if (ctx.phase === 'develop') writeFileSync(join(root, 'partial.txt'), 'Preserve this work');
     if (ctx.phase === phase) {
       phases.push(ctx.phase);
-      return result(phase === 'review' ? 'approve' : 'blocked', [assessment()]);
+      return result(status, [assessment()]);
     }
     return worker(root, phases)(provider, opts);
   } });

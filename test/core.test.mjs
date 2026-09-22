@@ -112,7 +112,7 @@ test('worker scope defers another task on shared files until integration', async
       if (ctx.task.id === 'T1') writeFileSync(join(p, 'value.mjs'), 'export const value = 2;');
       else writeFileSync(join(p, 'evidence.txt'), 'verified');
     }
-    return result(options.readOnly ? 'approve' : 'done');
+    return result(options.readOnly ? 'approve' : 'ready_for_validation');
   } });
   assert.equal(done.status, 'done');
   assert.deepEqual(phases, ['develop:T1', 'review:T1', 'develop:T2', 'review:T2']);
@@ -178,7 +178,7 @@ test('user-owned final acceptance failures trigger repair before paying for revi
     if (options.readOnly) { reviews++; assert.equal(JSON.parse(options.text).changes.validation.length, 2); return result('approve'); }
     develops++; writeFileSync(join(p, 'value.mjs'), 'export const value = 2;');
     if (develops === 2) { assert.match(options.input, /Deterministic validation failed/); writeFileSync(join(p, 'evidence.txt'), 'checked'); }
-    return result();
+    return result('ready_for_validation');
   } });
   assert.equal(done.status, 'done');
   assert.equal(develops, 2);
@@ -218,7 +218,7 @@ test('a planned acceptance check overlapping the caller gate executes once befor
     phases.push(options.readOnly ? 'review' : 'develop');
     if (!options.readOnly) writeFileSync(join(p, 'value.mjs'), 'export const value = 2;');
     else assert.equal(JSON.parse(options.text).changes.validation.length, 1);
-    return result(options.readOnly ? 'approve' : 'done');
+    return result(options.readOnly ? 'approve' : 'ready_for_validation');
   } });
   assert.equal(done.status, 'done');
   assert.deepEqual(phases, ['develop', 'review']);

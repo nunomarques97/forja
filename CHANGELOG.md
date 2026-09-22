@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 — Explicit implementation handoff for validation
+
+- Developers can return `ready_for_validation` after implementation and focused tests, identifying scheduled checks still to run. The controller executes task checks and applicable caller acceptance checks before independent review; the handoff does not declare completion or claim those checks passed.
+- Preserve legacy `done` results, source-integrity checks, bounded repairs, intermediate-task acceptance boundaries and Sponsor decisions. Unscheduled visual/security evidence remains the worker's responsibility. No additional agent, phase or budget is introduced; timeouts and intermediate messages are not treated as valid handoffs.
+- Cover failing checks, interrupted validation, review approval requirements and preservation of existing validation and decision gates with regression tests.
+
 ## 0.4.3 — Avoid overlapping integration checks
 
 - Share an exact overlap between the end of planned task checks and the start of caller-owned final checks. An acceptance command listed at both boundaries runs once before independent review.

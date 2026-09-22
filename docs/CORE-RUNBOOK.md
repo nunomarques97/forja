@@ -114,6 +114,8 @@ Para Codex, usa modelos disponíveis na tua conta ou omite `models`; effort pass
 
 ## Retomar e resolver bloqueios
 
+O developer pode devolver `ready_for_validation` depois de implementar e executar testes focados. Entrega ao controlador os `task.checks` e os `final_checks` aplicáveis, identificando no resumo o que executou e o que ficou por executar. O controlador corre esses comandos e só depois pede revisão independente; esta entrega não conclui a tarefa nem afirma que os checks passaram. Evidência visual, de segurança ou outra que os comandos não produzam continua a ser responsabilidade do worker. Falhas mantêm os limites de reparação e a proteção contra alterações de código durante os checks. Resultados `done` existentes continuam aceites e passam pelos mesmos gates. Timeouts e mensagens intermédias nunca são convertidos automaticamente numa entrega válida.
+
 Ctrl+C durante um subprocesso termina-o e preserva o trabalho. Uma morte abrupta pode deixar um worker vivo, verificado antes da retoma:
 
 ```powershell
@@ -150,7 +152,7 @@ A página permite responder a decisões de tecnologia pendentes; as restantes a�
 - Codex: `exec --json`, schema/ficheiro de resposta; sandbox `workspace-write` no developer, `read-only` nas outras fases. Novos planners cloud recebem `--search`; Ollama não. Mantém AGENTS hierárquicos e configuração nativa. Ferramentas/MCP continuam sob controlo do utilizador. Restrições incompatíveis com um teste bloqueiam com evidência.
 - Futuro agente: `--provider custom`, `provider.command` executável e `provider.args` array. `{schema}`/`{result}` são substituídos nos argumentos. O wrapper recebe stdin e emite como última linha JSON `{"result": <objeto conforme schema>, "usage": <métricas opcionais>}`; exit não zero é falha. Usage custom fica no registo original, sem normalização inventada. Ferramentas/sandbox são responsabilidade do wrapper.
 
-Um plano é `{"decisions": [], "technology": [], "tasks": [...]}`. Cada tarefa tem `id`, `title`, `criteria` (array), `files` (paths relativos), `risks` (labels), `complexity` (`easy|medium|hard`), `checks` (`[{"command":"node","args":["--test"]}]`) e `after` (IDs). Resultado: `status`, `summary`, `findings`, `technology`; developer usa `done|blocked|checkpoint`, revisão usa `approve|reject|blocked`. O schema nativo exige `technology` em novos runs; planos fornecidos e estados antigos sem o campo continuam aceites. Novos providers normalizam eventos na fronteira; transições/testes pertencem ao Core. Não acrescentes outro catálogo de regras.
+Um plano é `{"decisions": [], "technology": [], "tasks": [...]}`. Cada tarefa tem `id`, `title`, `criteria` (array), `files` (paths relativos), `risks` (labels), `complexity` (`easy|medium|hard`), `checks` (`[{"command":"node","args":["--test"]}]`) e `after` (IDs). Resultado: `status`, `summary`, `findings`, `technology`; developer usa `done|ready_for_validation|blocked|checkpoint`, revisão usa `approve|reject|blocked`. O schema nativo exige `technology` em novos runs; planos fornecidos e estados antigos sem o campo continuam aceites. Novos providers normalizam eventos na fronteira; transições/testes pertencem ao Core. Não acrescentes outro catálogo de regras.
 
 ## Métricas e compatibilidade
 
