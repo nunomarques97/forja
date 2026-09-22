@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 — Validation evidence bound to unchanged source
+
+- Check the project snapshot after each acceptance command, including failed commands and final regression checks. A source change blocks continuation before later checks, review or automatic repair can conceal it or consume more worker sessions.
+- Preserve changed files and check logs for inspection; never assign passing evidence to a source version that changed during validation. Generated output in Git-ignored paths remains allowed.
+- Add regression coverage for source changes, changes restored by a later command, failed mutating checks, new non-ignored files and ignored output. This is a source-integrity check, not a sandbox for commands.
+
 ## 0.4.1 — Resume after Sponsor technology approval
 
 - Clarify that the controller collects Sponsor choices before implementation; planners must not create redundant tasks to ask for or confirm approval.
