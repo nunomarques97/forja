@@ -13,6 +13,8 @@ The complete Core implementation is included here: scheduling, native executors,
 
 ## Versions
 
+**Current release: [v0.8.0](https://github.com/nunomarques97/forja/tree/v0.8.0).**
+
 | Version | What it contains |
 |---|---|
 | [Core v0.1.0](https://github.com/nunomarques97/forja/tree/v0.1.0) | The Core baseline before the routing experiment: Claude/Codex adapters, executable checks, independent review, recovery, context retrieval, usage accounting, and the viewer. |
@@ -23,6 +25,10 @@ The complete Core implementation is included here: scheduling, native executors,
 | [Core v0.4.2](https://github.com/nunomarques97/forja/tree/v0.4.2) | Validation stops if a check changes project source, preserving the files and invalidating its claimed pass. |
 | [Core v0.4.3](https://github.com/nunomarques97/forja/tree/v0.4.3) | An exact overlap between task checks and caller acceptance checks runs once, preserving both ordered sequences. |
 | [Core v0.5.0](https://github.com/nunomarques97/forja/tree/v0.5.0) | Explicit implementation handoff to controller validation, followed by independent review. |
+| [Core v0.5.1](https://github.com/nunomarques97/forja/tree/v0.5.1) | Documentation refresh for release discovery and validation handoff. |
+| [Core v0.6.0](https://github.com/nunomarques97/forja/tree/v0.6.0) | On-demand `core diagnose` summarizes existing execution metadata without calling a model. |
+| [Core v0.7.0](https://github.com/nunomarques97/forja/tree/v0.7.0) | Optional `protectedFiles` pins caller-owned acceptance tests, fixtures and contracts; changes block further execution instead of silently replacing the acceptance baseline. |
+| [Core v0.8.0](https://github.com/nunomarques97/forja/tree/v0.8.0) | Optional full access for every Codex and Claude phase, while retaining controller quality and Sponsor decision gates. |
 
 Find the current version in [package.json](package.json), the complete release history in the [changelog](CHANGELOG.md), and published snapshots under [tags](https://github.com/nunomarques97/forja/tags). The table above highlights behavior changes; documentation-only patches are recorded in the changelog. Experimental presets remain disabled unless explicitly selected.
 
@@ -45,7 +51,7 @@ flowchart LR
     Review -->|Rejected, within budget| Develop
 ```
 
-The controller executes checks and records their output. Review runs in a separate session with read-only access. Caller-defined final acceptance checks run at integration, before approval. Authentication errors, timeouts, exhausted budgets, and invalid results leave the run blocked with its work preserved.
+The controller executes checks and records their output. Review runs in a separate session with read-only access by default. Full-access configurations allow additional probes in external scratch space while the reviewer must preserve project files. Caller-defined final acceptance checks run at integration, before approval. Authentication errors, timeouts, exhausted budgets, and invalid results leave the run blocked with its work preserved.
 
 After implementation and focused tests, a developer can return `ready_for_validation`, identifying the scheduled checks left for the controller. This avoids requiring the worker to wait for those commands before handing over. It is not completion: mandatory checks and independent approval still apply. Required visual, security or other evidence outside the scheduled commands remains the worker's responsibility. Existing `done` results continue through the same checks and review.
 
@@ -84,6 +90,12 @@ node $forja start --provider codex --goal "Add name search, preserve existing fi
 
 Use `--provider claude` for Claude Code. Start from a clean working tree, or explicitly authorize existing changes with `--allow-dirty`. A run edits project files and executes commands; Core workers are instructed not to commit or publish.
 
+For full access in **planning, development and review**, pass `--config C:\path\to\forja\config\core-full-access.json`. This profile enables both Codex and Claude without changing models or budgets. To retain an existing routing profile, merge `"fullAccess": true` into each native provider's entry under `providers` instead.
+
+Codex uses `danger-full-access` and disables approval prompts. Claude uses `bypassPermissions`, disables its command sandbox for the session and exposes the default built-in tools. Operating-system privileges, managed policies, authentication and available integrations still apply. Controller validation, protected files, review integrity and Sponsor cost decisions remain enforced. The option applies to new Core runs; it does not change existing runs or the legacy runner. See the [configuration details](docs/CORE-RUNBOOK.md#acesso-completo-dos-executores).
+
+Use `protectedFiles` to declare acceptance files whose initial bytes must be preserved, for example `{"protectedFiles":["test/acceptance.test.mjs","test/fixtures/expected.json"]}`. Include relevant helpers and data explicitly. This boundary check preserves altered files for inspection; it does not infer dependencies or certify test coverage.
+
 ```powershell
 node $forja core status
 node $forja core usage
@@ -96,7 +108,7 @@ State, logs, and results live in the project's `.forja/` directory, which should
 
 ## Testing
 
-The v0.5.0 public validation run contained **819 tests: 817 passed, zero failed, and two skipped** because private historical evidence was unavailable. Coverage includes scheduler transitions, recovery, provider contracts, routing budgets, usage accounting, and viewer behavior. These checks validate the orchestrator, not general improvements in generated-product quality or execution time.
+The v0.8.0 public validation run contained **855 tests: 853 passed, zero failed, and two skipped** because private historical evidence was unavailable. Coverage includes scheduler transitions, recovery, provider contracts, routing budgets, usage accounting, protected acceptance files, full-access configuration and viewer behavior. These checks validate the orchestrator, not general improvements in generated-product quality or execution time.
 
 | Area | Examples covered | Tests |
 |---|---|---|
@@ -104,6 +116,8 @@ The v0.5.0 public validation run contained **819 tests: 817 passed, zero failed,
 | Validation handoff and integrity | Explicit delivery before scheduled checks, failure/attempt limits, interrupted validation, independent approval and source preservation. | [Handoff](test/validation-handoff.test.mjs), [check integrity](test/check-integrity.test.mjs) |
 | Context and accounting | Knowledge selection, required-source validation, provider-specific token normalization, and incomplete usage records. | [Knowledge](test/knowledge.test.mjs), [metrics](test/metrics.test.mjs) |
 | Provider routing | Local/cloud boundaries, model selection, preflight failures, and cloud-session limits. | [Routing](test/routing.test.mjs) |
+| Full access | Native permissions across all phases, preserved defaults, mixed-provider isolation and unchanged review/protected-file gates. | [Access](test/full-access.test.mjs) |
+| Protected acceptance files | Pinned bytes, invalid paths, mutations during workers/checks, final regression and recovery. | [Protected files](test/protected-files.test.mjs) |
 | Technology decisions | Paid/unknown-cost pauses, free alternatives, late discovery, stale answers, authentication, state bounds, notification failure and preserved budgets. | [Technology](test/technology.test.mjs) |
 | Interruption diagnostics and state | Incremental metadata capture, timeout preservation, trace collisions, observation failures, and atomic replacement failures. | [Provider traces](test/provider-trace.test.mjs), [atomic state](test/state-atomic.test.mjs) |
 | Viewer and supervision | Event reduction, API behavior, process ownership, stale locks, and recovery coordination. | [State](test/state.test.mjs), [Core observation](test/core-observe.test.mjs), [guard](test/guard.test.mjs) |

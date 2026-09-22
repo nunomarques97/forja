@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 — Explicit full access for native workers
+
+- Add provider-level `fullAccess: true` for every Core phase. Codex uses `danger-full-access` with approvals disabled; Claude uses `bypassPermissions`, disables its command sandbox for the session and exposes the default built-in tools, including during planning and review.
+- Add a shared full-access configuration for both native providers. Existing configurations retain their previous permissions; provider-specific settings remain isolated across mixed routes. Custom executors must configure their own permissions.
+- Keep controller checks, protected acceptance files, review source-integrity checks and Sponsor cost decisions. Full access changes native execution permissions, not acceptance criteria or operating-system privileges.
+- Refresh the README version overview, including the 0.6.0 diagnostics and 0.7.0 protected-file releases.
+
 ## 0.7.0 — Protected acceptance files
 
 - Add optional `protectedFiles` configuration for caller-owned acceptance tests, fixture data and contracts. Snapshot their hashes before work and block changed, missing or linked files before further workers/checks, including resume and final regression validation.

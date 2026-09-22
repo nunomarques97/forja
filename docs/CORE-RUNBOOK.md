@@ -18,6 +18,24 @@ Claude só muda `--provider claude`. De outra pasta, acrescenta `--project 'C:\c
 
 `core init` é opcional: acrescenta uma referência a CORE.md em blocos geridos de AGENTS/CLAUDE e ignora `.forja/`. Preserva as regras existentes e recusa marcadores inválidos. O arranque direto já envia CORE.md; se dispensares init, acrescenta `.forja/` ao `.gitignore` para não versionar logs privados. Não copies o catálogo antigo de agentes para novos projetos.
 
+## Acesso completo dos executores
+
+Para permitir acesso completo em **plan, develop e review**, seleciona o perfil [core-full-access.json](../config/core-full-access.json):
+
+```powershell
+node $forja start --provider codex --config C:\tools\forja\config\core-full-access.json --goal "Implementar o objetivo"
+```
+
+O mesmo perfil funciona com `--provider claude`. Numa configuração com modelos/rotas próprios, acrescenta `"providers": {"codex": {"fullAccess": true}, "claude": {"fullAccess": true}}`, preservando os restantes campos de cada provider. O perfil de acesso não escolhe modelos nem aumenta limites.
+
+Codex recebe `--sandbox danger-full-access` e `approval_policy="never"`. Claude recebe `--permission-mode bypassPermissions`, `--tools default` e `--settings {"sandbox":{"enabled":false}}`. Isto elimina as restrições de sandbox e os pedidos de aprovação nativos que o FORJA configura, incluindo nas fases antes limitadas a leitura. A configuração MCP explícita mantém-se. Permissões do sistema operativo, políticas administradas, autenticação e disponibilidade das ferramentas continuam a depender do ambiente; acesso completo não eleva o processo a administrador.
+
+Sem `fullAccess: true`, mantém-se o comportamento anterior. O valor deve ser booleano; executores `custom` configuram permissões no próprio comando. A configuração é guardada no novo run; não altera retroativamente runs existentes nem o workflow legado `runner`.
+
+Planner e reviewer mantêm as suas funções: não alteram código do projeto. Um reviewer com acesso completo pode usar espaço temporário fora do projeto para verificações adicionais. O Core continua a detetar alterações indevidas ao código/estado e aos ficheiros protegidos. Checks obrigatórios, limites e decisões do Sponsor sobre custos mantêm-se.
+
+Referências dos executores: [Codex sandboxing](https://learn.chatgpt.com/docs/sandboxing), [Claude CLI](https://code.claude.com/docs/en/cli-reference) e [Claude sandboxing](https://code.claude.com/docs/en/sandboxing).
+
 ## Arquitetura e estado
 
 ```mermaid

@@ -1,0 +1,6 @@
+{
+  "providers": {
+    "codex": { "fullAccess": true },
+    "claude": { "fullAccess": true }
+  }
+}
