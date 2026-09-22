@@ -1,14 +1,14 @@
 # Adaptive orchestration: proposal and evaluation plan
 
-**Status: research proposal, not an implemented mode.** Core still runs optional planning, development, controller checks and independent review. This document defines the next experiment and the conditions for adding capability-specific assistance. It does not activate extra agents, extend budgets or change old runs.
+**Status: research proposal, not an implemented mode.** Core still runs optional planning, development, controller checks and independent review. The initial contract-only acceptance study below did not justify another runtime phase. This document records that result and the conditions for further capability-specific experiments. It does not activate extra agents, extend budgets or change old runs.
 
 ## Decision
 
 Keep the current workflow as the default. Investigate **one bounded request for assistance**, made when a worker can identify a specific unresolved question or verification gap. Start with sequential assistance and one project writer. Do not introduce a permanent architect, researcher or second reviewer for every task.
 
-The smallest useful experiment is an independent executable acceptance check for an uncertain contract. Its author receives the contract before seeing the implementation, and its tests must accept alternative correct implementations as well as reject defects. This tests whether another capability adds reliable evidence, rather than assuming a new role name improves quality.
+The initial experiment compared executable acceptance tests written with implementation access against tests written from the contract alone. Both accepted the correct alternatives and rejected the same defective variants; the contract-only arm took more authoring time. Keep that result distinct from the untested question of whether targeted assistance helps a worker with a specific unresolved contract gap.
 
-Production integration waits for that experiment. A keyword router choosing a larger team would be easy to implement but would not establish that the team is appropriate. A model's claimed confidence is also not a calibrated probability of success.
+Production integration requires positive evidence from a further bounded experiment. A keyword router choosing a larger team would be easy to implement but would not establish that the team is appropriate. A model's claimed confidence is also not a calibrated probability of success.
 
 ## What Core already adapts
 
@@ -78,13 +78,35 @@ The first increment must specify all of these transitions before a native pilot:
 | Two reviews disagree | Resolve a reproducible finding against criteria; no majority-vote approval over a valid defect. |
 | Retry, validate-only recovery or final regression | Preserve counters and provenance; no automatic repeat of a completed helper or replacement of acceptance bytes. |
 
+## Initial acceptance study
+
+Four fresh Codex sessions used the ordinary strong route, **gpt-5.6-sol/high**, full access and the same ten-minute authoring cap. Two new families covered atomic record updates and an asynchronous cache. Each had two materially different correct implementations and twelve syntactically valid, independently witnessed defects. The baseline author saw one implementation; the contract-only author saw neither. Fixtures, run order, scoring and stopping rules were frozen before model calls; no generated tests were manually repaired or rerun through a model.
+
+| Observation across both families | Implementation-aware | Contract-only |
+|---|---:|---:|
+| Correct implementations accepted | 4/4 | 4/4 |
+| Faulty variants rejected without grading timeout | 23/24 | 23/24 |
+| Rejections containing an explicit assertion failure | 20/24 | 22/24 |
+| Native authoring time | 406.357 s | 504.170 s |
+| Native authoring sessions | 2 | 2 |
+
+The frozen assertion-only counter reached its numerical promotion threshold, but inspecting the retained failures changed the engineering decision: the two apparent additional detections already failed baseline tests through runtime errors. The candidate made those failures explicit assertions; it did not reject an additional faulty implementation. Preserve both measurements rather than silently replacing the original score. **Do not promote the helper on this evidence.** Authoring took 24.1% longer in this sample, without additional behavioral rejection or fewer correct-control failures.
+
+Both arms exceeded the external 15-second grading cap on the same defective pending-invalidation case: their tests awaited a loader-start event that the defect prevented. Those timeouts are not counted as successful detections. All four native authors delivered within their ten-minute cap; the grading timeouts are separate. Full product implementation and independent review were not evaluated. Native authoring time is not the total cost of adding a helper to a real run.
+
+This is one observation per arm/family, not a general estimate of quality, latency or false-positive rates. Correct variants cover only selected freedoms, such as different asynchronous dispatch and Promise identities; some validation helpers are shared. Contract-only isolation was supported by absent source files and inspected tool traces, not an OS filesystem boundary. Earlier studies remain closed.
+
+A useful next hypothesis is **bounded asynchronous test failure with clear contract-level diagnostics**, evaluated on new cases. It remains untested. More generally, an extra helper still needs a concrete verification gap and evidence that it improves outcomes; task difficulty alone is insufficient.
+
 ## Evaluation before implementation
 
 Freeze new fixtures, exact provider/model/effort, budgets, run order, grading and stopping rules before any calls. Keep earlier closed studies closed. Use the ordinary configured models; do not validate a cheap route with an unrelated stronger model.
 
-**First experiment: independent acceptance.** Use two new behavioral families, each with at least two materially different correct implementations and independently witnessed defective variants. Compare the current developer-generated tests with a contract-only helper's executable tests. Evaluate held-out variants that were not used to calibrate the helper. Measure false rejection of valid behavior separately from missed defects. Do not expose hidden variants to either author, and record any root intervention as assistance.
+**Initial protocol, now completed above:** use two new behavioral families, each with at least two materially different correct implementations and independently witnessed defective variants. Compare the current developer-generated tests with a contract-only helper's executable tests. Evaluate held-out variants that were not used to calibrate the helper. Measure false rejection of valid behavior separately from missed defects. Do not expose hidden variants to either author, and record any root intervention as assistance. Follow-up experiments need new cases and their own frozen protocol; do not reopen these runs to obtain a positive result.
 
-Promotion gate for this bounded experiment: no false rejection of the held-out correct variants, no family regression in defect detection, at least two additional independently witnessed defects detected overall, and no weakened acceptance/source integrity. These are prospective engineering thresholds, not a statistical guarantee. If both arms hit a ceiling, retain the current default; a tie is not evidence for another mandatory agent.
+The original predeclared promotion gate required no false rejection of the held-out correct variants, no family regression in defect detection, at least two additional independently witnessed defects detected overall, and no weakened acceptance/source integrity. These engineering thresholds were not a statistical guarantee. A tie is not evidence for another mandatory agent.
+
+For future scoring, classify explicit assertions, attributable contract failures, infrastructure errors and timeouts separately. Compare the identities of faulty variants rejected, not just error-code counts. A more explicit failure message is a diagnostic improvement to assess separately, not automatically another defect detected. Retain the initial study's original metric and its adjudication.
 
 Report total native time, complete controller wall time, input/cache/output coverage, calls, retries, repair, timeouts and incomplete runs. Quality is primary: extra time is acceptable when it purchases demonstrated improvement. Do not count speculative parallel time savings, missing usage as zero, or passing partial code as autonomous completion.
 
@@ -92,7 +114,7 @@ Report total native time, complete controller wall time, input/cache/output cove
 
 ## Implementation sequence and exit criteria
 
-1. Run the independent-acceptance experiment outside the scheduler. Exit with a frozen result, including negative findings; no runtime migration.
+1. The initial independent-acceptance experiment is closed without promotion. Any further prototype requires a distinct bounded question and a new frozen evaluation outside the scheduler; no runtime migration follows from this study.
 2. If justified, add typed assistance schemas and a pure eligibility/reservation policy. Test boundaries, request duplication, budgets and compatibility with old state without launching models.
 3. Add one sequential helper adapter route and persisted recovery transitions. Reuse controller evidence/integrity mechanisms, but explicitly handle generated artifact ownership. Run the complete suite and a fresh native pilot.
 4. Document effective capability, reason, model, added time and outcome in existing observation surfaces. A future UI change requires its own desktop/mobile verification.

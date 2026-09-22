@@ -2,7 +2,7 @@
 
 FORJA keeps a small provider-neutral scheduler. External projects inform specific choices; their popularity and advertised speedups are not evidence that replacing the runtime improves this workload. Core requires no external agent framework.
 
-For the current investigation of task-dependent capabilities, see the [adaptive-orchestration proposal](ADAPTIVE-ORCHESTRATION.md). It separates existing routing from proposed assistance, identifies recovery/budget requirements and defines the next experiment. No adaptive team mode is enabled by this research.
+For task-dependent capabilities, see the [adaptive-orchestration proposal and initial acceptance study](ADAPTIVE-ORCHESTRATION.md). The completed comparison found the same faulty variants rejected and all correct controls accepted in both arms; contract-only authoring took 24.1% longer in that small sample. An apparent assertion-count gain was a difference in failure classification, not additional faulty implementations rejected. The proposal retains recovery/budget requirements and future evaluation gates. No adaptive team mode is enabled by this research.
 
 ## Knowledge without repository noise
 

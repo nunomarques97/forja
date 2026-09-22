@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/tree/v0.8.2"><img src="https://img.shields.io/badge/version-0.8.2-ff9955" alt="Version 0.8.2"></a>
+  <a href="https://github.com/nunomarques97/forja/tree/v0.8.3"><img src="https://img.shields.io/badge/version-0.8.3-ff9955" alt="Version 0.8.3"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -121,16 +121,17 @@ Run `node $forja serve` from the FORJA checkout to open the local viewer. Its `/
 
 The **v0.8.2** public regression run recorded **871 tests: 869 passed, zero failed, two skipped** because private historical evidence was unavailable. Sixteen new tests cover interrupted handoffs and stale review approval, including abrupt process death and unchanged-source controls. The suite uses fixtures and simulated executors; native-model evaluations are separate. Passing controller tests does not prove reliable autonomous delivery of every complex product.
 
-The next research direction is **bounded assistance for a specific missing capability**, with independent evidence and shared budgets. The [proposal and evaluation plan](docs/ADAPTIVE-ORCHESTRATION.md) defines triggers, recovery, rejected alternatives and promotion criteria. It adds no mandatory agent to your runs.
+The initial [contract-only acceptance study](docs/ADAPTIVE-ORCHESTRATION.md#initial-acceptance-study) found no additional faulty implementation rejected: both methods rejected the same **23/24** defective variants without grading timeout and accepted **4/4** correct controls. Contract-only authoring took **504 s versus 406 s (+24.1%)** in this small sample. Version **0.8.3** records that decision; runtime remains unchanged from v0.8.2. Bounded assistance for a specific capability gap remains a proposal, with no mandatory extra agent.
 
 For development, run `npm test`, `npm run check` and `npm run release:check`. Start with [Core tests](test/core.test.mjs), [protected files](test/protected-files.test.mjs), [full access](test/full-access.test.mjs) and [technology decisions](test/technology.test.mjs). Review the [contribution and publication rules](docs/RELEASE.md) before staging evidence or publishing changes.
 
 ## Releases
 
-**Current: [v0.8.2](https://github.com/nunomarques97/forja/tree/v0.8.2)** — recover accepted development handoffs after controller death and require fresh review for post-approval source changes.
+**Current: [v0.8.3](https://github.com/nunomarques97/forja/tree/v0.8.3)** — document the acceptance study and evaluation criteria; runtime unchanged.
 
 | Release | Main change |
 |---|---|
+| [0.8.2](https://github.com/nunomarques97/forja/tree/v0.8.2) | Recover accepted handoffs after controller death and invalidate stale review approval. |
 | [0.8.1](https://github.com/nunomarques97/forja/tree/v0.8.1) | Project presentation and proposed adaptive orchestration; runtime unchanged. |
 | [0.8.0](https://github.com/nunomarques97/forja/tree/v0.8.0) | Explicit full access for every Codex and Claude phase. |
 | [0.7.0](https://github.com/nunomarques97/forja/tree/v0.7.0) | Protected caller-owned acceptance files. |

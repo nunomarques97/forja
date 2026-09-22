@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.3 — Contract-first acceptance research decision
+
+- Document a frozen, four-session comparison of implementation-aware and contract-only test authors. Both accepted all four correct controls and rejected the same 23 of 24 faulty variants without grading timeout; contract-only authoring took 24.1% longer in this sample.
+- Preserve the original assertion-only score and explain why its apparent improvement did not establish additional defect detection. Record the shared asynchronous test timeout and distinguish authoring measurements from end-to-end product delivery.
+- Keep the current runtime and model routes. No helper phase, prompt change, budget increase or new default is introduced; refine future evaluation guidance to compare actual faulty variants and failure categories.
+
 ## 0.8.2 — Recover handoffs and invalidate stale approval
 
 - Persist an accepted `done` or `ready_for_validation` handoff before publishing its result artifact. After controller death, resume can restore the artifact and enter mandatory validation/review without repeating development or charging another attempt/session.
