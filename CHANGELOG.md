@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.2 — Recover handoffs and invalidate stale approval
+
+- Persist an accepted `done` or `ready_for_validation` handoff before publishing its result artifact. After controller death, resume can restore the artifact and enter mandatory validation/review without repeating development or charging another attempt/session.
+- Bind recovery to the task, attempt, invocation, source hash and Git HEAD. Changed source/HEAD blocks replay; explicit task retry discards the receipt. Technology choices must be processed before retry can discard their cost evidence. Review budgets and Sponsor decisions remain mandatory.
+- Cover abrupt process death before result publication, during the handoff and again during replay, plus source/HEAD changes, manual recovery, exhausted budgets, malformed state and legacy results. This is process-crash recovery, not power-loss durability or exactly-once external execution; checkpoints and incomplete provider calls are unchanged.
+- Revalidate and request fresh review when source changes after the final task approval but before the run completes. Passing final checks cannot renew independent approval for different source; unchanged source needs no extra review, and existing session limits still apply.
+
 ## 0.8.1 — Project presentation and adaptive orchestration research
 
 - Refresh the public README with an original lightweight SVG identity, an earlier quick start, concise quality controls, provider behavior, evidence limits and visible release history.

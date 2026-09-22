@@ -145,6 +145,10 @@ Para Codex, usa modelos disponíveis na tua conta ou omite `models`; effort pass
 
 O developer pode devolver `ready_for_validation` depois de implementar e executar testes focados. Entrega ao controlador os `task.checks` e os `final_checks` aplicáveis, identificando no resumo o que executou e o que ficou por executar. O controlador corre esses comandos e só depois pede revisão independente; esta entrega não conclui a tarefa nem afirma que os checks passaram. Evidência visual, de segurança ou outra que os comandos não produzam continua a ser responsabilidade do worker. Falhas mantêm os limites de reparação e a proteção contra alterações de código durante os checks. Resultados `done` existentes continuam aceites e passam pelos mesmos gates. Timeouts e mensagens intermédias nunca são convertidos automaticamente numa entrega válida.
 
+A partir de 0.8.2, uma entrega válida `done` ou `ready_for_validation` fica registada no estado antes da publicação do resultado. Se o controlador morrer depois desse registo e antes da passagem para validação, a retoma recupera a entrega sem repetir o developer nem gastar outra tentativa/sessão. Os checks e a revisão continuam obrigatórios e sujeitos aos budgets existentes. O registo vincula tarefa, tentativa, invocação, conteúdo do projeto e Git HEAD; alterações à fonte ou HEAD bloqueiam a reutilização e preservam o trabalho para inspeção.
+
+`retry` explícito da tarefa descarta esse registo, incluindo com `--validate-only`. Se a entrega contiver escolhas de tecnologia, retoma primeiro para as processar: a recuperação não pode apagar evidência de custos por resolver. Restaura a fonte/HEAD da entrega se tiverem sido alterados, ou abandona o run para iniciar outro objetivo. Resultados antigos sem este registo não são promovidos automaticamente a entregas recuperáveis. A garantia cobre morte do processo após o registo; não cobre falha de energia/disco nem efeitos externos dos workers. Checkpoints, respostas bloqueadas e invocações sem resultado válido mantêm o comportamento anterior.
+
 Ctrl+C durante um subprocesso termina-o e preserva o trabalho. Uma morte abrupta pode deixar um worker vivo, verificado antes da retoma:
 
 ```powershell
@@ -163,7 +167,7 @@ node $forja core retry --task T1 --validate-only --why "Ambiente de testes corri
 node $forja core abandon --why "Objetivo substituído"
 ```
 
-`retry` preserva alterações/contadores; recusa tarefas concluídas e limites esgotados sem aumento explícito. `--validate-only` começa nos checks, sem nova implementação, e continua a exigir revisão independente. `abandon` termina como `failed` e permite novo objetivo, mantendo ficheiros/evidência. Código alterado entre checks e revisão invalida a evidência e força nova validação.
+`retry` preserva alterações/contadores; recusa tarefas concluídas e limites esgotados sem aumento explícito. `--validate-only` começa nos checks, sem nova implementação, e continua a exigir revisão independente. `abandon` termina como `failed` e permite novo objetivo, mantendo ficheiros/evidência. Código alterado entre checks e revisão invalida a evidência e força nova validação. Desde 0.8.2, alterações após a última aprovação e antes de o run terminar também exigem novos checks e revisão; passar a regressão final não renova uma aprovação sobre outra versão. A retoma sem alterações não chama outro revisor, e runs já terminados não são reabertos automaticamente.
 
 Não apagues um lock que indica processo vivo: inspeciona os PIDs em `.forja/lock.json`. Um `takeover.json` deixado por recuperação interrompida exige verificar o PID e lock antes de remover apenas esse guard. `call-N-stream.json` explica erros do provider; `<tarefa>-aN-check-K.log` explica checks; `core usage --details` mostra invocações. A guarda reconhece Core e só retoma runs interrompidos ainda marcados como ativos, com os intervalos e limites existentes; nunca reabre um bloqueio explícito nem compete com um worker vivo.
 

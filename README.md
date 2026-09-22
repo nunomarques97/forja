@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/tree/v0.8.1"><img src="https://img.shields.io/badge/version-0.8.1-ff9955" alt="Version 0.8.1"></a>
+  <a href="https://github.com/nunomarques97/forja/tree/v0.8.2"><img src="https://img.shields.io/badge/version-0.8.2-ff9955" alt="Version 0.8.2"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -109,6 +109,8 @@ node $forja core resume
 
 `diagnose` summarizes existing execution metadata without calling a model or resuming work. Missing or incomplete measurements stay explicit. `resume` continues eligible preserved work; it does not resolve a Sponsor decision or erase exhausted limits.
 
+Since **0.8.2**, a recorded valid developer handoff can survive controller death without another development session. Recovery checks source and Git HEAD, then runs the required checks and review. Source changes after the last approval also require fresh validation and review before an unfinished run can complete. Unchanged approved source needs no extra review. These are process-crash guarantees, not power-loss durability or exactly-once external execution. [Recovery details](docs/CORE-RUNBOOK.md).
+
 Run `node $forja serve` from the FORJA checkout to open the local viewer. Its `/core` page shows tasks, checks and usage and accepts pending Sponsor choices. A configured notification transport can alert the Sponsor. See the [runbook](docs/CORE-RUNBOOK.md) for project/run selection, notification setup and recovery.
 
 ## Status and evidence
@@ -117,7 +119,7 @@ Run `node $forja serve` from the FORJA checkout to open the local viewer. Its `/
 |---|---|
 | Sequential Core workflow, separate review, executable checks, recovery, protected acceptance, explicit routing, full access and diagnostics. | Economy/Ollama presets are opt-in experiments. Dynamic specialist allocation, parallel project writers and adaptive replanning are **not implemented**. |
 
-The **v0.8.0** public regression run recorded **855 tests: 853 passed, zero failed, two skipped** because private historical evidence was unavailable. This documentation release does not change the runtime. The suite uses fixtures and simulated executors; native-model evaluations are separate. Passing controller tests does not prove reliable autonomous delivery of every complex product.
+The **v0.8.2** public regression run recorded **871 tests: 869 passed, zero failed, two skipped** because private historical evidence was unavailable. Sixteen new tests cover interrupted handoffs and stale review approval, including abrupt process death and unchanged-source controls. The suite uses fixtures and simulated executors; native-model evaluations are separate. Passing controller tests does not prove reliable autonomous delivery of every complex product.
 
 The next research direction is **bounded assistance for a specific missing capability**, with independent evidence and shared budgets. The [proposal and evaluation plan](docs/ADAPTIVE-ORCHESTRATION.md) defines triggers, recovery, rejected alternatives and promotion criteria. It adds no mandatory agent to your runs.
 
@@ -125,10 +127,11 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.8.1](https://github.com/nunomarques97/forja/tree/v0.8.1)** — refreshed project introduction, original visual identity and an adaptive-orchestration proposal; runtime unchanged.
+**Current: [v0.8.2](https://github.com/nunomarques97/forja/tree/v0.8.2)** — recover accepted development handoffs after controller death and require fresh review for post-approval source changes.
 
 | Release | Main change |
 |---|---|
+| [0.8.1](https://github.com/nunomarques97/forja/tree/v0.8.1) | Project presentation and proposed adaptive orchestration; runtime unchanged. |
 | [0.8.0](https://github.com/nunomarques97/forja/tree/v0.8.0) | Explicit full access for every Codex and Claude phase. |
 | [0.7.0](https://github.com/nunomarques97/forja/tree/v0.7.0) | Protected caller-owned acceptance files. |
 | [0.6.0](https://github.com/nunomarques97/forja/tree/v0.6.0) | On-demand execution diagnostics. |
