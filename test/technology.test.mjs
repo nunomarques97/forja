@@ -64,6 +64,18 @@ test('technology data is bounded, evidenced and cannot contain a worker-supplied
   assert.throws(() => addTechnology(free, [assessment('free')]), /already assessed/);
 });
 
+test('rephrased or changed worker reassessments cannot replace a Sponsor choice', () => {
+  const run = {}; addTechnology(run, [assessment()]);
+  run.technology[0].selection = { option: 'local', by: 'sponsor', reason: 'Use the free option', at: new Date().toISOString() };
+  const saved = structuredClone(run);
+  const recap = assessment(); recap.constraints = 'Rephrased constraints';
+  assert.throws(() => addTechnology(run, [recap]), /already assessed/);
+  assert.deepEqual(run, saved);
+  const changed = assessment(); changed.options[0].cost = 'paid';
+  assert.throws(() => addTechnology(run, [changed]), /already assessed/);
+  assert.deepEqual(run, saved);
+});
+
 test('routine planning still uses exactly plan/develop/review and sends no notification', async t => {
   const root = fixture(t), phases = [];
   createRun(root, { goal: 'Return two' });

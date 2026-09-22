@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — Resume after Sponsor technology approval
+
+- Clarify that the controller collects Sponsor choices before implementation; planners must not create redundant tasks to ask for or confirm approval.
+- Define structured technology output as new unresolved choices only. Workers use recorded decisions and return an empty assessment instead of repeating approved alternatives.
+- Keep duplicate and changed-decision rejection strict, with a regression protecting recorded Sponsor selections. No approval, budget or payment boundary is relaxed.
+
 ## 0.4.0 — Technology choices and Sponsor cost decisions
 
 - New runs compare material unresolved technology choices within the existing planner, with bounded alternatives, evidence, cost basis and recommendation. Routine work returns an empty assessment; there is no mandatory Scout session. Planner adapters enable primary-source research for cloud providers.
