@@ -209,6 +209,23 @@ test('core executes real acceptance command, independent review, compact state a
   assert.equal(usageReport(p).rows.length, 2);
   assert.equal(usageReport(p).rows[0].usage, null);
 });
+
+test('a planned acceptance check overlapping the caller gate executes once before independent review', async () => {
+  const p = repo(), supplied = plan(), phases = [];
+  createRun(p, { goal: 'Return two with one shared acceptance gate', plan: supplied, config: { finalChecks: structuredClone(supplied.tasks[0].checks) } });
+  let checks = 0;
+  const done = await drive(p, { log: () => {}, runCheck: async (...args) => { checks++; return execute(...args); }, providerCall: async (_, options) => {
+    phases.push(options.readOnly ? 'review' : 'develop');
+    if (!options.readOnly) writeFileSync(join(p, 'value.mjs'), 'export const value = 2;');
+    else assert.equal(JSON.parse(options.text).changes.validation.length, 1);
+    return result(options.readOnly ? 'approve' : 'done');
+  } });
+  assert.equal(done.status, 'done');
+  assert.deepEqual(phases, ['develop', 'review']);
+  assert.equal(checks, 1);
+  assert.equal(done.tasks[0].validation.length, 1);
+  assert.equal(done.tasks[0].validation[0].passed, true);
+});
 test('failed deterministic validation bypasses review and gives one bounded repair attempt', async () => {
   const p = repo();
   createRun(p, { goal: 'Return two', plan: plan() });

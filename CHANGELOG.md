@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.3 — Avoid overlapping integration checks
+
+- Share an exact overlap between the end of planned task checks and the start of caller-owned final checks. An acceptance command listed at both boundaries runs once before independent review.
+- Preserve the order of both check sequences, explicit repetitions within each list, non-adjacent matches, intermediate-task gates and source-change revalidation. Commands and argument arrays must match exactly.
+
 ## 0.4.2 — Validation evidence bound to unchanged source
 
 - Check the project snapshot after each acceptance command, including failed commands and final regression checks. A source change blocks continuation before later checks, review or automatic repair can conceal it or consume more worker sessions.

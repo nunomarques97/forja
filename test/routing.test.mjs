@@ -59,6 +59,26 @@ test('goal checks wait for integration and do not repeat on every old task', () 
   assert.equal(checksFor(r, b).length, 2);
   assert.throws(() => validateFinalChecks({ finalChecks: [{ command: 'node', args: 'shell text' }] }));
 });
+
+test('integration shares an exact overlapping check sequence without reordering either contract', () => {
+  const a = { command: 'node', args: ['a.mjs'] }, b = { command: 'node', args: ['b.mjs'] }, c = { command: 'node', args: ['c.mjs'] };
+  for (const [planned, final, expected] of [
+    [[a, b], [b], [a, b]],
+    [[a, b], [a, b, c], [a, b, c]],
+    [[a, b], [a, c], [a, b, a, c]], // A non-adjacent match must still run.
+    [[a, b], [b, a], [a, b, a]],
+    [[a], [a, a], [a, a]], // Explicit repeats within either list remain.
+    [[a, a], [a], [a, a]],
+    [[a], [{ command: 'node', args: ['A.mjs'] }], [a, { command: 'node', args: ['A.mjs'] }]],
+    [[a], [{ command: 'other', args: ['a.mjs'] }], [a, { command: 'other', args: ['a.mjs'] }]],
+    [[a], [], [a]],
+  ]) {
+    const t = { id: 'T', status: 'validate', checks: structuredClone(planned) };
+    const r = { tasks: [t], config: { finalChecks: structuredClone(final) } }, before = structuredClone(r);
+    assert.deepEqual(checksFor(r, t), expected);
+    assert.deepEqual(r, before);
+  }
+});
 test('review probes cover async failure transitions and UI focus without claiming evidence', () => {
   const probes = reviewFocus({ files: ['View.tsx'], criteria: ['refresh current search'], risks: [] }).join(' ');
   assert.match(probes, /keyboard focus/);
