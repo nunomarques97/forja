@@ -32,6 +32,10 @@ flowchart LR
 
 Node controla dependências, tentativas e transições. Não há Lead a delegar cada tarefa, mínimo de tarefas, PM/Scout/Architect obrigatório ou agentes de relatório. Um plano explícito `--plan plan.json` dispensa o planner. O percurso normal tem uma invocação de planeamento e duas por tarefa; cada invocação pode conter várias chamadas ao modelo.
 
+Ao fornecer um plano, começa pela menor unidade que entregue um comportamento completo e verificável. Cálculo e apresentação sobre os mesmos ficheiros podem pertencer à mesma tarefa quando cabem no contexto e no limite de execução. Sem reparações, passar de duas tarefas para uma reduz as sessões de desenvolvimento/revisão de quatro para duas, mantendo uma revisão independente e os checks finais. Divide quando houver critérios que possam ser aceites separadamente, riscos distintos ou trabalho que exceda os limites; partilhar ficheiros, por si só, não justifica fundir tarefas. O planner já recebe esta preferência por tarefas coesas; planos explícitos continuam sob controlo do autor.
+
+O planner faz a descoberta de código antes de devolver o plano e mantém os testes de aceitação na tarefa que implementa o comportamento. Quando dividir trabalho, deve explicar o motivo nas decisões. Os checks são executáveis e argumentos lançados diretamente, sem shell implícita: um comando interno como `Get-Content` não é um executável nem um teste de comportamento. Estas instruções orientam o modelo; não fundem tarefas nem certificam semanticamente os checks propostos.
+
 `.forja/current.json` guarda o estado corrente. `.forja/runs/<id>/state.json` conserva cada run, acompanhado por prompts, schemas, resultados, streams, patches e logs dos checks. `usage.jsonl` mede invocações; `recovery.jsonl` regista intervenções explícitas; `SUMMARY.md` é gerado por código. Os logs podem conter código/dados privados. Runs anteriores ficam preservados.
 
 Há um escritor por projeto. O lock regista controlador e subprocesso; a retoma recusa processos vivos. Recuperação de lock obsoleto é serializada. Estado inválido, paths exteriores/symlinks, alteração do estado pelo worker e commits inesperados interrompem o run. Estas verificações não substituem uma sandbox contra executores maliciosos.
@@ -39,6 +43,10 @@ Há um escritor por projeto. O lock regista controlador e subprocesso; a retoma 
 ## Contexto e conhecimento
 
 Cada sessão recebe regras comuns estáveis, objetivo, tarefa/critérios, decisões compactas, títulos concluídos, último feedback útil e referências à evidência. O mapa de paths e declarações tem limite de 6.000 caracteres; o pacote tem limite de 48.000. Se não couber, pára para repartir a tarefa em vez de cortar critérios.
+
+O pacote identifica também as tarefas restantes (critérios, paths e dependências) e se os checks finais são exigidos na tarefa atual. Developer e reviewer usam a mesma fronteira de aceitação do scheduler: alterações de suporte e regressões da tarefa atual são obrigatórias; trabalho atribuído a tarefas seguintes não deve ser antecipado só por partilhar ficheiros. Os checks finais continuam visíveis como contexto de integração. Isto é orientação explícita, não uma sandbox de ficheiros nem prova de que o modelo respeitará a divisão; os critérios restantes contam para o mesmo limite de contexto.
+
+A orientação adicional de âmbito só é enviada quando há outras tarefas pendentes. Planeamento, tarefas únicas e integração final não recebem esse texto redundante; a indicação estruturada da aplicabilidade dos checks permanece.
 
 O mapa é heurístico, não um AST nem uma prova do comportamento. `.forja/index.json` guarda símbolos/hashes; metadata alterada força releitura. O agente recupera código e instruções hierárquicas quando necessário. O revisor recebe paths alterados, patch contra a base do run, indicação de ficheiros novos e logs. Ficheiros partilhados podem incluir alterações anteriores. Não recebe conversas passadas.
 
@@ -123,6 +131,8 @@ Um plano é `{"decisions": [], "tasks": [...]}`. Cada tarefa tem `id`, `title`, 
 `core usage` agrega por fase/tarefa/provider; `--details` inclui as linhas. Captura modelo pedido/reportado, effort, tentativa, fontes, caracteres, duração, resultado e usage nativo. Claude input total soma entrada não cacheada + criação + leitura de cache; Codex input já inclui cache. Chamadas Claude são IDs assistant únicos observados, diferentes de turnos. Chamadas Codex ficam null quando não expostas.
 
 `characters/4` é proxy do prompt submetido, sem system/tools/instruções nativas e conteúdo recuperado. Totais parciais indicam cobertura; percentagens de input exigem cobertura completa. Não são euros nem fatura. Linhas danificadas são sinalizadas e registos íntegros continuam legíveis. Corrigir duplicados de message ID no histórico Claude é contabilidade, não poupança.
+
+Novas invocações guardam também `call-N-events.jsonl` incrementalmente: tempos monotónicos de receção de eventos stdout, tipo e metadata curta dos itens, sem copiar comandos, mensagens ou resultados das ferramentas. O ledger referencia esse ficheiro, mesmo após recuperação de uma invocação interrompida. O journal regista no máximo 10.000 eventos; o resumo final indica eventos omitidos e linhas não interpretadas. Ausência do resumo final significa captura incompleta. O stream bruto continua privado e separado. Estes intervalos incluem buffering do CLI; não são tempos puros de inferência, contagens de chamadas ao modelo nem substitutos de usage ausente. Uma falha de escrita interrompe o worker e bloqueia a execução em vez de declarar a captura completa.
 
 `runner`, `run`, `task`, `status`, `resume`, bootstrap e `forjalvl` continuam no fluxo antigo. Viewer e guarda reconhecem ambos os fluxos. Para Core, usa os comandos deste manual. Os dois fluxos recusam novos runs ativos sobrepostos. Termina/encerra explicitamente o run legado antes de usar `start`; `docs/forja/RUN.json` não é reescrito. A compatibilidade preserva projetos existentes; o Core é a metodologia recomendada para novos runs.
 

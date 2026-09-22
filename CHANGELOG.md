@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 — Task boundaries and interruption diagnostics
+
+- Worker context identifies remaining task criteria, shared files, dependencies and whether final integration checks apply now. Scheduler and prompts share the same gate predicate, including repairs. Additional scope guidance is omitted when no other task remains.
+- Native provider invocations persist a bounded metadata-only event journal while running. Monotonic receipt times, event coverage and interrupted traces aid diagnosis without reconstructing missing token usage or treating receipt intervals as model inference time.
+- Trace destinations reject existing files and symlinks; observation failures stop execution. Raw provider streams remain separate private run evidence.
+- Legacy atomic state writes preserve the previous complete file and propagate replacement failures instead of falling back to an in-place write. Transient Windows replacement errors retain bounded retries.
+- Documented cohesive task planning and its development/review session tradeoff. Existing routing/model defaults and independent review remain unchanged; there is no automatic task merging or new runtime dependency.
+- Planner guidance keeps acceptance tests with implementation, performs discovery during planning, requires a reason for task boundaries and specifies executable behavioral checks without an implicit shell.
+
+Task guidance is not a file sandbox or a guarantee of model compliance. Smaller task counts can reduce sessions for bounded cohesive work, but do not establish general product-quality, speed or monetary savings. Event journals are observational metadata, not model-call counts or token invoices. No automatic commit or push was added to Core workers.
+
 ## 0.2.0 — Quality gates and explicit routing
 
 - User-configured final acceptance commands run at integration, before approval, and after relevant final regressions. Failed checks return to development within the existing attempt budget.

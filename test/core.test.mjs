@@ -35,6 +35,7 @@ import {
 import { invocation, parseOutput, execute } from '../lib/core/providers.mjs';
 import { initCore } from '../lib/core/init.mjs';
 import { summarizeUsage } from '../lib/core/metrics.mjs';
+import { checksFor } from '../lib/core/quality.mjs';
 const dirs = [];
 after(() => {
   for (const p of dirs) rmSync(p, { recursive: true, force: true });
@@ -79,6 +80,63 @@ const result = (status = 'done', summary = 'Implemented') => ({
   result: { status, summary, findings: [] },
   duration_ms: 1,
   usage: null,
+});
+
+test('worker scope defers another task on shared files until integration', async () => {
+  const p = repo();
+  const first = task();
+  const second = {
+    ...task(), id: 'T2', title: 'Add presentation evidence', after: ['T1'],
+    criteria: ['Presentation evidence exists'], files: ['value.mjs', 'evidence.txt'],
+    checks: [{ command: 'node', args: ['-e', "if(!require('fs').existsSync('evidence.txt')) process.exit(1)"] }],
+  };
+  const finalCheck = { command: 'node', args: ['-e', "if(require('fs').readFileSync('evidence.txt','utf8') !== 'verified') process.exit(1)"] };
+  createRun(p, { goal: 'Return two and add presentation evidence', plan: { decisions: [], tasks: [first, second] }, config: { finalChecks: [finalCheck] } });
+  const phases = [];
+  const done = await drive(p, { log: () => {}, providerCall: async (_, options) => {
+    const ctx = JSON.parse(options.text);
+    assert.match(options.tracePath, /call-\d+-events\.jsonl$/);
+    phases.push(`${ctx.phase}:${ctx.task.id}`);
+    assert.deepEqual(ctx.final_checks, [finalCheck]);
+    assert.equal(ctx.task_scope.final_checks_required, ctx.task.id === 'T2');
+    if (ctx.task.id === 'T1') {
+      assert.match(options.input, /not an intermediate completion gate/);
+      assert.deepEqual(ctx.task_scope.remaining_tasks, [{ id: second.id, title: second.title, criteria: second.criteria, files: second.files, after: second.after }]);
+      assert.equal(existsSync(join(p, 'evidence.txt')), false);
+    } else {
+      assert.doesNotMatch(options.input, /not an intermediate completion gate/);
+      assert.deepEqual(ctx.task_scope.remaining_tasks, []);
+      assert.deepEqual(ctx.completed, [{ id: 'T1', title: first.title }]);
+    }
+    if (!options.readOnly) {
+      if (ctx.task.id === 'T1') writeFileSync(join(p, 'value.mjs'), 'export const value = 2;');
+      else writeFileSync(join(p, 'evidence.txt'), 'verified');
+    }
+    return result(options.readOnly ? 'approve' : 'done');
+  } });
+  assert.equal(done.status, 'done');
+  assert.deepEqual(phases, ['develop:T1', 'review:T1', 'develop:T2', 'review:T2']);
+  assert.equal(done.tasks[0].validation.length, 1);
+  assert.equal(done.tasks[1].validation.length, 2);
+  assert.ok(usageReport(p).rows.every(r => /call-\d+-events\.jsonl$/.test(r.events_log)));
+});
+
+test('scope retains integration gates on repair and stays within the packet budget', () => {
+  const p = repo();
+  const a = { ...task(), status: 'todo' }, b = { ...task(), id: 'T2', status: 'done' };
+  const r = { goal: 'Repair', tasks: [a, b], finalCheckTaskId: 'T2', config: { finalChecks: [{ command: 'node', args: ['--version'] }] } };
+  for (const t of [a, b]) {
+    const ctx = packet({ root: p, run: r, task: t, phase: 'develop' });
+    const data = JSON.parse(ctx.text);
+    assert.equal(data.task_scope.final_checks_required, checksFor(r, t).length > t.checks.length);
+    assert.equal(ctx.sources.reduce((n, s) => n + s.characters, 0), ctx.characters);
+  }
+  const planning = JSON.parse(packet({ root: p, run: { ...r, tasks: [] }, phase: 'plan' }).text);
+  assert.equal(planning.task_scope.final_checks_required, false);
+  assert.deepEqual(planning.final_checks, r.config.finalChecks);
+  b.status = 'todo';
+  b.criteria = ['x'.repeat(48000)];
+  assert.throws(() => packet({ root: p, run: r, task: a, phase: 'develop' }), /48,000/);
 });
 
 test('mixed routing keeps local development and independent native review in the ledger', async () => {
@@ -609,7 +667,7 @@ test('usage and recovery append paths refuse external file symlinks', async (t) 
   assert.equal(JSON.parse(readFileSync(current(p))).status, 'blocked');
 });
 
-test('existing prompt symlinks are refused before starting a provider', async (t) => {
+for (const filename of ['call-1-prompt.txt', 'call-1-events.jsonl']) test(`existing ${filename} symlinks are refused before starting a provider`, async (t) => {
   const p = repo(),
     outside = repo();
   const run = createRun(p, { goal: 'Return two', plan: plan() });
@@ -618,7 +676,7 @@ test('existing prompt symlinks are refused before starting a provider', async (t
   const external = join(outside, 'keep.txt');
   writeFileSync(external, 'unchanged');
   try {
-    symlinkSync(external, join(dir, 'call-1-prompt.txt'), 'file');
+    symlinkSync(external, join(dir, filename), 'file');
   } catch (e) {
     if (e.code === 'EPERM') {
       t.skip('File symlinks unavailable.');

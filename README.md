@@ -6,7 +6,7 @@ FORJA coordinates Claude Code and Codex through a small Node.js controller. It o
 
 [![Node.js 24](https://img.shields.io/badge/Node.js-24-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-blue)](package.json)
-[![Core v0.2.0](https://img.shields.io/badge/Core-v0.2.0-blue)](CHANGELOG.md)
+[![Core v0.3.0](https://img.shields.io/badge/Core-v0.3.0-blue)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 The complete Core implementation is included here: scheduling, native executors, validation, independent review, recovery, context retrieval, metrics, and the viewer. Economy and local-model presets are optional extensions to that workflow.
@@ -17,6 +17,7 @@ The complete Core implementation is included here: scheduling, native executors,
 |---|---|
 | [Core v0.1.0](https://github.com/nunomarques97/forja/tree/v0.1.0) | The Core baseline before the routing experiment: Claude/Codex adapters, executable checks, independent review, recovery, context retrieval, usage accounting, and the viewer. |
 | [Core v0.2.0](https://github.com/nunomarques97/forja/tree/v0.2.0) | The same foundation plus caller-defined final checks, explicit phase/model routing, and optional economy/Ollama presets. |
+| [Core v0.3.0](https://github.com/nunomarques97/forja/tree/v0.3.0) | Explicit task boundaries, incremental provider-event diagnostics, and state preservation when atomic replacement fails. |
 
 Use the v0.1.0 tag to inspect the earlier implementation. This README describes the current Core; experimental presets remain disabled unless explicitly selected.
 
@@ -40,6 +41,8 @@ flowchart LR
 ```
 
 The controller executes checks and records their output. Review runs in a separate session with read-only access. Caller-defined final acceptance checks run at integration, before approval. Authentication errors, timeouts, exhausted budgets, and invalid results leave the run blocked with its work preserved.
+
+Workers receive the current acceptance boundary, remaining task criteria, and whether integration checks apply now. Cohesive tasks avoid unnecessary development/review sessions when the work fits the configured limits; task grouping remains explicit. Incremental event journals retain bounded metadata during provider execution, including timeouts. Their timestamps measure event receipt, including CLI buffering, and do not replace missing token usage.
 
 ## Engineering decisions
 
@@ -83,13 +86,14 @@ State, logs, and results live in the project's `.forja/` directory, which should
 
 ## Testing
 
-The v0.2.0 public validation run contained **782 tests: 780 passed, zero failed, and two skipped** because private historical evidence was unavailable. Coverage includes scheduler transitions, recovery, provider contracts, routing budgets, usage accounting, and viewer behavior.
+The v0.3.0 public validation run contained **792 tests: 790 passed, zero failed, and two skipped** because private historical evidence was unavailable. Coverage includes scheduler transitions, recovery, provider contracts, routing budgets, usage accounting, and viewer behavior.
 
 | Area | Examples covered | Tests |
 |---|---|---|
 | Scheduler and recovery | Failed checks, rejected reviews, interrupted work, exhausted budgets, and changes that invalidate earlier validation. | [Core](test/core.test.mjs) |
 | Context and accounting | Knowledge selection, required-source validation, provider-specific token normalization, and incomplete usage records. | [Knowledge](test/knowledge.test.mjs), [metrics](test/metrics.test.mjs) |
 | Provider routing | Local/cloud boundaries, model selection, preflight failures, and cloud-session limits. | [Routing](test/routing.test.mjs) |
+| Interruption diagnostics and state | Incremental metadata capture, timeout preservation, trace collisions, observation failures, and atomic replacement failures. | [Provider traces](test/provider-trace.test.mjs), [atomic state](test/state-atomic.test.mjs) |
 | Viewer and supervision | Event reduction, API behavior, process ownership, stale locks, and recovery coordination. | [State](test/state.test.mjs), [Core observation](test/core-observe.test.mjs), [guard](test/guard.test.mjs) |
 | Publication controls | Staged-content scanning and narrowly scoped synthetic-fixture approvals. | [Release checks](test/release-check.test.mjs) |
 
