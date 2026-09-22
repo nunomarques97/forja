@@ -149,6 +149,23 @@ node $forja core abandon --why "Objetivo substituído"
 
 Não apagues um lock que indica processo vivo: inspeciona os PIDs em `.forja/lock.json`. Um `takeover.json` deixado por recuperação interrompida exige verificar o PID e lock antes de remover apenas esse guard. `call-N-stream.json` explica erros do provider; `<tarefa>-aN-check-K.log` explica checks; `core usage --details` mostra invocações. A guarda reconhece Core e só retoma runs interrompidos ainda marcados como ativos, com os intervalos e limites existentes; nunca reabre um bloqueio explícito nem compete com um worker vivo.
 
+## Proteger o contrato de aceitação
+
+Para um novo run, declara em `--config` os ficheiros de aceitação que devem permanecer intactos:
+
+```json
+{
+  "protectedFiles": ["test/acceptance.test.mjs", "test/fixtures/expected.json"],
+  "finalChecks": [{"command": "node", "args": ["--test", "test/acceptance.test.mjs"]}]
+}
+```
+
+O Core guarda os hashes dos ficheiros existentes no arranque e verifica-os antes/depois dos workers e dos checks, incluindo a validação final e a retoma. Alteração, remoção ou substituição por link bloqueia o run antes de continuar. Os ficheiros alterados ficam preservados; não são restaurados automaticamente. O worker recebe os caminhos protegidos e pode acrescentar testes próprios em ficheiros separados. Se o contrato estiver errado, deve reportar `blocked` em vez de o reescrever.
+
+`resume`, `retry` e `--validate-only` mantêm os hashes iniciais. Para continuar, restaura o conteúdo original; para adotar um contrato revisto, abandona o run e inicia outro explicitamente. A proteção também cobre ficheiros ignorados pelo Git. Runs sem `protectedFiles` mantêm o comportamento anterior, sem outra fase ou chamada de agente.
+
+A lista contém até 100 caminhos relativos de ficheiros regulares, com limite de 8 MiB por ficheiro e 16 MiB no total. Não aceita links, diretórios, duplicados que diferem apenas em maiúsculas, caminhos exteriores, `.git` ou `.forja`. Declara também os dados e auxiliares relevantes: o Core não infere dependências a partir do comando. Esta verificação protege os bytes declarados nas fronteiras de execução; não prova a cobertura dos testes, não substitui a revisão e não deteta alterações restauradas dentro de uma única chamada. Não é uma sandbox contra processos maliciosos.
+
 ## Viewer
 
 `node $forja serve` abre o servidor local; usa o endereço apresentado e o caminho `/core`. A autenticação existente aplica-se também ao Core. A página mostra projeto, run, tarefas, sessões, provider/modelo/effort, tentativas, checks/revisão e consumo, incluindo cache e estimativas USD quando disponíveis. Abre os detalhes das sessões para identificar a origem do custo. `core init` e `start` registam o projeto automaticamente.

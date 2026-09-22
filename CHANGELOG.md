@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 — Protected acceptance files
+
+- Add optional `protectedFiles` configuration for caller-owned acceptance tests, fixture data and contracts. Snapshot their hashes before work and block changed, missing or linked files before further workers/checks, including resume and final regression validation.
+- Preserve changed files for inspection; retries and validation-only recovery cannot silently replace the initial acceptance baseline. Workers receive the protected paths and can add separate tests. Existing runs without this configuration retain their workflow and budgets.
+- Bound file reads and validate the persisted manifest. This guards declared bytes at execution boundaries; it neither infers check dependencies nor proves test coverage or isolates hostile processes. No additional model session or runtime dependency is introduced.
+
 ## 0.6.0 — On-demand execution diagnostics
 
 - Add `core diagnose`, a read-only summary of existing invocation ledgers and metadata journals. Show observed tool completions/failures, unfinished events, first file-change receipt, overlapping tool intervals and unattributed time without running a provider or changing execution budgets.
