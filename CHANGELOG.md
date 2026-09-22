@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1 — Project presentation and adaptive orchestration research
+
+- Refresh the public README with an original lightweight SVG identity, an earlier quick start, concise quality controls, provider behavior, evidence limits and visible release history.
+- Document a proposed bounded assistance protocol, source/version provenance, shared budgets, recovery transitions and a staged evaluation plan. Dynamic specialist allocation and parallel project writers remain unimplemented.
+- Clarify optional full-access behavior in the routing reference. Runtime code, prompts, models, budgets and existing runs are unchanged; previous v0.8.0 regression counts are explicitly historical.
+
 ## 0.8.0 — Explicit full access for native workers
 
 - Add provider-level `fullAccess: true` for every Core phase. Codex uses `danger-full-access` with approvals disabled; Claude uses `bypassPermissions`, disables its command sandbox for the session and exposes the default built-in tools, including during planning and review.

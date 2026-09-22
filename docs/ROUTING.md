@@ -2,6 +2,8 @@
 
 Core keeps the same plan → developer → executable checks → independent review workflow. Routing selects the executor for each existing phase; it does not introduce an agent team, proxy service or another orchestration framework. Existing configurations retain their provider and native model defaults.
 
+Dynamic capability-specific assistance is a [research proposal](ADAPTIVE-ORCHESTRATION.md), not a supported routing mode. For full access in all existing phases, use [core-full-access.json](../config/core-full-access.json) or merge its settings into your model profile; this permission option does not select models or add agents.
+
 ## Start with an explicit preset
 
 From the project root, with the chosen CLI installed and authenticated:
@@ -56,7 +58,7 @@ Requires a recent Codex CLI supporting `exec --oss --local-provider ollama`, an 
 ollama create forja-gpt-oss:20b-32k -f C:\tools\forja\config\ollama.Modelfile
 ```
 
-Inspect the Modelfile and ensure the base model is installed first: running `ollama create` yourself can obtain a missing base. The FORJA preflight only inspects existing tags/model metadata and rejects remote/cloud models or models without tools. Its endpoint is fixed to loopback. The local invocation ignores user configuration, sets a 32k context window and native compaction threshold of 24k, and preserves `workspace-write` / `read-only` phase sandboxes. On Windows it selects the elevated native sandbox; initial sandbox setup must already work. It never uses the sandbox-bypass flag. User instructions, skills/plugins and CLI background features can still affect execution; this is not full network isolation.
+Inspect the Modelfile and ensure the base model is installed first: running `ollama create` yourself can obtain a missing base. The FORJA preflight only inspects existing tags/model metadata and rejects remote/cloud models or models without tools. Its endpoint is fixed to loopback. The local invocation ignores user configuration, sets a 32k context window and native compaction threshold of 24k, and, by default, preserves `workspace-write` / `read-only` phase sandboxes. Explicit provider `fullAccess: true` instead selects `danger-full-access` with approval prompts disabled, as for cloud Codex. On Windows it selects the elevated native sandbox; initial sandbox setup must already work. It never uses the sandbox-bypass flag. User instructions, skills/plugins and CLI background features can still affect execution; this is not full network isolation.
 
 A native Windows smoke test edited a file and executed its assertion in approximately 28 seconds. This establishes basic tool execution only. Memory/VRAM needs and speed depend on the model and hardware. There is no GPU scheduler: do not overlap the pilot with another project's Ollama workload. Stop or finish one workload before starting the other. Cloud-only presets do not load an Ollama model.
 

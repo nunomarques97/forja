@@ -1,6 +1,8 @@
 # Selected architecture research
 
-FORJA keeps a small provider-neutral scheduler. External projects inform specific choices; their popularity and advertised speedups are not evidence that replacing the runtime improves this workload. No external agent framework is required by Core 0.1.0.
+FORJA keeps a small provider-neutral scheduler. External projects inform specific choices; their popularity and advertised speedups are not evidence that replacing the runtime improves this workload. Core requires no external agent framework.
+
+For the current investigation of task-dependent capabilities, see the [adaptive-orchestration proposal](ADAPTIVE-ORCHESTRATION.md). It separates existing routing from proposed assistance, identifies recovery/budget requirements and defines the next experiment. No adaptive team mode is enabled by this research.
 
 ## Knowledge without repository noise
 
