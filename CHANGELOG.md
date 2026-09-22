@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1 — Current release documentation
+
+- Replace stale README version labels with links to the package version, changelog and published tags. Document the validation handoff and its unchanged acceptance/review requirements.
+- Update the public release overview and identify the v0.5.0 test results explicitly. This patch changes documentation and package version metadata only; runtime behavior is unchanged.
+
 ## 0.5.0 — Explicit implementation handoff for validation
 
 - Developers can return `ready_for_validation` after implementation and focused tests, identifying scheduled checks still to run. The controller executes task checks and applicable caller acceptance checks before independent review; the handoff does not declare completion or claim those checks passed.

@@ -6,7 +6,7 @@ FORJA coordinates Claude Code and Codex through a small Node.js controller. It o
 
 [![Node.js 24](https://img.shields.io/badge/Node.js-24-339933?logo=nodedotjs&logoColor=white)](package.json)
 [![Runtime dependencies: 0](https://img.shields.io/badge/runtime_dependencies-0-blue)](package.json)
-[![Core v0.4.0](https://img.shields.io/badge/Core-v0.4.0-blue)](CHANGELOG.md)
+[![Core changelog](https://img.shields.io/badge/Core-changelog-blue)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 The complete Core implementation is included here: scheduling, native executors, validation, independent review, recovery, context retrieval, metrics, and the viewer. Economy and local-model presets are optional extensions to that workflow.
@@ -19,8 +19,12 @@ The complete Core implementation is included here: scheduling, native executors,
 | [Core v0.2.0](https://github.com/nunomarques97/forja/tree/v0.2.0) | The same foundation plus caller-defined final checks, explicit phase/model routing, and optional economy/Ollama presets. |
 | [Core v0.3.0](https://github.com/nunomarques97/forja/tree/v0.3.0) | Explicit task boundaries, incremental provider-event diagnostics, and state preservation when atomic replacement fails. |
 | [Core v0.4.0](https://github.com/nunomarques97/forja/tree/v0.4.0) | Conditional technology comparison and explicit Sponsor decisions for reported paid or unknown-cost alternatives, with a paused scheduler and authenticated decision panel. |
+| [Core v0.4.1](https://github.com/nunomarques97/forja/tree/v0.4.1) | Correct resumption after a recorded Sponsor technology choice, without redundant reassessment. |
+| [Core v0.4.2](https://github.com/nunomarques97/forja/tree/v0.4.2) | Validation stops if a check changes project source, preserving the files and invalidating its claimed pass. |
+| [Core v0.4.3](https://github.com/nunomarques97/forja/tree/v0.4.3) | An exact overlap between task checks and caller acceptance checks runs once, preserving both ordered sequences. |
+| [Core v0.5.0](https://github.com/nunomarques97/forja/tree/v0.5.0) | Explicit implementation handoff to controller validation, followed by independent review. |
 
-Use the v0.1.0 tag to inspect the earlier implementation. This README describes the current Core; experimental presets remain disabled unless explicitly selected.
+Find the current version in [package.json](package.json), the complete release history in the [changelog](CHANGELOG.md), and published snapshots under [tags](https://github.com/nunomarques97/forja/tags). The table above highlights behavior changes; documentation-only patches are recorded in the changelog. Experimental presets remain disabled unless explicitly selected.
 
 ## Why this project
 
@@ -42,6 +46,8 @@ flowchart LR
 ```
 
 The controller executes checks and records their output. Review runs in a separate session with read-only access. Caller-defined final acceptance checks run at integration, before approval. Authentication errors, timeouts, exhausted budgets, and invalid results leave the run blocked with its work preserved.
+
+After implementation and focused tests, a developer can return `ready_for_validation`, identifying the scheduled checks left for the controller. This avoids requiring the worker to wait for those commands before handing over. It is not completion: mandatory checks and independent approval still apply. Required visual, security or other evidence outside the scheduled commands remains the worker's responsibility. Existing `done` results continue through the same checks and review.
 
 Workers receive the current acceptance boundary, remaining task criteria, and whether integration checks apply now. Cohesive tasks avoid unnecessary development/review sessions when the work fits the configured limits; task grouping remains explicit. Incremental event journals retain bounded metadata during provider execution, including timeouts. Their timestamps measure event receipt, including CLI buffering, and do not replace missing token usage.
 
@@ -90,11 +96,12 @@ State, logs, and results live in the project's `.forja/` directory, which should
 
 ## Testing
 
-The v0.4.0 public validation run contained **804 tests: 802 passed, zero failed, and two skipped** because private historical evidence was unavailable. This includes twelve technology-decision tests; the decision panel also passed eight desktop/mobile browser scenarios. Coverage includes scheduler transitions, recovery, provider contracts, routing budgets, usage accounting, and viewer behavior. These checks validate the orchestrator, not general improvements in generated-product quality or execution time.
+The v0.5.0 public validation run contained **819 tests: 817 passed, zero failed, and two skipped** because private historical evidence was unavailable. Coverage includes scheduler transitions, recovery, provider contracts, routing budgets, usage accounting, and viewer behavior. These checks validate the orchestrator, not general improvements in generated-product quality or execution time.
 
 | Area | Examples covered | Tests |
 |---|---|---|
 | Scheduler and recovery | Failed checks, rejected reviews, interrupted work, exhausted budgets, and changes that invalidate earlier validation. | [Core](test/core.test.mjs) |
+| Validation handoff and integrity | Explicit delivery before scheduled checks, failure/attempt limits, interrupted validation, independent approval and source preservation. | [Handoff](test/validation-handoff.test.mjs), [check integrity](test/check-integrity.test.mjs) |
 | Context and accounting | Knowledge selection, required-source validation, provider-specific token normalization, and incomplete usage records. | [Knowledge](test/knowledge.test.mjs), [metrics](test/metrics.test.mjs) |
 | Provider routing | Local/cloud boundaries, model selection, preflight failures, and cloud-session limits. | [Routing](test/routing.test.mjs) |
 | Technology decisions | Paid/unknown-cost pauses, free alternatives, late discovery, stale answers, authentication, state bounds, notification failure and preserved budgets. | [Technology](test/technology.test.mjs) |
