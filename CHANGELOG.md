@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 — On-demand execution diagnostics
+
+- Add `core diagnose`, a read-only summary of existing invocation ledgers and metadata journals. Show observed tool completions/failures, unfinished events, first file-change receipt, overlapping tool intervals and unattributed time without running a provider or changing execution budgets.
+- Make missing, truncated, unsupported and inconsistent evidence explicit. Codex v1 metadata supports tool summaries; other providers and absent journals remain unavailable instead of reporting fabricated zeroes. Recorded coverage does not guarantee every native tool was exposed.
+- Bound file/request/event reads and retain metadata-only output. No prompts, command contents, native session files, inferred token costs or automatic recovery are introduced. Execution quality and end-to-end speed are unchanged by this diagnostic capability.
+
 ## 0.5.1 — Current release documentation
 
 - Replace stale README version labels with links to the package version, changelog and published tags. Document the validation handoff and its unchanged acceptance/review requirements.

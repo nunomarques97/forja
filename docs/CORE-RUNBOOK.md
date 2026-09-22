@@ -11,6 +11,7 @@ $forja = 'C:\tools\forja\bin\forja.mjs'
 node $forja start --provider codex --goal "Adicionar pesquisa por nome, mantendo os filtros e testando os casos vazios"
 node $forja core status
 node $forja core usage
+node $forja core diagnose
 ```
 
 Claude só muda `--provider claude`. De outra pasta, acrescenta `--project 'C:\caminho\projeto'`. Com alterações pendentes, revê-as e usa `--allow-dirty` para autorizar a execução nesse estado. Os hashes iniciais não são um backup: o agente tem acesso de escrita e deve preservar trabalho existente. Core não faz commits nem publica. Uma decisão pendente sobre tecnologia paga ou custo incerto pode enviar uma notificação de estado ao Sponsor, se o transporte existente estiver configurado.
@@ -61,6 +62,16 @@ O gate é determinístico sobre custos **reportados**. Classificar custos, ident
 `.forja/current.json` guarda o estado corrente. `.forja/runs/<id>/state.json` conserva cada run, acompanhado por prompts, schemas, resultados, streams, patches e logs dos checks. `usage.jsonl` mede invocações; `recovery.jsonl` regista intervenções explícitas; `SUMMARY.md` é gerado por código. Os logs podem conter código/dados privados. Runs anteriores ficam preservados.
 
 Há um escritor por projeto. O lock regista controlador e subprocesso; a retoma recusa processos vivos. Recuperação de lock obsoleto é serializada. Estado inválido, paths exteriores/symlinks, alteração do estado pelo worker e commits inesperados interrompem o run. Estas verificações não substituem uma sandbox contra executores maliciosos.
+
+## Diagnóstico local de execução
+
+`node bin/forja.mjs core diagnose --project <projeto>` resume o ledger e os ficheiros `call-N-events.jsonl` do run atual, incluindo runs terminados. É uma leitura pedida explicitamente: não chama modelos, não retoma tarefas e não acrescenta instrumentação ao percurso de execução. Não lê prompts, saídas brutas dos providers nem sessões nativas; não envia notificações.
+
+Por invocação, mostra o resultado do processo e a duração disponível, operações observadas por tipo, falhas, operações sem evento final, primeira alteração de ficheiro concluída e último evento. `observed_tool_span_ms` une intervalos entre eventos de início/fim correspondentes, sem somar duas vezes ferramentas sobrepostas. `outside_observed_tool_spans_ms` é o tempo restante; inclui trabalho e espera que o protocolo não permite atribuir. Não representa tempo desperdiçado, ocioso ou exclusivamente de inferência. Os tempos são de receção de eventos, sujeitos ao buffering do CLI. Um evento de edição não prova código correto, nem um comando com código zero substitui aceitação/revisão. `returned` não significa entrega válida ou aprovação.
+
+`coverage: recorded` significa que não foram detetadas lacunas no journal lido, não que o provider tenha exposto todas as operações nativas. `partial` assinala truncamento, eventos inconsistentes ou dados descartados; `unavailable` mantém métricas desconhecidas. O resumo de ferramentas suporta metadata Codex v1. Outros providers, versões desconhecidas e runs antigos sem journal ficam explicitamente indisponíveis. Uma operação `open` não tem evento final registado; não é prova de que o processo continua vivo. Num run ativo, o relatório é apenas uma fotografia dos ficheiros disponíveis e não inventa duração final.
+
+A leitura limita-se a 4 MiB por ficheiro, 16 MiB por pedido, 200 invocações e 10.000 eventos por journal. Limites e problemas de leitura aparecem como avisos. Caminhos de logs indicados no ledger não são seguidos; o comando usa os nomes esperados dentro do projeto e recusa ficheiros simbólicos finais. O resultado contém metadata selecionada e avisos fixos, não conteúdo das ferramentas. Não altera os ficheiros observados nem infere tokens/custos em falta.
 
 ## Contexto e conhecimento
 
