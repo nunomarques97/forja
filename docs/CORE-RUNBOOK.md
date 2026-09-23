@@ -215,6 +215,18 @@ async function expectProgress(promise, criterion, milliseconds) {
 
 Escolhe o limite conforme o contrato e o ambiente; não o apresentes como SLA do produto. Este helper não cancela a operação nem interrompe um ciclo síncrono infinito. Um watchdog num processo externo limita a execução total, incluindo código que bloqueia o event loop; expirar esse watchdog dá uma avaliação incompleta, não prova qual requisito foi violado.
 
+Ao esperar uma rejeição, aplica o guard à conclusão da assertion. Em `assert.rejects(expectProgress(operation, ...), predicate)`, o predicate pode receber o timeout do guard e convertê-lo num `ERR_ASSERTION`, perdendo o código de progresso no resultado. Com `assert` de `node:assert/strict`, conserva essa distinção assim:
+
+```js
+await expectProgress(
+  assert.rejects(operation, error => error === expectedReason),
+  'rejeição após a falha controlada',
+  500,
+);
+```
+
+Um timeout por teste pode aparecer no resumo do Node como teste cancelado; consulta também `failureType` e o diagnóstico. `testTimeoutFailure` identifica o limite explícito do teste, enquanto o cancelamento por event loop vazio não prova que existia um guard. Não classifiques apenas pelo total de assertions, falhas ou cancelamentos. O [ensaio comparativo do helper](RESEARCH.md#supplied-progress-helper-comparison) preserva as categorias automáticas e a inspeção suplementar separadamente.
+
 Nos resultados, distingue divergência observada por assertion, progresso obrigatório ausente, exceção/erro de carregamento do próprio alvo, infraestrutura do avaliador indisponível e timeout do processo. Uma exceção da implementação pode rejeitar legitimamente um defeito mesmo sem assertion; não a reclassifiques automaticamente como infraestrutura. Conserva logs e categorias originais, incluindo avaliações incompletas. O Core conserva os códigos de saída e logs dos checks; não infere automaticamente esta classificação semântica.
 
 Valida o avaliador com controlos corretos e defeitos conhecidos antes de congelar o contrato. Falhas de infraestrutura e watchdog não contam como deteção específica de defeitos. Mantém os testes finais protegidos e acrescenta testes do worker separadamente. O [ensaio inicial de permissões concorrentes](RESEARCH.md#bounded-asynchronous-acceptance-pilot) aplica estas distinções a um caso limitado; não estabelece cobertura universal.
