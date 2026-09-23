@@ -369,18 +369,20 @@ describe('o runner (processo real, claude falso)', () => {
     assert.equal(run.driver, 'runner');
     assert.match(run.driver_source, /migrado/);
   });
-  test('uma conversa pede o run a um runner vivo: o runner liberta-o ENTRE sessões, com checkpoint, e sai', async () => {
+  test('uma conversa pede o run a um runner vivo: o runner liberta-o ENTRE sessões, com checkpoint, e sai', async t => {
     const data = fresh('data');
     const p = fresh('runner-passagem');
     const marker = join(root, `sessao-${n}.txt`);
-    // O "claude": marca que a sessão começou, fica 3 s a "trabalhar", sai sem dizer nada.
+    const release = join(root, `release-${n}.txt`);
+    // Keep the fake session alive until the request and refusal are observed.
     const fake = join(root, `fake-claude-${n}.mjs`);
-    writeFileSync(fake, "import { writeFileSync } from 'node:fs'; writeFileSync(process.env.MARK, String(Date.now())); setTimeout(() => {}, 3000);\n");
+    writeFileSync(fake, "import { writeFileSync, existsSync } from 'node:fs'; writeFileSync(process.env.MARK, 'ready'); const timer = setInterval(() => { if (existsSync(process.env.RELEASE)) clearInterval(timer); }, 25); setTimeout(() => process.exit(1), 60000).unref();\n");
     const slow = `"${process.execPath}" "${fake}"`;
     forja(p, data, ['run', 'start', '--goal', 'autónomo que vai passar', '--driver', 'runner']);
-    const child = spawn(process.execPath, [cli, 'runner', '--max-sessions', '6'], { cwd: p, env: { ...env(data), FORJA_CLAUDE_CMD: slow, MARK: marker }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, [cli, 'runner', '--max-sessions', '6'], { cwd: p, env: { ...env(data), FORJA_CLAUDE_CMD: slow, MARK: marker, RELEASE: release }, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = ''; child.stdout.on('data', d => { out += d; }); child.stderr.on('data', d => { out += d; });
-    const exited = new Promise(r => child.on('exit', r));
+    const exited = new Promise((res, rej) => { child.on('error', rej); child.on('close', res); });
+    t.after(async () => { writeFileSync(release, 'release'); await exited; });
     for (let i = 0; i < 200 && !existsSync(marker); i++) await new Promise(r => setTimeout(r, 100));
     assert.ok(existsSync(marker), 'a primeira sessão começou');
     const lock = JSON.parse(readFileSync(lockPath(p, join(data, 'runner')), 'utf8'));
@@ -390,6 +392,7 @@ describe('o runner (processo real, claude falso)', () => {
     assert.equal(JSON.parse(ask.stdout).pending, 'interactive', 'com o runner vivo é um pedido, não uma tomada');
     assert.equal(readRunOf(p).driver, 'runner', 'ainda do runner enquanto a sessão corre');
     assert.equal(forja(p, data, ['run', 'resume']).status, 4, 'e a conversa ainda não pode continuar');
+    writeFileSync(release, 'release');
     const code = await exited;
     assert.equal(code, 0, out);
     const run = readRunOf(p);

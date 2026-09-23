@@ -559,27 +559,33 @@ async function ask({ pos, opt }) {
   out({ ok: true, id });
 }
 async function answers() {
-  const run = requireRun();
-  const applied = new Set(run.answers_applied || []);
-  const project = basename(projectRoot());
-  let n = 0;
-  for (const file of listAnswerFiles()) {
-    if (basename(file, '.jsonl') !== project) continue;
-    for (const line of readFileSync(file, 'utf8').split('\n')) {
-      if (!line.trim()) continue;
-      let a; try { a = JSON.parse(line); } catch { continue; }
-      const key = `${a.id}@${a.ts}`;
-      if (!a.id || !a.answer || applied.has(key)) continue;
-      if (markAnswered(a.id, a.answer, a.ts)) { applied.add(key); n += 1; emit('answer', { id: a.id, text: a.answer, via: 'viewer' }, { run }); }
+  // Capture identity before waiting, but apply answers to the fresh state under
+  // the same mutex as driver claims. A stale snapshot can erase a handoff.
+  const expected = requireRun();
+  return withClaimMutex(projectRoot(), () => {
+    const run = readRun();
+    if (!run || run.run_id !== expected.run_id) throw new Error('Run changed while applying answers; retry for the current run.');
+    const applied = new Set(run.answers_applied || []);
+    const project = basename(projectRoot());
+    let n = 0;
+    for (const file of listAnswerFiles()) {
+      if (basename(file, '.jsonl') !== project) continue;
+      for (const line of readFileSync(file, 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        let a; try { a = JSON.parse(line); } catch { continue; }
+        const key = `${a.id}@${a.ts}`;
+        if (!a.id || !a.answer || applied.has(key)) continue;
+        if (markAnswered(a.id, a.answer, a.ts)) { applied.add(key); n += 1; emit('answer', { id: a.id, text: a.answer, via: 'viewer' }, { run }); }
+      }
     }
-  }
-  // Answers typed straight into SPONSOR-QUEUE.md (Resposta: …) are events too.
-  for (const q of readQueue()) {
-    if (q.answer && q.status.startsWith('aberta')) { markAnswered(q.id, q.answer); applied.add(`${q.id}@file`); n += 1; emit('answer', { id: q.id, text: q.answer, via: 'file' }, { run }); }
-  }
-  run.answers_applied = [...applied]; writeRun(run);
-  writeHandover();
-  out(answersView({ applied: n, open: readQueue().filter(q => q.status.startsWith('aberta')).map(q => q.id) }));
+    // Answers typed straight into SPONSOR-QUEUE.md (Resposta: …) are events too.
+    for (const q of readQueue()) {
+      if (q.answer && q.status.startsWith('aberta')) { markAnswered(q.id, q.answer); applied.add(`${q.id}@file`); n += 1; emit('answer', { id: q.id, text: q.answer, via: 'file' }, { run }); }
+    }
+    run.answers_applied = [...applied]; writeRun(run);
+    writeHandover();
+    out(answersView({ applied: n, open: readQueue().filter(q => q.status.startsWith('aberta')).map(q => q.id) }));
+  });
 }
 async function fallback({ pos, opt }) {
   const run = requireRun();

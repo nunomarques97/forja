@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.1 — Preserve handoffs and validate execution budgets
+
+- Apply legacy answers under the driver claim mutex, rereading current state and refusing a replaced run. Preserve concurrent handoff requests, ownership changes and checkpoints.
+- Synchronize the runner handoff regression with explicit session release instead of a fixed delay; cover stale answer snapshots with deterministic concurrent CLI tests.
+- Make `core doctor` validate execution budgets with the same defaults, coercion and bounds as startup, before inspecting executors. Keep diagnostics private, project files unchanged and cloud routing limits strict.
+
 ## 0.11.0 — Recover preserved work with explicit limits
 
 - Persist checkpoint receipts across controller restarts, retain partial edits and account for continuations separately from implementation attempts. Refuse exhausted budgets before charging an attempt or starting another provider.

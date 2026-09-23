@@ -6,6 +6,8 @@ Manual de referência dos novos runs. [CORE.md](CORE.md) é o contrato curto env
 
 Antes do primeiro run, usa `node $forja core doctor --provider codex` (ou `claude`), na raiz Git do projeto; acrescenta `--config` se usares rotas próprias. Verifica Node, Git, raiz do projeto, alterações pendentes, exclusão de `.forja/`, configuração e presença dos executores. Não chama modelos, lê credenciais nem escreve no projeto. `ready: true` confirma apenas requisitos locais: autenticação, acesso ao modelo e quota continuam por verificar no CLI do provider. Avisos sobre alterações pendentes ou `.forja/` exigem revisão; `core init` pode preparar instruções e o ignore, mas essas alterações precisam de revisão antes de um arranque com árvore limpa.
 
+O doctor aplica aos budgets de execução as mesmas regras do arranque: `maxSessions` 1–200 (default 30), `maxAttempts` 1–5 (2), `maxMinutes` 1–180 (30), `maxRotations` 0–5 (2) e `maxContextTokens` 1.000–1.000.000 (120.000). Aceita inteiros e strings numéricas inteiras sem alterar a configuração; um valor inválido devolve um erro de configuração antes de inspecionar executores. `maxCloudSessions` mantém a validação estrita de routing: número inteiro 0–200.
+
 Requisitos: Node 24, Git e Claude Code ou Codex instalado e autenticado. Na raiz Git do projeto:
 
 ```powershell
