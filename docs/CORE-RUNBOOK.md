@@ -188,6 +188,37 @@ O Core guarda os hashes dos ficheiros existentes no arranque e verifica-os antes
 
 A lista contém até 100 caminhos relativos de ficheiros regulares, com limite de 8 MiB por ficheiro e 16 MiB no total. Não aceita links, diretórios, duplicados que diferem apenas em maiúsculas, caminhos exteriores, `.git` ou `.forja`. Declara também os dados e auxiliares relevantes: o Core não infere dependências a partir do comando. Esta verificação protege os bytes declarados nas fronteiras de execução; não prova a cobertura dos testes, não substitui a revisão e não deteta alterações restauradas dentro de uma única chamada. Não é uma sandbox contra processos maliciosos.
 
+## Aceitação assíncrona com falhas limitadas
+
+Liga cada cenário a um requisito identificável e controla os acontecimentos que desbloqueiam a operação: libertação de capacidade, cancelamento, fecho ou conclusão de um pedido. Usa Promises controladas e barreiras do event loop para observar a ordem; um `sleep` arbitrário não demonstra causalidade. Verifica também que uma operação permanece pendente quando o contrato o exige, e aceita implementações corretas com diferentes formas válidas de notificar Promises.
+
+Quando o teste espera progresso depois de um acontecimento controlado, limita essa espera e identifica o ponto que falhou. Por exemplo, o helper abaixo impede que uma Promise por resolver deixe esse ponto de aceitação indefinidamente pendente:
+
+```js
+async function expectProgress(promise, criterion, milliseconds) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(Object.assign(
+          new Error(`${criterion}: expected progress was not observed`),
+          { code: 'CONTRACT_PROGRESS' },
+        )), milliseconds);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+```
+
+Escolhe o limite conforme o contrato e o ambiente; não o apresentes como SLA do produto. Este helper não cancela a operação nem interrompe um ciclo síncrono infinito. Um watchdog num processo externo limita a execução total, incluindo código que bloqueia o event loop; expirar esse watchdog dá uma avaliação incompleta, não prova qual requisito foi violado.
+
+Nos resultados, distingue divergência observada por assertion, progresso obrigatório ausente, exceção/erro de carregamento do próprio alvo, infraestrutura do avaliador indisponível e timeout do processo. Uma exceção da implementação pode rejeitar legitimamente um defeito mesmo sem assertion; não a reclassifiques automaticamente como infraestrutura. Conserva logs e categorias originais, incluindo avaliações incompletas. O Core conserva os códigos de saída e logs dos checks; não infere automaticamente esta classificação semântica.
+
+Valida o avaliador com controlos corretos e defeitos conhecidos antes de congelar o contrato. Falhas de infraestrutura e watchdog não contam como deteção específica de defeitos. Mantém os testes finais protegidos e acrescenta testes do worker separadamente. O [ensaio inicial de permissões concorrentes](RESEARCH.md#bounded-asynchronous-acceptance-pilot) aplica estas distinções a um caso limitado; não estabelece cobertura universal.
+
 ## Viewer
 
 `node $forja serve` abre o servidor local; usa o endereço apresentado e o caminho `/core`. A autenticação existente aplica-se também ao Core. A página mostra projeto, run, tarefas, sessões, provider/modelo/effort, tentativas, checks/revisão e consumo, incluindo cache e estimativas USD quando disponíveis. Abre os detalhes das sessões para identificar a origem do custo. `core init` e `start` registam o projeto automaticamente.
