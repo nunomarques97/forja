@@ -306,11 +306,11 @@ export function startServer(opts = {}) {
 
   // ---------- entry page (T-SEC-1) ----------
   // The ntfy link no longer carries the token (docs/ARCHITECTURE.md §10), so the
-  // two HTML pages — and only those two — answer an unauthenticated GET with a
+  // explicit Core and compatibility entry pages answer an unauthenticated GET with a
   // form instead of a dead end: the Sponsor pastes the token once per tunnel URL
   // and the cookie keeps him in. Every other route still answers 401.
   // The page is inline (no /assets: those need the cookie), has no script, and
-  // echoes nothing from the request — `next` is one of two literals and the
+  // echoes nothing from the request — `next` is a whitelisted page path and the
   // error is one of two fixed strings, so there is no place to inject HTML.
   // A wrong token costs the same second and the same slot in the brake whether
   // it arrives in the form or in `?k=`.
@@ -342,6 +342,7 @@ export function startServer(opts = {}) {
   function entryTarget(pathname) {
     if (pathname === '/') return '/';
     if (pathname === '/core') return '/core';
+    if (pathname === '/legacy' || pathname === '/legacy/m') return pathname;
     if (pathname === '/m' || pathname === '/m/') return '/m';
     return null;
   }
@@ -498,10 +499,9 @@ export function startServer(opts = {}) {
       const snapshot = coreSnapshot(dataDir);
       return json(res, snapshot.ok ? 200 : 500, snapshot);
     }
-    if (req.method === 'GET' && url.pathname === '/core') return sendFile(res, join(here, 'core.html'));
-
-    if (req.method === 'GET' && url.pathname === '/') return sendFile(res, join(here, 'index.html'));
-    if (req.method === 'GET' && (url.pathname === '/m' || url.pathname === '/m/')) return sendFile(res, join(here, 'mobile.html'));
+    if (req.method === 'GET' && ['/', '/core', '/m', '/m/'].includes(url.pathname)) return sendFile(res, join(here, 'core.html'));
+    if (req.method === 'GET' && url.pathname === '/legacy') return sendFile(res, join(here, 'index.html'));
+    if (req.method === 'GET' && url.pathname === '/legacy/m') return sendFile(res, join(here, 'mobile.html'));
     if (req.method === 'GET' && url.pathname.startsWith('/assets/')) {
       const rel = url.pathname.slice('/assets/'.length);
       if (rel.includes('..') || rel.includes('\\')) { res.writeHead(400); res.end(); return; }

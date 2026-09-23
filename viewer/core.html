@@ -1,46 +1,43 @@
 <!doctype html>
 <html lang="pt-PT">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FORJA · Execuções Core</title>
-    <link rel="stylesheet" href="/assets/core.css" />
-  </head>
-  <body>
-    <header>
-      <a class="brand" href="/">FORJA</a>
-      <nav aria-label="Navegação">
-        <a href="/core" aria-current="page">Core</a
-        ><a href="/">Eventos clássicos</a>
-      </nav>
-      <span id="connection" role="status">A ligar…</span>
-    </header>
-    <main>
-      <div class="intro">
-        <div>
-          <p class="eyebrow">A OFICINA · CORE</p>
-          <h1>Trabalho em curso</h1>
-          <p>Do objetivo à revisão, com o consumo de cada etapa.</p>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FORJA · Trabalho em curso</title>
+  <link rel="stylesheet" href="/assets/core.css">
+</head>
+<body>
+  <a class="skip" href="#main">Saltar para o trabalho</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="FORJA — início"><span class="brand-mark" aria-hidden="true">F</span>FORJA</a>
+    <span class="workspace-label">ESPAÇO DE TRABALHO</span>
+    <div class="connection"><span class="connection-dot" aria-hidden="true"></span><span id="connection">A ligar ao servidor…</span></div>
+  </header>
+  <main id="main">
+    <section class="intro" aria-labelledby="page-title">
+      <div><p class="eyebrow">VISÃO GERAL</p><h1 id="page-title">O trabalho, à vista.</h1><p>O que está em curso. O que precisa de ti. O que ficou concluído.</p></div>
+      <button id="refresh" class="secondary" type="button"><span aria-hidden="true">↻</span> Atualizar</button>
+    </section>
+    <div id="notice" class="notice" hidden></div>
+    <p id="announcements" class="sr-only" role="status" aria-live="polite"></p>
+    <p id="action-status" class="action-status" role="status"></p>
+    <section id="overview" class="overview" aria-label="Resumo dos projetos" hidden></section>
+    <section class="work" aria-labelledby="work-title">
+      <div class="section-header"><div><p class="eyebrow">PROJETOS</p><h2 id="work-title">Execuções atuais</h2></div><span id="project-count" class="muted"></span></div>
+      <div class="toolbar">
+        <div class="filters" role="group" aria-label="Filtrar projetos">
+          <button type="button" data-filter="all" aria-pressed="true">Todos</button>
+          <button type="button" data-filter="attention" aria-pressed="false">Precisam de atenção</button>
+          <button type="button" data-filter="running" aria-pressed="false">Em curso</button>
+          <button type="button" data-filter="done" aria-pressed="false">Concluídos</button>
         </div>
-        <button id="refresh" type="button">Atualizar</button>
+        <label class="search"><span class="sr-only">Pesquisar projetos ou objetivos</span><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Pesquisar projetos…" autocomplete="off"></label>
       </div>
-      <div id="projects" aria-live="polite"></div>
-      <aside>
-        <h2>Continuar no terminal</h2>
-        <p>
-          Na pasta do projeto, usa <code>forja core resume</code> para uma
-          execução interrompida. Uma tarefa bloqueada precisa de
-          <code>forja core retry --task ID --why "motivo"</code>. Os limites e
-          tentativas são preservados.
-        </p>
-        <p>
-          Novos projetos: <code>forja core init</code>, seguido de
-          <code>forja start --provider claude --goal "objetivo"</code> (ou
-          <code>codex</code>). A guarda recupera apenas execuções em curso cujo
-          processo e trabalhador terminaram.
-        </p>
-      </aside>
-    </main>
-    <script type="module" src="/assets/core.js"></script>
-  </body>
+      <div id="projects" aria-busy="true"><div class="empty"><span class="empty-symbol" aria-hidden="true">···</span><h3>A carregar o trabalho</h3><p>A consultar os projetos registados neste servidor.</p></div></div>
+    </section>
+    <details class="help"><summary>Começar ou continuar no terminal <span aria-hidden="true">↗</span></summary><div class="help-grid"><div><h3>Novo projeto</h3><p>Na pasta do projeto:</p><code>forja core init</code><code>forja start --provider codex --goal "objetivo"</code><p>Podes também usar o provider <code>claude</code>.</p></div><div><h3>Retomar trabalho</h3><code>forja core resume</code><p>Para repetir uma tarefa bloqueada com um motivo explícito:</p><code>forja core retry --task ID --why "motivo"</code></div></div></details>
+  </main>
+  <footer><span>FORJA <span class="footer-divider">/</span> Do objetivo à revisão.</span><details class="compatibility"><summary>Workflows anteriores</summary><p>As vistas antigas acompanham execuções do runner anterior ao Core.</p><a href="/legacy">Abrir viewer anterior</a></details></footer>
+  <script type="module" src="/assets/core.js"></script>
+</body>
 </html>

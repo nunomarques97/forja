@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/tree/v0.9.0"><img src="https://img.shields.io/badge/version-0.9.0-ff9955" alt="Version 0.9.0"></a>
+  <a href="https://github.com/nunomarques97/forja/tree/v0.10.0"><img src="https://img.shields.io/badge/version-0.10.0-ff9955" alt="Version 0.10.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -111,7 +111,7 @@ node $forja core resume
 
 Since **0.8.2**, a recorded valid developer handoff can survive controller death without another development session. Recovery checks source and Git HEAD, then runs the required checks and review. Source changes after the last approval also require fresh validation and review before an unfinished run can complete. Unchanged approved source needs no extra review. These are process-crash guarantees, not power-loss durability or exactly-once external execution. [Recovery details](docs/CORE-RUNBOOK.md).
 
-Run `node $forja serve` from the FORJA checkout to open the local viewer. Its `/core` page shows tasks, checks and usage and accepts pending Sponsor choices. A configured notification transport can alert the Sponsor. See the [runbook](docs/CORE-RUNBOOK.md) for project/run selection, notification setup and recovery.
+Run `node $forja serve` from the FORJA checkout to open the local viewer. The responsive workspace at `/` (also `/core` and `/m`) prioritizes projects needing attention, with search, status filters and expandable task/session evidence. It accepts pending Sponsor choices; the previous event/roster pages are available through a secondary compatibility link. A configured notification transport can alert the Sponsor. See the [runbook](docs/CORE-RUNBOOK.md) for project/run selection, notification setup and recovery.
 
 ## Status and evidence
 
@@ -127,10 +127,11 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.9.0](https://github.com/nunomarques97/forja/tree/v0.9.0)** — explicit knowledge references with consultation conditions, complete mandatory notes and compatible automatic retrieval. Specialist document bodies stay out of automatic prompts; workers can read applicable sources on demand. See the [knowledge configuration](docs/CORE-RUNBOOK.md#conhecimento-selecionado).
+**Current: [v0.10.0](https://github.com/nunomarques97/forja/tree/v0.10.0)** — a Core-first workspace with project overview, decisions, search and filters, plus bounded refresh and stale-response protection. Restart the viewer from the updated checkout to load it; existing services and active runs are not migrated.
 
 | Release | Main change |
 |---|---|
+| [0.9.0](https://github.com/nunomarques97/forja/tree/v0.9.0) | Explicit on-demand knowledge references with complete mandatory notes. |
 | [0.8.3](https://github.com/nunomarques97/forja/tree/v0.8.3) | Acceptance study decision and evaluation criteria; runtime unchanged from v0.8.2. |
 | [0.8.2](https://github.com/nunomarques97/forja/tree/v0.8.2) | Recover accepted handoffs after controller death and invalidate stale review approval. |
 | [0.8.1](https://github.com/nunomarques97/forja/tree/v0.8.1) | Project presentation and proposed adaptive orchestration; runtime unchanged. |

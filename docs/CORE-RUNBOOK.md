@@ -233,7 +233,9 @@ Valida o avaliador com controlos corretos e defeitos conhecidos antes de congela
 
 ## Viewer
 
-`node $forja serve` abre o servidor local; usa o endereço apresentado e o caminho `/core`. A autenticação existente aplica-se também ao Core. A página mostra projeto, run, tarefas, sessões, provider/modelo/effort, tentativas, checks/revisão e consumo, incluindo cache e estimativas USD quando disponíveis. Abre os detalhes das sessões para identificar a origem do custo. `core init` e `start` registam o projeto automaticamente.
+`node $forja serve` abre o servidor local. A entrada `/`, `/core` e `/m` apresentam o mesmo workspace Core responsivo: resumo dos projetos, atenção necessária, pesquisa e filtros por estado. Cada projeto mostra o run atual; não é um histórico de todas as execuções. Tarefas, checks/revisão e sessões ficam em detalhes expansíveis, incluindo provider/modelo/effort, tentativas, consumo, cache e estimativas USD quando disponíveis. `core init` e `start` registam o projeto automaticamente. As vistas anteriores ficam em `/legacy` e `/legacy/m`, através do acesso secundário no rodapé.
+
+Atualizar substitui pedidos anteriores; leituras e decisões têm limite de dez segundos. Uma falha mantém os últimos dados com aviso de desatualização e permite tentar novamente. Escolhas por enviar, foco e detalhes abertos são preservados quando ainda pertencem ao mesmo projeto/run/decisão. Um timeout nunca confirma uma escolha. A autenticação mantém-se. Para carregar uma nova versão, reinicia o viewer a partir do checkout atualizado; atualizar o código não migra serviços ou runs de outra instalação.
 
 A página permite responder a decisões de tecnologia pendentes; as restantes ações de recuperação usam os comandos acima. Reinicia viewer/guarda já em execução para carregarem o código atualizado. O encerramento do viewer preserva os executores Core e os seus subprocessos.
 

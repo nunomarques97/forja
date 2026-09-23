@@ -204,7 +204,20 @@ test('Core viewer uses existing authentication and refuses legacy launch on a Co
     assert.equal((await fetch(base + '/api/core')).status, 401);
     assert.match(await (await fetch(base + '/core')).text(), /login/);
     const headers = { Cookie: `forja_k=${server.token}` };
-    assert.equal((await fetch(base + '/core', { headers })).status, 200);
+    for (const route of ['/', '/core', '/m', '/m/']) {
+      const page = await fetch(base + route, { headers });
+      assert.equal(page.status, 200);
+      const html = await page.text();
+      assert.match(html, /O trabalho, à vista/);
+      assert.doesNotMatch(html, /role="tablist"|Modelos e ligações|Eventos clássicos/);
+      assert.match(html, /href="\/legacy"/);
+    }
+    for (const route of ['/legacy', '/legacy/m']) {
+      const login = await (await fetch(base + route)).text();
+      assert.match(login, /form method="post" action="\/login"/);
+      const legacy = await (await fetch(base + route, { headers })).text();
+      assert.match(legacy, /Modelos e ligações/);
+    }
     const response = await fetch(base + '/api/core', { headers });
     assert.equal(response.status, 200);
     assert.equal((await response.json()).projects[0].core.run.driver, 'core');

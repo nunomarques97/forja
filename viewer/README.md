@@ -1,6 +1,6 @@
 # Viewer — API contract (server ↔ pages)
 
-`viewer/server.mjs` serves the pages and streams **state**, never raw events. Pages: `viewer/index.html` (desktop), `viewer/mobile.html` (phone, `/m`), assets under `viewer/assets/`. Everything below is what a page may rely on.
+`viewer/server.mjs` serves the pages and streams **state**, never raw events. The responsive workspace is `viewer/core.html` at `/`, `/core` and `/m`. Compatibility pages are `viewer/index.html` at `/legacy` and `viewer/mobile.html` at `/legacy/m`. Assets live under `viewer/assets/`. Everything below is what a page may rely on.
 
 ## Auth
 
@@ -10,7 +10,8 @@ Every route except `/health` needs the token. A visitor without the cookie gets 
 
 | Route | Returns |
 |---|---|
-| `GET /` · `GET /m` | desktop page · phone page |
+| `GET /` · `GET /core` · `GET /m` | responsive Core workspace |
+| `GET /legacy` · `GET /legacy/m` | previous event/roster pages, desktop and phone |
 | `GET /assets/<file>` | static files from `viewer/assets/` |
 | `GET /state` | the snapshot (below) |
 | `GET /events` | SSE: `event: state` with the snapshot on connect and on every change (debounced 250 ms); `event: ping` every 15 s |
@@ -60,6 +61,8 @@ Timeline `kind` values: `run.start`, `run.resume`, `checkpoint`, `run.finish`, `
 
 ## Core
 
-Open `/core` for project/run/task/session status and explicit Sponsor technology choices. `core init` and `start` register projects; native usage is shown with measurement coverage and optional USD estimates, never presented as a subscription invoice. Authentication and host checks are shared with the existing viewer. Paid or unknown-cost alternatives pause work until a choice is submitted; no radio option is preselected. Other recovery stays in `core resume` / `core retry`; the guard only resumes interrupted running jobs. Restart an already-running viewer/guard to load this implementation. See [Core runbook](../docs/CORE-RUNBOOK.md).
+Open `/` (or `/core` or `/m`) for the Core workspace. It summarizes current runs, prioritizes projects needing attention, and supports search and status filters. Tasks, checks, review and session consumption are expandable. This is the current run per project, not a historical run browser. Legacy event/roster pages remain under the secondary compatibility link. `core init` and `start` register projects; native usage is shown with measurement coverage and optional USD estimates, never presented as a subscription invoice. Authentication and host checks are shared with the existing viewer. Paid or unknown-cost alternatives pause work until a choice is submitted; no radio option is preselected. Other recovery stays in `core resume` / `core retry`; the guard only resumes interrupted running jobs. Restart an already-running viewer/guard to load this implementation. See [Core runbook](../docs/CORE-RUNBOOK.md).
+
+Reads and decision submissions have a ten-second browser deadline, including response-body parsing. Manual refresh supersedes an older read; submitting a decision invalidates outstanding reads before writing. Obsolete completions cannot publish their snapshot. A timeout never confirms a choice. Network errors retain the last snapshot with a stale warning and permit retry. The client cleans up requests, timers and listeners on page exit and reconnects on browser history restoration. Polling preserves open details, keyboard focus and an unsubmitted choice for the same project/run/decision.
 
 `POST /api/core/decision` accepts `{ project, run, decision, option }` for a registered project and current Core run. It shares authentication/Host checks, refuses cross-origin requests, limits the body to 4 KB and acquires the project lock before recording the choice. Repeating the same answer is idempotent; stale runs or changed answers return 409. After the final choice it tries to resume through the existing launcher, within persisted budgets. Response `{ ok, waiting, resumed }` distinguishes a recorded choice from a launched process. No purchase is performed. Pending choices and sanitized HTTP(S) evidence links are projected by `GET /api/core`; local evidence paths remain private.

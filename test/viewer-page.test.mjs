@@ -42,7 +42,7 @@ before(async () => {
 after(() => { server.kill(); rmSync(dir, { recursive: true, force: true }); });
 
 describe('pages', () => {
-  for (const [path, mode] of [['/', 'desktop'], ['/m', 'mobile']]) {
+  for (const [path, mode] of [['/legacy', 'desktop'], ['/legacy/m', 'mobile']]) {
     test(`${path} needs the cookie, is Portuguese, lists the ten roster names with the "a pedido" label, has no template leftovers and no token`, async () => {
       // T-SEC-1: sem cookie estas duas rotas dão a página de entrada (o link do
       // ntfy já não leva o token), nunca a página real. O contrato completo da
@@ -1057,7 +1057,7 @@ describe('ligação perdida (T-UI-8): a faixa no topo, "dados de HH:MM" e a volt
     for (let i = css.indexOf('.page {'); i >= 0; i = css.indexOf('.page {', i + 1)) {
       assert.ok(!css.slice(i, css.indexOf('}', i)).includes('overflow'), 'um overflow na .page cortava o sticky');
     }
-    for (const path of ['/', '/m']) {
+    for (const path of ['/legacy', '/legacy/m']) {
       const html = (await http(path, auth())).body;
       const wrap = '<div id="conn-banner" role="status" aria-live="polite"></div>';
       assert.ok(html.includes(wrap), `${path}: wrapper permanente com a região ao vivo`);

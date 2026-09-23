@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0 — A Core-first workspace
+
+- Make the responsive Core workspace the default at `/`, `/core` and `/m`. Move the previous event/roster pages to `/legacy` and `/legacy/m`, preserving authentication and legacy APIs.
+- Lead with projects, attention needed, current goals and task progress. Add search/status filters; move task validation and session consumption into expandable details. Preserve choices, focus and expanded details across refresh.
+- Bound reads and decision submissions, including response bodies; supersede obsolete reads and invalidate them before a decision. Keep stale data visible on errors, support retry, and clean up page lifecycles. No new dependencies, providers or execution phases.
+- Verify desktop/mobile presentation and controlled network/decision transitions. Existing running services require restart from the updated checkout; active runs are not migrated.
+
 ## 0.9.0 — Explicit on-demand knowledge references
 
 - Add opt-in version 2 knowledge manifests with `mode: "reference"` and a short `when` condition. Every worker phase receives the source path and consultation condition without automatic indexing or injection of the document body. Automatic excerpts and complete required notes remain available, including explicitly listed ADRs outside discovery folders.
