@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.1 — English workspace and viewer screenshots
+
+- Use English throughout the Core workspace and sign-in page, including status, decisions, errors, accessibility labels and number/time formatting. Project goals, task names and generated decision content retain their original language; compatibility views remain in Portuguese.
+- Illustrate the public README with reviewed desktop and mobile screenshots using fictional projects. No private run data, credentials or local paths appear in these images.
+- Preserve authentication, decision handling and refresh behavior. Existing services need a restart from the updated checkout to serve the new text.
+
 ## 0.10.0 — A Core-first workspace
 
 - Make the responsive Core workspace the default at `/`, `/core` and `/m`. Move the previous event/roster pages to `/legacy` and `/legacy/m`, preserving authentication and legacy APIs.

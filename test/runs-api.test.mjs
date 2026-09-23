@@ -473,7 +473,7 @@ describe('POST /runs — a body split across chunks', () => {
     assert.match(atCap.json.error, /600/, 'no limite o corpo é lido: recusado pelo comprimento do objetivo, não pelo tamanho');
     const over = await postSplit(body(MAX_BODY + 1), 100);
     assert.equal(over.status, 400);
-    assert.match(over.json.error, /demasiado grande/);
+    assert.match(over.json.error, /too large/);
   });
 });
 

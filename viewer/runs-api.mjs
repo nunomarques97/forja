@@ -103,7 +103,7 @@ export function readBody(req, res, onDone) {
     const buf = Buffer.isBuffer(d) ? d : Buffer.from(d);
     bytes += buf.length;
     if (refused) { if (bytes > 1024 * 1024) req.destroy(); return; } // answer 400 and drain; a body past 1 MB is dropped outright
-    if (bytes > MAX_BODY) { refused = true; chunks.length = 0; send(res, 400, { error: 'pedido demasiado grande' }); return; }
+    if (bytes > MAX_BODY) { refused = true; chunks.length = 0; send(res, 400, { error: 'Request body is too large.' }); return; }
     chunks.push(buf);
   });
   req.on('end', () => { if (!refused) onDone(Buffer.concat(chunks).toString('utf8')); });

@@ -7,13 +7,13 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/tree/v0.10.0"><img src="https://img.shields.io/badge/version-0.10.0-ff9955" alt="Version 0.10.0"></a>
+  <a href="https://github.com/nunomarques97/forja/tree/v0.10.1"><img src="https://img.shields.io/badge/version-0.10.1-ff9955" alt="Version 0.10.1"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
 </p>
 
-<p align="center"><a href="#quick-start">Quick start</a> · <a href="#how-it-works">Workflow</a> · <a href="#quality-and-control">Quality</a> · <a href="#status-and-evidence">Status</a> · <a href="#releases">Releases</a> · <a href="#documentation">Docs</a></p>
+<p align="center"><a href="#quick-start">Quick start</a> · <a href="#viewer">Viewer</a> · <a href="#how-it-works">Workflow</a> · <a href="#quality-and-control">Quality</a> · <a href="#status-and-evidence">Status</a> · <a href="#releases">Releases</a> · <a href="#documentation">Docs</a></p>
 
 FORJA is a **Node.js orchestration CLI** for development in an existing Git project. Each phase starts a fresh native coding-agent session with relevant context; a small controller owns task state, checks, retry limits and recovery.
 
@@ -40,6 +40,23 @@ node $forja start --provider codex --goal "Add name search, preserve existing fi
 Use `--provider claude` for Claude Code. The project must have a clean working tree unless you explicitly pass `--allow-dirty`. Ignore the project's `.forja/` directory: it contains private run state and logs. Optional `core init` adds the ignore rule and short instruction references; review and commit those setup changes before a clean-tree start.
 
 Workers edit files and execute commands. They are instructed not to commit or publish. Starting an ordinary chat does not automatically start FORJA.
+
+## Viewer
+
+An English workspace for the current run of each registered project: goals, progress, decisions that need you, and expandable task and session evidence. Open it with `node $forja serve` from the FORJA checkout. Project-authored text keeps its original language; the optional legacy views remain in Portuguese.
+
+**Desktop — compare alternatives and make an explicit choice.**
+
+![FORJA desktop workspace showing project counts and a paused team portal with local and managed storage alternatives](docs/assets/viewer-desktop.png)
+
+<details>
+<summary><strong>Mobile — filter current work and inspect tasks</strong></summary>
+
+<p><img src="docs/assets/viewer-mobile.png" width="390" alt="FORJA mobile workspace filtered to an active import project, with task checks and review status expanded"></p>
+
+</details>
+
+Screenshots use fictional projects and illustrative measurements. They show the same responsive workspace, with the mobile view filtered to work in progress.
 
 ## How it works
 
@@ -127,10 +144,11 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.10.0](https://github.com/nunomarques97/forja/tree/v0.10.0)** — a Core-first workspace with project overview, decisions, search and filters, plus bounded refresh and stale-response protection. Restart the viewer from the updated checkout to load it; existing services and active runs are not migrated.
+**Current: [v0.10.1](https://github.com/nunomarques97/forja/tree/v0.10.1)** — English Core workspace and sign-in, with desktop/mobile screenshots in this README. Restart the viewer from the updated checkout to load it; existing services and active runs are not migrated.
 
 | Release | Main change |
 |---|---|
+| [0.10.0](https://github.com/nunomarques97/forja/tree/v0.10.0) | Core-first workspace, project overview, decisions, filters and resilient refresh. |
 | [0.9.0](https://github.com/nunomarques97/forja/tree/v0.9.0) | Explicit on-demand knowledge references with complete mandatory notes. |
 | [0.8.3](https://github.com/nunomarques97/forja/tree/v0.8.3) | Acceptance study decision and evaluation criteria; runtime unchanged from v0.8.2. |
 | [0.8.2](https://github.com/nunomarques97/forja/tree/v0.8.2) | Recover accepted handoffs after controller death and invalidate stale review approval. |

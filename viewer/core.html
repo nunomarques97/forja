@@ -1,43 +1,43 @@
 <!doctype html>
-<html lang="pt-PT">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FORJA · Trabalho em curso</title>
+  <title>FORJA · Work in progress</title>
   <link rel="stylesheet" href="/assets/core.css">
 </head>
 <body>
-  <a class="skip" href="#main">Saltar para o trabalho</a>
+  <a class="skip" href="#main">Skip to work</a>
   <header class="site-header">
-    <a class="brand" href="/" aria-label="FORJA — início"><span class="brand-mark" aria-hidden="true">F</span>FORJA</a>
-    <span class="workspace-label">ESPAÇO DE TRABALHO</span>
-    <div class="connection"><span class="connection-dot" aria-hidden="true"></span><span id="connection">A ligar ao servidor…</span></div>
+    <a class="brand" href="/" aria-label="FORJA — home"><span class="brand-mark" aria-hidden="true">F</span>FORJA</a>
+    <span class="workspace-label">WORKSPACE</span>
+    <div class="connection"><span class="connection-dot" aria-hidden="true"></span><span id="connection">Connecting to the server…</span></div>
   </header>
   <main id="main">
     <section class="intro" aria-labelledby="page-title">
-      <div><p class="eyebrow">VISÃO GERAL</p><h1 id="page-title">O trabalho, à vista.</h1><p>O que está em curso. O que precisa de ti. O que ficou concluído.</p></div>
-      <button id="refresh" class="secondary" type="button"><span aria-hidden="true">↻</span> Atualizar</button>
+      <div><p class="eyebrow">OVERVIEW</p><h1 id="page-title">Your work, at a glance.</h1><p>What is running. What needs you. What is done.</p></div>
+      <button id="refresh" class="secondary" type="button"><span aria-hidden="true">↻</span> Refresh</button>
     </section>
     <div id="notice" class="notice" hidden></div>
     <p id="announcements" class="sr-only" role="status" aria-live="polite"></p>
     <p id="action-status" class="action-status" role="status"></p>
-    <section id="overview" class="overview" aria-label="Resumo dos projetos" hidden></section>
+    <section id="overview" class="overview" aria-label="Project overview" hidden></section>
     <section class="work" aria-labelledby="work-title">
-      <div class="section-header"><div><p class="eyebrow">PROJETOS</p><h2 id="work-title">Execuções atuais</h2></div><span id="project-count" class="muted"></span></div>
+      <div class="section-header"><div><p class="eyebrow">PROJECTS</p><h2 id="work-title">Current runs</h2></div><span id="project-count" class="muted"></span></div>
       <div class="toolbar">
-        <div class="filters" role="group" aria-label="Filtrar projetos">
-          <button type="button" data-filter="all" aria-pressed="true">Todos</button>
-          <button type="button" data-filter="attention" aria-pressed="false">Precisam de atenção</button>
-          <button type="button" data-filter="running" aria-pressed="false">Em curso</button>
-          <button type="button" data-filter="done" aria-pressed="false">Concluídos</button>
+        <div class="filters" role="group" aria-label="Filter projects">
+          <button type="button" data-filter="all" aria-pressed="true">All</button>
+          <button type="button" data-filter="attention" aria-pressed="false">Needs attention</button>
+          <button type="button" data-filter="running" aria-pressed="false">In progress</button>
+          <button type="button" data-filter="done" aria-pressed="false">Completed</button>
         </div>
-        <label class="search"><span class="sr-only">Pesquisar projetos ou objetivos</span><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Pesquisar projetos…" autocomplete="off"></label>
+        <label class="search"><span class="sr-only">Search projects or goals</span><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search projects…" autocomplete="off"></label>
       </div>
-      <div id="projects" aria-busy="true"><div class="empty"><span class="empty-symbol" aria-hidden="true">···</span><h3>A carregar o trabalho</h3><p>A consultar os projetos registados neste servidor.</p></div></div>
+      <div id="projects" aria-busy="true"><div class="empty"><span class="empty-symbol" aria-hidden="true">···</span><h3>Loading your work</h3><p>Fetching projects registered on this server.</p></div></div>
     </section>
-    <details class="help"><summary>Começar ou continuar no terminal <span aria-hidden="true">↗</span></summary><div class="help-grid"><div><h3>Novo projeto</h3><p>Na pasta do projeto:</p><code>forja core init</code><code>forja start --provider codex --goal "objetivo"</code><p>Podes também usar o provider <code>claude</code>.</p></div><div><h3>Retomar trabalho</h3><code>forja core resume</code><p>Para repetir uma tarefa bloqueada com um motivo explícito:</p><code>forja core retry --task ID --why "motivo"</code></div></div></details>
+    <details class="help"><summary>Start or continue in the terminal <span aria-hidden="true">↗</span></summary><div class="help-grid"><div><h3>New project</h3><p>In your project folder:</p><code>forja core init</code><code>forja start --provider codex --goal "goal"</code><p>You can also use the provider <code>claude</code>.</p></div><div><h3>Resume work</h3><code>forja core resume</code><p>To retry a blocked task with an explicit reason:</p><code>forja core retry --task ID --why "reason"</code></div></div></details>
   </main>
-  <footer><span>FORJA <span class="footer-divider">/</span> Do objetivo à revisão.</span><details class="compatibility"><summary>Workflows anteriores</summary><p>As vistas antigas acompanham execuções do runner anterior ao Core.</p><a href="/legacy">Abrir viewer anterior</a></details></footer>
+  <footer><span>FORJA <span class="footer-divider">/</span> From goal to review.</span><details class="compatibility"><summary>Legacy workflows</summary><p>The legacy views track runs from the runner that preceded Core.</p><a href="/legacy">Open legacy viewer</a></details></footer>
   <script type="module" src="/assets/core.js"></script>
 </body>
 </html>

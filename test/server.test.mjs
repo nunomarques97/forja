@@ -97,7 +97,7 @@ describe('página de entrada e POST /login', () => {
     assert.match(ok.headers['set-cookie'][0], /forja_k=.*HttpOnly.*SameSite=Lax/);
     const bad = await http('/m?k=deadbeef');
     assert.equal(bad.status, 200);
-    assert.match(bad.body, /Token errado/);
+    assert.match(bad.body, /Incorrect token/);
     assert.ok(!bad.body.includes(token));
     assert.equal((await http('/state?k=deadbeef')).status, 401, 'fora das duas páginas continua 401');
   });
@@ -176,13 +176,13 @@ describe('travão de tentativas: 5 por minuto, no formulário e no ?k=', () => {
     for (let i = 1; i <= 3; i++) {
       const { r, ms } = await timed(() => form2(`nao-e-o-token-${i}`));
       assert.equal(r.status, 200, `tentativa ${i}`);
-      assert.match(r.body, /Token errado/);
+      assert.match(r.body, /Incorrect token/);
       assert.ok(!r.headers['set-cookie'], 'nenhum cookie numa tentativa falhada');
       assert.ok(!/[a-f0-9]{32,}/.test(r.body), 'a resposta não diz nada sobre o token');
       assert.ok(ms >= 900, `a tentativa ${i} demorou ${ms} ms — devia custar ~1 s`);
     }
     const k4 = await timed(() => h('/m?k=nao-e-o-token-4'));
-    assert.equal(k4.r.status, 200); assert.match(k4.r.body, /Token errado/);
+    assert.equal(k4.r.status, 200); assert.match(k4.r.body, /Incorrect token/);
     assert.ok(k4.ms >= 900, `o ?k= errado devia custar o mesmo segundo (${k4.ms} ms)`);
     const k5 = await timed(() => h('/state?k=nao-e-o-token-5'));
     assert.equal(k5.r.status, 401, 'fora das duas páginas continua 401');
@@ -191,7 +191,7 @@ describe('travão de tentativas: 5 por minuto, no formulário e no ?k=', () => {
     const blocked = await form2('nao-e-o-token-6', '/m');
     assert.equal(blocked.status, 429);
     assert.equal(blocked.headers['retry-after'], '60');
-    assert.match(blocked.body, /Demasiadas tentativas/);
+    assert.match(blocked.body, /Too many attempts/);
     assert.ok(blocked.body.includes('name="next" value="/m"'), 'a página de 429 não perde o destino');
     assert.ok((await h('/?k=ainda-errado')).body.includes('name="next" value="/"'), 'e no PC volta para /');
 

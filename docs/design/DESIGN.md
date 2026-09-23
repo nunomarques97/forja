@@ -4,6 +4,8 @@ The viewer makes the current project, work in progress, blockers and completion 
 
 ## Core
 
+Use English for workspace controls, status, accessibility labels, errors and sign-in. Preserve project-authored text in its original language. Use English number/time formatting; the legacy compatibility views retain their original Portuguese UI.
+
 `/`, `/core` and `/m` serve one responsive Core workspace. Lead with the project overview, attention needed, current goal and task progress. Search and status filters operate on the current run per registered project; do not imply a complete run history. Unreadable, blocked, failed and interrupted projects belong in attention. A persisted running status without a live process is interrupted, not evidence of active work. Completed projects remain visible. Tasks/checks/review and actual sessions are expandable details; the entry screen has no legacy tabs or fictional roster.
 
 Its sole mutation is an explicit Sponsor technology choice for a paused run: show alternatives, costs/uncertainty, tradeoffs and recommendation without preselecting an answer. Confirming records that choice and attempts bounded continuation after all decisions are answered; it never makes a payment. Project and task names lead the hierarchy. Planning, implementation, checks and independent review remain distinguishable. Show only sessions that actually exist.
@@ -32,5 +34,7 @@ The existing palette lives in `viewer/assets/viewer.css`: background `#0E0C0B`, 
 ## Verification
 
 Viewer changes require desktop and narrow mobile inspection, keyboard navigation, loading/error/empty state checks and a check for page overflow. Store screenshots and real run evidence locally in ignored storage. Publish concise technical findings only; conversation history and raw screenshots do not belong in the release.
+
+Curated documentation screenshots may be published under `docs/assets/` when explicitly requested, captured with fictional projects, and reviewed for private data, credentials and local paths. Label them as illustrative examples. Keep raw QA captures and browser profiles in ignored storage.
 
 The API contract is in [viewer/README.md](../../viewer/README.md). Core operation is described in [CORE-RUNBOOK.md](../CORE-RUNBOOK.md).

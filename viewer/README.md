@@ -4,6 +4,8 @@
 
 ## Auth
 
+The Core workspace and sign-in page use English. Project goals, task titles and decision content retain their original language. The compatibility pages at `/legacy` and `/legacy/m` retain their Portuguese interface.
+
 Every route except `/health` needs the token. A visitor without the cookie gets the **entry page** on `/` and `/m` (a form; `POST /login` sets the cookie) and 401 everywhere else; pasting `/?k=<token>` still works. Either way the server sets the `forja_k` HttpOnly cookie (`SameSite=Lax`, 30 days, `Secure` outside loopback) and redirects to the clean path. Pages never see or store the token; they just use `fetch`/`EventSource` with same-origin cookies. Nothing prints the token — not the startup banner, not `forja token` (its output is captured into `data/events.jsonl`); it is read from `data/viewer-token.txt` and rotated with `forja token rotate`.
 
 ## Routes

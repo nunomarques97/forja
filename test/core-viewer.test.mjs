@@ -13,7 +13,7 @@ test('Core requests: deadline releases a hung fetch and a hung response body for
   const first=client.refresh();
   if(body)calls[0].resolve({ok:true,status:200,json:()=>new Promise(()=>{})});
   await first;
-  assert.equal(states.at(-1).kind,'error');assert.match(states.at(-1).message,/demorou/);assert.ok(calls[0].opts.signal.aborted);
+  assert.equal(states.at(-1).kind,'error');assert.match(states.at(-1).message,/took too long/);assert.ok(calls[0].opts.signal.aborted);
   const retry=client.refresh();calls[1].resolve(response(snapshot('fresh')));await retry;
   assert.equal(seen.at(-1).id,'fresh');assert.equal(states.at(-1).kind,'ready');
  }
@@ -34,7 +34,7 @@ test('Core requests: a decision invalidates a pending read and blocks polls/dupl
  const old=client.refresh(),choice=client.choose({option:'local'});
  assert.equal(calls[1].path,'/api/core/decision');assert.ok(calls[0].opts.signal.aborted);
  assert.equal(await client.refresh({force:true}),null);
- await assert.rejects(client.choose({option:'other'}),/Já existe/);
+ await assert.rejects(client.choose({option:'other'}),/already being saved/);
  calls[1].resolve(response({ok:true,resumed:true}));assert.equal((await choice).resumed,true);
  const after=client.refresh({force:true});calls[2].resolve(response(snapshot('after-choice')));await after;
  calls[0].resolve(response(snapshot('old-decision')));await old;assert.deepEqual(seen.map(x=>x.id),['after-choice']);
@@ -59,16 +59,16 @@ test('Core requests: disposal cancels work without late callbacks; a new lifecyc
 });
 test('Core requests: unauthorized and malformed responses produce visible errors', {timeout:1000}, async t=>{
  const {client,calls,states}=setup(t);
- let p=client.refresh();calls[0].resolve({status:401});await p;assert.match(states.at(-1).message,/Sessão expirada/);
- p=client.refresh();calls[1].resolve(response({ok:true}));await p;assert.match(states.at(-1).message,/incompleta/);
+ let p=client.refresh();calls[0].resolve({status:401});await p;assert.match(states.at(-1).message,/Session expired/);
+ p=client.refresh();calls[1].resolve(response({ok:true}));await p;assert.match(states.at(-1).message,/incomplete/);
 });
 const project=(name,status,alive=true)=>({name,core:{run:{run_id:'F-test',status,goal:'Objetivo '+name,provider:'codex',updated_at:'2026-09-23'},runnerAlive:alive,invocations:0,tasks:[],technology:[],usage:{rows:[],totals:{invocations:0,input_covered_invocations:0}}}});
 test('Core overview prioritizes attention, separates interrupted runs, and filters without fabricating history',()=>{
  const rows=[project('Final','done'),project('Ativo','running'),project('Parado','running',false),project('Bloqueado','blocked')];
- assert.equal(projectState(rows[2]).label,'Interrompido');assert.equal(projectState(rows[2]).group,'attention');
+ assert.equal(projectState(rows[2]).label,'Interrupted');assert.equal(projectState(rows[2]).group,'attention');
  assert.deepEqual(selectProjects(rows).map(p=>p.name),['Bloqueado','Parado','Ativo','Final']);
  assert.deepEqual(selectProjects(rows,'attention','parado').map(p=>p.name),['Parado']);
- assert.equal(selectProjects(rows,'done').length,1);assert.match(renderOverview(rows),/Precisam de atenção/);
+ assert.equal(selectProjects(rows,'done').length,1);assert.match(renderOverview(rows),/Needs attention/);
  const html=renderProject(project('<script>alert(1)</script>','running',false));
- assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;/);assert.match(html,/Sem processo ativo/);assert.match(html,/data-section="sessions"/);assert.doesNotMatch(html,/<details[^>]*\bopen\b/);
+ assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;/);assert.match(html,/No active process/);assert.match(html,/data-section="sessions"/);assert.doesNotMatch(html,/<details[^>]*\bopen\b/);
 });

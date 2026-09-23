@@ -103,7 +103,7 @@ test('Core lock protects live orphan and corrupt state does not fall back to leg
     true,
   );
   writeFileSync(join(f.project, '.forja/current.json'), '{');
-  assert.match(coreObservation(f.project).error, /ilegível/);
+  assert.match(coreObservation(f.project).error, /unreadable/);
   assert.deepEqual(projectStatus({ path: f.project }), {
     run: null,
     runnerAlive: true,
@@ -208,7 +208,8 @@ test('Core viewer uses existing authentication and refuses legacy launch on a Co
       const page = await fetch(base + route, { headers });
       assert.equal(page.status, 200);
       const html = await page.text();
-      assert.match(html, /O trabalho, à vista/);
+      assert.match(html, /<html lang="en">/);
+      assert.match(html, /Your work, at a glance/);
       assert.doesNotMatch(html, /role="tablist"|Modelos e ligações|Eventos clássicos/);
       assert.match(html, /href="\/legacy"/);
     }

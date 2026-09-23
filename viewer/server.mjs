@@ -302,7 +302,7 @@ export function startServer(opts = {}) {
     catch { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('not found'); }
   }
   const json = (res, status, obj) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(JSON.stringify(obj)); };
-  const denied = res => { res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<!doctype html><meta charset="utf-8"><title>Forja</title><body style="font-family:system-ui;background:#1a1512;color:#e8dfd3;display:grid;place-items:center;height:100vh;margin:0"><p>Sem acesso. Abre a página do viewer e cola o token.</p>'); };
+  const denied = res => { res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<!doctype html><meta charset="utf-8"><title>Forja</title><body style="font-family:system-ui;background:#1a1512;color:#e8dfd3;display:grid;place-items:center;height:100vh;margin:0"><p>Access denied. Open the viewer home page and paste your token.</p>'); };
 
   // ---------- entry page (T-SEC-1) ----------
   // The ntfy link no longer carries the token (docs/ARCHITECTURE.md §10), so the
@@ -347,14 +347,14 @@ export function startServer(opts = {}) {
     return null;
   }
   const LOGIN_ERRORS = {
-    wrong: 'Token errado. Confirma que copiaste a linha toda.',
-    throttled: 'Demasiadas tentativas. Espera um minuto e tenta outra vez.',
+    wrong: 'Incorrect token. Make sure you copied the whole line.',
+    throttled: 'Too many attempts. Wait a minute and try again.',
   };
   function loginPage(next, error) {
     const err = error ? `<p class="err" role="alert">${LOGIN_ERRORS[error]}</p>` : '';
-    const onde = next === '/m' ? 'neste telemóvel' : 'neste browser'; // `/` is the PC page
-    return `<!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
-      + `<meta name="robots" content="noindex"><title>Forja — entrar</title><style>`
+    const onde = next === '/m' ? 'on this phone' : 'in this browser'; // `/` is the PC page
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
+      + `<meta name="robots" content="noindex"><title>Forja — sign in</title><style>`
       // Token names and values are viewer/assets/viewer.css's (docs/design/DESIGN.md);
       // the page is a light ticket, so it uses the ticket family, including the
       // darkened wood (`--wood` gives 1,9:1 on the ticket) and the ticket's dark
@@ -377,13 +377,13 @@ export function startServer(opts = {}) {
       // the indicator is above 3:1 against the ticket at every point.
       + `:focus-visible{outline:2px solid var(--patina);outline-offset:2px;box-shadow:0 0 0 2px var(--ticket-ink)}`
       + `.err{color:var(--ticket-label);font-weight:600}`
-      + `</style></head><body><main><p class="label">Forja</p><h1>Entrar</h1>`
-      + `<p class="hint">Cola o token que está em data\\viewer-token.txt no PC; fica guardado ${onde} para este endereço.</p>`
+      + `</style></head><body><main><p class="label">Forja</p><h1>Sign in</h1>`
+      + `<p class="hint">Paste the token from data\\viewer-token.txt on the host computer. Access is remembered ${onde} for this address.</p>`
       + err
       + `<form method="post" action="/login"><input type="hidden" name="next" value="${next}">`
       + `<label for="k">Token</label>`
       + `<input id="k" name="k" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>`
-      + `<button type="submit">Entrar</button></form></main></body></html>`;
+      + `<button type="submit">Sign in</button></form></main></body></html>`;
   }
   function sendLogin(res, next, error = null, status = 200) {
     const body = loginPage(next, error);

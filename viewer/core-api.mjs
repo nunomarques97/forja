@@ -8,7 +8,7 @@ import { launchCore } from '../lib/spawn-runner.mjs';
 export function coreSnapshot(dataDir) {
   const registry = loadProjects(dataDir);
   if (registry.corrupt)
-    return { ok: false, error: 'Registo de projetos ilegível.' };
+    return { ok: false, error: 'Project registry is unreadable.' };
   return {
     ok: true,
     at: new Date().toISOString(),
@@ -26,16 +26,16 @@ export function coreSnapshot(dataDir) {
 export function handleCoreDecision(req, res, ctx) {
   if (req.url.split('?')[0] !== '/api/core/decision') return false;
   const send = (code, body) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
-  if (req.method !== 'POST') { send(405, { error: 'Método não permitido.' }); return true; }
-  if (crossSite(req)) { send(403, { error: 'Origem não permitida.' }); return true; }
+  if (req.method !== 'POST') { send(405, { error: 'Method not allowed.' }); return true; }
+  if (crossSite(req)) { send(403, { error: 'Origin not allowed.' }); return true; }
   readBody(req, res, body => {
-    let p; try { p = JSON.parse(body); } catch { send(400, { error: 'Pedido inválido.' }); return; }
+    let p; try { p = JSON.parse(body); } catch { send(400, { error: 'Invalid request.' }); return; }
     if (!p || typeof p.project !== 'string' || p.project.length > 200 || !/^F-\d+-[a-f0-9]{6}$/.test(p.run || '') || !/^D[1-8]$/.test(p.decision || '') || !/^[A-Za-z][A-Za-z0-9_-]{0,39}$/.test(p.option || '')) {
-      send(400, { error: 'Escolha inválida.' }); return;
+      send(400, { error: 'Invalid choice.' }); return;
     }
-    if (loadProjects(ctx.dataDir).corrupt) { send(503, { error: 'Registo de projetos indisponível.' }); return; }
+    if (loadProjects(ctx.dataDir).corrupt) { send(503, { error: 'Project registry is unavailable.' }); return; }
     const project = readProjects(ctx.dataDir).find(x => x.name === p.project);
-    if (!project) { send(404, { error: 'Projeto não encontrado.' }); return; }
+    if (!project) { send(404, { error: 'Project not found.' }); return; }
     try {
       const { run, changed } = decideTechnology(project.path, { runId: p.run, decisionId: p.decision, optionId: p.option, resume: true });
       const waiting = pendingTechnology(run).length > 0;
@@ -45,7 +45,7 @@ export function handleCoreDecision(req, res, ctx) {
         catch { /* The decision stays durable; the guard or CLI can resume. */ }
       }
       send(200, { ok: true, waiting, resumed: Number.isInteger(pid) && pid > 0 });
-    } catch { send(409, { error: 'A decisão mudou ou há um trabalhador ativo. Atualiza a página antes de escolher.' }); }
+    } catch { send(409, { error: 'The decision has changed or a worker is active. Refresh the page before choosing.' }); }
   });
   return true;
 }
