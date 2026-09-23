@@ -9,16 +9,20 @@ export function coreSnapshot(dataDir) {
   const registry = loadProjects(dataDir);
   if (registry.corrupt)
     return { ok: false, error: 'Project registry is unreadable.' };
+  let legacyOnlyProjects = 0;
+  const projects = readProjects(dataDir)
+    .map((p) => {
+      const core = coreObservation(p.path, { details: true });
+      if (core === null) legacyOnlyProjects++;
+      return { name: p.name, core };
+    })
+    .filter((p) => p.core)
+    .sort((a, b) => a.name.localeCompare(b.name));
   return {
     ok: true,
     at: new Date().toISOString(),
-    projects: readProjects(dataDir)
-      .map((p) => ({
-        name: p.name,
-        core: coreObservation(p.path, { details: true }),
-      }))
-      .filter((p) => p.core)
-      .sort((a, b) => a.name.localeCompare(b.name)),
+    legacy_only_projects: legacyOnlyProjects,
+    projects,
   };
 }
 

@@ -5,6 +5,13 @@ const number = value => value == null ? '—' : new Intl.NumberFormat('en').form
 const status = (key, text = labels[key] || key) => `<span class="status ${esc(key)}"><span aria-hidden="true"></span>${esc(text)}</span>`;
 const costs = { free: 'No expected cost', paid: 'Paid option', unknown: 'Cost unknown' };
 const projectKey = p => JSON.stringify([p.name, p.core.run?.run_id]);
+const safeCount = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
+export function renderLegacyNotice(value) {
+  const count = safeCount(value);
+  if (!count) return '';
+  const noun = count === 1 ? 'project has' : 'projects have';
+  return `<p id="legacy-discovery-text"><strong>${number(count)} registered ${noun} no Core run.</strong> You can still view ${count === 1 ? 'it' : 'them'} in the legacy workspace.</p><a href="/legacy">Open legacy viewer</a>`;
+}
 export function projectState(p) {
   const c = p.core;
   if (c.error) return { group: 'attention', key: 'failed', label: 'Status unavailable' };
@@ -47,8 +54,18 @@ export function renderProject(p) {
     <p class="run-reference">${esc(r.provider)} · ${esc(r.run_id)}<br>Updated ${esc(r.updated_at)}</p></details></div></article>`;
 }
 const empty = (title, body) => `<div class="empty"><span class="empty-symbol" aria-hidden="true">◇</span><h3>${title}</h3><p>${body}</p></div>`;
+export function renderEmptyState(projectCount, legacyOnlyProjects) {
+  if (projectCount) return empty('No projects in this view', 'Try another filter or search for a different name.');
+  if (safeCount(legacyOnlyProjects)) return empty('No Core runs yet', 'Projects without a Core run remain available in the legacy viewer above.');
+  return empty('It starts with a goal.', 'Start a run in the terminal. Its project, tasks and decisions will appear here automatically.');
+}
 export function bootCore({ doc = document, fetchImpl = globalThis.fetch, intervalMs = 5000, timeoutMs = 10000 } = {}) {
   const root = doc.getElementById('projects'), refreshButton = doc.getElementById('refresh'), life = new AbortController();
+  const legacyNotice = doc.createElement('aside');
+  legacyNotice.className = 'legacy-discovery';
+  legacyNotice.setAttribute('aria-labelledby', 'legacy-discovery-text');
+  legacyNotice.hidden = true;
+  root.parentNode.insertBefore(legacyNotice, root);
   let snapshot = null, filter = 'all', query = '', disposed = false, submitting = false, lastStates = '', first = true;
   const rendered = new Map(), choices = new Map();
   const listen = (target, event, handler) => target.addEventListener(event, handler, { signal: life.signal });
@@ -57,6 +74,14 @@ export function bootCore({ doc = document, fetchImpl = globalThis.fetch, interva
     if (!snapshot || disposed) return;
     const projects = selectProjects(snapshot.projects), visible = new Set(selectProjects(projects, filter, query).map(projectKey));
     const active = doc.activeElement, inside = root.contains(active);
+    const legacyOnlyProjects = safeCount(snapshot.legacy_only_projects);
+    const legacyHtml = renderLegacyNotice(legacyOnlyProjects);
+    if (legacyNotice.innerHTML !== legacyHtml) {
+      const focused = legacyNotice.contains(active);
+      legacyNotice.innerHTML = legacyHtml;
+      legacyNotice.hidden = !legacyHtml;
+      if (focused) (legacyNotice.querySelector('a') || refreshButton).focus({ preventScroll: true });
+    } else legacyNotice.hidden = !legacyHtml;
     for (const form of root.querySelectorAll('form.technology')) {
       const value = form.querySelector('input:checked')?.value;
       if (value) choices.set(JSON.stringify([form.dataset.project, form.dataset.run, form.dataset.decision]), value);
@@ -104,10 +129,10 @@ export function bootCore({ doc = document, fetchImpl = globalThis.fetch, interva
         next = article.nextElementSibling;
       }
     }
-    if (!visible.size) root.insertAdjacentHTML('beforeend', projects.length ? empty('No projects in this view', 'Try another filter or search for a different name.') : empty('It starts with a goal.', 'Start a run in the terminal. Its project, tasks and decisions will appear here automatically.'));
-    const states = JSON.stringify(projects.map(p => [projectKey(p), projectState(p).label, p.core.tasks?.map(t => t.status)]));
+    if (!visible.size) root.insertAdjacentHTML('beforeend', renderEmptyState(projects.length, legacyOnlyProjects));
+    const states = JSON.stringify([legacyOnlyProjects, projects.map(p => [projectKey(p), projectState(p).label, p.core.tasks?.map(t => t.status)])]);
     if (states !== lastStates) {
-      if (!first) announce('Project status updated. ' + projects.filter(p => projectState(p).group === 'attention').length + ' need attention.');
+      if (!first) announce('Project status updated. ' + projects.filter(p => projectState(p).group === 'attention').length + ' need attention. ' + (legacyOnlyProjects ? `${legacyOnlyProjects} ${legacyOnlyProjects === 1 ? 'project is' : 'projects are'} available in the legacy viewer.` : 'No projects are available only in the legacy viewer.'));
       lastStates = states; first = false;
     }
   }
@@ -169,7 +194,7 @@ export function bootCore({ doc = document, fetchImpl = globalThis.fetch, interva
   });
   const timer = setInterval(() => { if (!doc.hidden) client.refresh(); }, intervalMs);
   client.refresh();
-  function dispose() { disposed = true; clearInterval(timer); life.abort(); client.dispose(); }
+  function dispose() { disposed = true; clearInterval(timer); life.abort(); client.dispose(); legacyNotice.remove(); }
   return { refresh: () => client.refresh({ force: true }), dispose };
 }
 if (typeof document !== 'undefined') {

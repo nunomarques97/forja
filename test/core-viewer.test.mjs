@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCoreClient } from '../viewer/assets/core-client.js';
-import { projectState, selectProjects, renderOverview, renderProject } from '../viewer/assets/core.js';
+import { projectState, selectProjects, renderOverview, renderProject, renderLegacyNotice, renderEmptyState } from '../viewer/assets/core.js';
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => {resolve=a; reject=b}); return { promise, resolve, reject }; };
 const snapshot = id => ({ok:true,at:'2026-09-23T12:00:00Z',projects:[],id});
 const response = data => ({ok:true,status:200,json:async()=>data});
@@ -71,4 +71,19 @@ test('Core overview prioritizes attention, separates interrupted runs, and filte
  assert.equal(selectProjects(rows,'done').length,1);assert.match(renderOverview(rows),/Needs attention/);
  const html=renderProject(project('<script>alert(1)</script>','running',false));
  assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;/);assert.match(html,/No active process/);assert.match(html,/data-section="sessions"/);assert.doesNotMatch(html,/<details[^>]*\bopen\b/);
+});
+test('Legacy-only discovery is safe, pluralized, and distinct from Core and filter empty states',()=>{
+ assert.equal(renderLegacyNotice(undefined),'');
+ assert.equal(renderLegacyNotice(-1),'');
+ assert.equal(renderLegacyNotice(1.5),'');
+ assert.equal(renderLegacyNotice(Number.MAX_SAFE_INTEGER + 1),'');
+ assert.equal(renderLegacyNotice('<img src=x onerror=alert(1)>'),'');
+ assert.match(renderLegacyNotice(1),/1 registered project has no Core run/);
+ assert.match(renderLegacyNotice(1),/href="\/legacy"/);
+ assert.match(renderLegacyNotice(2),/2 registered projects have no Core run/);
+ assert.doesNotMatch(renderLegacyNotice(2),/<img|onerror/);
+ assert.match(renderEmptyState(0,undefined),/It starts with a goal/);
+ assert.match(renderEmptyState(0,'2'),/It starts with a goal/);
+ assert.match(renderEmptyState(0,2),/No Core runs yet/);
+ assert.match(renderEmptyState(1,2),/No projects in this view/);
 });

@@ -741,6 +741,36 @@ td:nth-child(n+4) {
   font-size:13px;
 }
 
+.legacy-discovery {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:24px;
+  min-width:0;
+  border:1px solid #46533b;
+  background:#1d231a;
+  border-radius:8px;
+  padding:14px 18px;
+  margin:0 0 20px;
+  overflow-wrap:anywhere;
+}
+
+.legacy-discovery p {
+  color:var(--text);
+  margin:0;
+  font-size:13px;
+}
+
+.legacy-discovery a {
+  display:inline-flex;
+  align-items:center;
+  min-height:44px;
+  flex-shrink:0;
+  color:var(--accent);
+  font-size:12px;
+  font-weight:650;
+}
+
 .warning {
   color:var(--bad);
 }
@@ -1002,6 +1032,12 @@ footer {
   }
   .metrics span {
     font-size:10px;
+  }
+  .legacy-discovery {
+    align-items:flex-start;
+    flex-direction:column;
+    gap:4px;
+    padding:14px 16px;
   }
   .help-grid {
     grid-template-columns:1fr;

@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/tree/v0.10.1"><img src="https://img.shields.io/badge/version-0.10.1-ff9955" alt="Version 0.10.1"></a>
+  <a href="https://github.com/nunomarques97/forja/tree/v0.10.2"><img src="https://img.shields.io/badge/version-0.10.2-ff9955" alt="Version 0.10.2"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -43,7 +43,7 @@ Workers edit files and execute commands. They are instructed not to commit or pu
 
 ## Viewer
 
-An English workspace for the current run of each registered project: goals, progress, decisions that need you, and expandable task and session evidence. Open it with `node $forja serve` from the FORJA checkout. Project-authored text keeps its original language; the optional legacy views remain in Portuguese.
+An English workspace for the current run of each registered project: goals, progress, decisions that need you, and expandable task and session evidence. Open it with `node $forja serve` from the FORJA checkout. Project-authored text keeps its original language; the optional legacy views remain in Portuguese. Projects without a Core run appear in a discovery notice with a direct link to the legacy viewer.
 
 **Desktop — compare alternatives and make an explicit choice.**
 
@@ -144,7 +144,7 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.10.1](https://github.com/nunomarques97/forja/tree/v0.10.1)** — English Core workspace and sign-in, with desktop/mobile screenshots in this README. Restart the viewer from the updated checkout to load it; existing services and active runs are not migrated.
+**Current: [v0.10.2](https://github.com/nunomarques97/forja/tree/v0.10.2)** — Discover registered projects without a Core run through a notice and direct legacy viewer link. Restart the viewer from the updated checkout to load it; existing services and active runs are not migrated.
 
 | Release | Main change |
 |---|---|

@@ -85,6 +85,41 @@ test('Core projection attributes partial usage and never emits raw evidence or p
   assert.match(renderProject(snap.projects[0]), /&lt;script&gt;/);
 });
 
+test('Core snapshot counts only existing projects with absent Core state', (t) => {
+  const f = fixture(t);
+  const legacy = join(f.root, 'legacy-private-name');
+  const corrupt = join(f.root, 'corrupt-core');
+  const unreadable = join(f.root, 'unreadable-core');
+  const missing = join(f.root, 'missing-project');
+  mkdirSync(legacy, { recursive: true });
+  mkdirSync(join(corrupt, '.forja'), { recursive: true });
+  mkdirSync(join(unreadable, '.forja/current.json'), { recursive: true });
+  mkdirSync(missing, { recursive: true });
+  upsertProject({ name: 'Legacy Secret', path: legacy }, f.data);
+  upsertProject({ name: 'Broken Core', path: corrupt }, f.data);
+  upsertProject({ name: 'Unreadable Core', path: unreadable }, f.data);
+  upsertProject({ name: 'Gone Project', path: missing }, f.data);
+  writeFileSync(join(corrupt, '.forja/current.json'), '{');
+  rmSync(missing, { recursive: true, force: true });
+
+  const snap = coreSnapshot(f.data);
+  assert.equal(snap.legacy_only_projects, 1);
+  assert.equal(Number.isSafeInteger(snap.legacy_only_projects), true);
+  assert.deepEqual(snap.projects.map(p => p.name), ['Broken Core', 'Project', 'Unreadable Core']);
+  assert.match(snap.projects[0].core.error, /unreadable/);
+  assert.match(snap.projects[2].core.error, /unreadable/);
+  assert.doesNotMatch(JSON.stringify(snap), /Legacy Secret|legacy-private-name|Gone Project|missing-project/);
+});
+
+test('Core snapshot reports safe zero metadata for an empty registry and preserves registry errors', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'forja-observe-empty-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  assert.deepEqual(coreSnapshot(root).projects, []);
+  assert.equal(coreSnapshot(root).legacy_only_projects, 0);
+  writeFileSync(join(root, 'projects.json'), '{');
+  assert.deepEqual(coreSnapshot(root), { ok: false, error: 'Project registry is unreadable.' });
+});
+
 test('Core lock protects live orphan and corrupt state does not fall back to legacy', (t) => {
   const f = fixture(t),
     lock = join(f.project, '.forja/lock.json');

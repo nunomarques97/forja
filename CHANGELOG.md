@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.2 — Discover existing projects from the Core workspace
+
+- Show a concise notice and legacy viewer link for registered projects without Core state, including when there are no Core runs yet. Keep filter no-results and genuinely empty onboarding distinct.
+- Expose only an aggregate count in the authenticated Core API; unreadable Core state remains an error project. Preserve stale snapshots, focus and compatibility with older servers.
+- Verify mixed and empty registries, malformed state, safe metadata handling, and desktop/mobile browser transitions.
+
 ## 0.10.1 — English workspace and viewer screenshots
 
 - Use English throughout the Core workspace and sign-in page, including status, decisions, errors, accessibility labels and number/time formatting. Project goals, task names and generated decision content retain their original language; compatibility views remain in Portuguese.
