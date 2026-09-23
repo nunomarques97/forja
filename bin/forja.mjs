@@ -901,12 +901,12 @@ async function delegate(mod, fn, args) {
 
 const usage = `FORJA core (docs/CORE-RUNBOOK.md)
   start --goal "..." --provider claude|codex [--project <repo>] [--allow-dirty] [--config <json>] [--plan <json>]
-  core init | core resume | core status | core usage [--details]
+  core init | core doctor [--provider claude|codex] [--config file] | core resume | core status | core usage [--details]
   core diagnose  (read-only execution metadata; no provider calls)
   core context --query "..."  (selected project knowledge with source references)
   core retry --task T1 --why "..." [--max-attempts 3] [--max-sessions 40]
   core abandon --why "..."
-  Budgets: --max-sessions 30 --max-attempts 2 --max-minutes 30 --max-rotations 2 --max-context-tokens 120000
+  Budgets: --max-sessions 30 --max-cloud-sessions N --max-attempts 2 --max-minutes 30 --max-rotations 2 --max-context-tokens 120000
 
 Observability: serve, then /core; guard supports Core and legacy runs.
 

@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/tree/v0.10.2"><img src="https://img.shields.io/badge/version-0.10.2-ff9955" alt="Version 0.10.2"></a>
+  <a href="https://github.com/nunomarques97/forja/tree/v0.11.0"><img src="https://img.shields.io/badge/version-0.11.0-ff9955" alt="Version 0.11.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -34,10 +34,13 @@ $forja = (Resolve-Path .\bin\forja.mjs).Path
 
 # Work from the Git root of the project you want to change.
 Set-Location 'C:\path\to\your-project'
+node $forja core doctor --provider codex
 node $forja start --provider codex --goal "Add name search, preserve existing filters, and test empty results"
 ```
 
 Use `--provider claude` for Claude Code. The project must have a clean working tree unless you explicitly pass `--allow-dirty`. Ignore the project's `.forja/` directory: it contains private run state and logs. Optional `core init` adds the ignore rule and short instruction references; review and commit those setup changes before a clean-tree start.
+
+`core doctor` checks local prerequisites without model calls or project changes. It does not confirm login, model access or subscription quota.
 
 Workers edit files and execute commands. They are instructed not to commit or publish. Starting an ordinary chat does not automatically start FORJA.
 
@@ -76,6 +79,8 @@ Supply `--plan plan.json` to skip planning. For each task, the developer impleme
 **The controller owns completion.** Source-changing checks, unauthorized review edits, invalid results, timeouts and exhausted limits leave the run blocked with work preserved. An impressive partial implementation is not a successful run.
 
 ## Quality and control
+
+Blocked runs show a safe recovery reason and execution limits in the viewer. Inspect preserved work before using `core resume` or `core retry`; checks and independent review remain required. Total sessions, cloud sessions and per-call time limits are separate budgets. Claude context stopping uses observed request input; Codex/custom do not expose an equivalent live context measurement. These limits do not change provider quota.
 
 | What you control | What FORJA enforces |
 |---|---|
@@ -144,10 +149,12 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.10.2](https://github.com/nunomarques97/forja/tree/v0.10.2)** — Discover registered projects without a Core run through a notice and direct legacy viewer link. Restart the viewer from the updated checkout to load it; existing services and active runs are not migrated.
+**Current: [v0.11.0](https://github.com/nunomarques97/forja/tree/v0.11.0)** — Durable checkpoint recovery, explicit cloud-session recovery budgets, safe viewer guidance and read-only setup diagnostics. Restart the viewer from the updated checkout to load it; existing services and active runs are not migrated.
 
 | Release | Main change |
 |---|---|
+| 0.11.0 | Recover checkpoints with explicit limits; diagnose setup and stopped runs. |
+| 0.10.3 | Reject unresolved acceptance targets before development. |
 | [0.10.0](https://github.com/nunomarques97/forja/tree/v0.10.0) | Core-first workspace, project overview, decisions, filters and resilient refresh. |
 | [0.9.0](https://github.com/nunomarques97/forja/tree/v0.9.0) | Explicit on-demand knowledge references with complete mandatory notes. |
 | [0.8.3](https://github.com/nunomarques97/forja/tree/v0.8.3) | Acceptance study decision and evaluation criteria; runtime unchanged from v0.8.2. |

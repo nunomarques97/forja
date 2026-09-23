@@ -1062,3 +1062,6 @@ footer {
     scroll-behavior:auto!important;
   }
 }
+:root .recovery-note { margin: 16px 0; padding: 16px; border: 1px solid #76613b; border-radius: 12px; background: #222219; overflow-wrap: anywhere; }
+:root .recovery-note strong { color: #f2d09b; }
+:root .recovery-note p { margin: 8px 0; line-height: 1.5; }

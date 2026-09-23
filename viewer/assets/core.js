@@ -46,6 +46,7 @@ export function renderProject(p) {
     <p class="goal">${esc(r.goal || 'Goal unavailable')}</p>
     <div class="work-progress"><div><p class="activity"><span class="activity-mark ${state.key}" aria-hidden="true"></span>${esc(activity)}</p><p class="muted">${r.status === 'blocked' && !c.technology?.length ? 'Check the tasks and review before resuming in the terminal.' : `${number(c.invocations)} session${c.invocations === 1 ? '' : 's'} started`}</p></div><div class="progress-summary"><span><strong>${completed}</strong> / ${tasks.length} tasks completed</span><progress max="${Math.max(tasks.length, 1)}" value="${completed}" aria-label="Completed tasks in ${esc(name)}"></progress></div></div>
     ${decisions(name, c)}
+    ${c.recovery ? `<aside class="recovery-note" aria-label="Recovery guidance"><strong>${esc(c.recovery.title)}</strong><p>${esc(c.recovery.guidance)}</p><p class="hint">Recovery is performed in the terminal. Saved work still needs validation and independent review.</p><details data-section="budgets"><summary data-focus="budgets">Execution limits</summary><p>Total sessions: ${number(c.recovery.sessions?.used)} / ${number(c.recovery.sessions?.limit)} · Cloud sessions: ${number(c.recovery.cloud_sessions?.used)} / ${number(c.recovery.cloud_sessions?.limit)}</p><p>Run time cap: ${number(c.recovery.minutes_per_call)} minutes per call. A route may set a lower cap.</p><p>Configured context threshold: ${number(c.recovery.context_tokens)} tokens.</p><p class="hint">${esc(c.recovery.context_note)}</p></details></aside>` : ''}
     <div class="project-details"><details data-section="tasks"><summary data-focus="tasks">Tasks and validation <span class="detail-count">${tasks.length}</span></summary><div class="task-list">${tasks.length ? tasks.map(t => `<div class="task"><span class="task-id">${esc(t.id)}</span><div class="task-title">${esc(t.title)}<small>${t.checks_passed}/${t.checks_total} checks · Review ${esc(labels[t.review] || t.review || 'pending')} · ${t.attempts} attempt${t.attempts === 1 ? '' : 's'}${t.rotations ? ` · ${t.rotations} rotation${t.rotations === 1 ? '' : 's'}` : ''}</small></div>${status(t.status)}</div>`).join('') : '<p class="muted">The task plan is not available yet.</p>'}</div></details>
     <details data-section="sessions"><summary data-focus="sessions">Sessions and usage <span class="detail-count">${c.usage.rows.length}</span></summary>
     <div class="metrics">${[[u.input_tokens_including_cache, 'Input (including cache)'], [u.output_tokens, 'Output'], [u.cached_input_tokens, 'Cached input']].map(([n, label]) => `<div><strong>${number(n)}</strong><span>${label}</span></div>`).join('')}</div>
@@ -114,7 +115,7 @@ export function bootCore({ doc = document, fetchImpl = globalThis.fetch, interva
           const choice = choices.get(JSON.stringify([form.dataset.project, form.dataset.run, form.dataset.decision]));
           for (const input of form.querySelectorAll('input')) input.checked = input.value === choice;
         }
-        if (focusKey) [...article.querySelectorAll('[data-focus]')].find(n => n.dataset.focus === focusKey)?.focus({ preventScroll: true });
+        if (focusKey) ([...article.querySelectorAll('[data-focus]')].find(n => n.dataset.focus === focusKey) || refreshButton).focus({ preventScroll: true });
         else if (focusedForm) refreshButton.focus({ preventScroll: true });
       }
       if (article) article.hidden = !visible.has(key);
@@ -130,7 +131,7 @@ export function bootCore({ doc = document, fetchImpl = globalThis.fetch, interva
       }
     }
     if (!visible.size) root.insertAdjacentHTML('beforeend', renderEmptyState(projects.length, legacyOnlyProjects));
-    const states = JSON.stringify([legacyOnlyProjects, projects.map(p => [projectKey(p), projectState(p).label, p.core.tasks?.map(t => t.status)])]);
+    const states = JSON.stringify([legacyOnlyProjects, projects.map(p => [projectKey(p), projectState(p).label, p.core.recovery?.code, p.core.tasks?.map(t => t.status)])]);
     if (states !== lastStates) {
       if (!first) announce('Project status updated. ' + projects.filter(p => projectState(p).group === 'attention').length + ' need attention. ' + (legacyOnlyProjects ? `${legacyOnlyProjects} ${legacyOnlyProjects === 1 ? 'project is' : 'projects are'} available in the legacy viewer.` : 'No projects are available only in the legacy viewer.'));
       lastStates = states; first = false;

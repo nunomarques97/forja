@@ -4,6 +4,8 @@ Manual de referência dos novos runs. [CORE.md](CORE.md) é o contrato curto env
 
 ## Arrancar
 
+Antes do primeiro run, usa `node $forja core doctor --provider codex` (ou `claude`), na raiz Git do projeto; acrescenta `--config` se usares rotas próprias. Verifica Node, Git, raiz do projeto, alterações pendentes, exclusão de `.forja/`, configuração e presença dos executores. Não chama modelos, lê credenciais nem escreve no projeto. `ready: true` confirma apenas requisitos locais: autenticação, acesso ao modelo e quota continuam por verificar no CLI do provider. Avisos sobre alterações pendentes ou `.forja/` exigem revisão; `core init` pode preparar instruções e o ignore, mas essas alterações precisam de revisão antes de um arranque com árvore limpa.
+
 Requisitos: Node 24, Git e Claude Code ou Codex instalado e autenticado. Na raiz Git do projeto:
 
 ```powershell
@@ -82,6 +84,12 @@ O gate é determinístico sobre custos **reportados**. Classificar custos, ident
 Há um escritor por projeto. O lock regista controlador e subprocesso; a retoma recusa processos vivos. Recuperação de lock obsoleto é serializada. Estado inválido, paths exteriores/symlinks, alteração do estado pelo worker e commits inesperados interrompem o run. Estas verificações não substituem uma sandbox contra executores maliciosos.
 
 ## Diagnóstico local de execução
+
+`core status` inclui orientação de recuperação com motivos fechados, também visível no viewer sem copiar erros brutos, argumentos ou caminhos privados. Runs antigos sem motivo estruturado mostram orientação genérica, sem inferir uma causa a partir do texto. Um processo ausente num run marcado `running` é apresentado como interrompido; isso não equivale a trabalho concluído.
+
+Checkpoints guardam uma entrega durável ligada à fonte e ao HEAD. Após reinício, essa entrega pode ser recuperada sem contabilizar a mesma continuação duas vezes. Um checkpoint não consome uma tentativa de implementação; ao esgotar as rotações, permanece bloqueado até aumentares `--max-rotations`. Uma recusa de orçamento anterior ao lançamento também não gasta tentativa. Timeout ou falha de provider continuam sem retry automático: inspeciona o diff e, se a implementação já estiver pronta, usa `core retry --task ID --validate-only --why "..."`; os checks e a revisão continuam obrigatórios. Para novo desenvolvimento, aumenta explicitamente o orçamento de tentativas se necessário. Recibos de versões anteriores apenas guardados como texto não são convertidos automaticamente em entregas aprovadas.
+
+Os limites têm âmbitos diferentes: `--max-sessions` limita sessões totais; `--max-cloud-sessions` limita sessões cloud; `--max-minutes` limita cada chamada e pode ser reduzido por uma rota. A retoma só permite aumentar budgets e regista limites anteriores/novos; aumentar sessões totais não ultrapassa um limite cloud explícito. Nenhum destes valores altera a quota da conta. `--max-context-tokens` usa observações do input de cada pedido Claude (incluindo cache), não tokens acumulados; Codex/custom não fornecem uma medida live comparável neste adapter e não se afirma um stop de contexto para eles. O ledger guarda os limites efetivos de cada chamada. Um evento explícito de quota/rate limit recusado pelo Claude é distinguido de avisos; causas desconhecidas continuam falhas genéricas.
 
 `node bin/forja.mjs core diagnose --project <projeto>` resume o ledger e os ficheiros `call-N-events.jsonl` do run atual, incluindo runs terminados. É uma leitura pedida explicitamente: não chama modelos, não retoma tarefas e não acrescenta instrumentação ao percurso de execução. Não lê prompts, saídas brutas dos providers nem sessões nativas; não envia notificações.
 

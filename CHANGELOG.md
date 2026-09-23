@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0 — Recover preserved work with explicit limits
+
+- Persist checkpoint receipts across controller restarts, retain partial edits and account for continuations separately from implementation attempts. Refuse exhausted budgets before charging an attempt or starting another provider.
+- Add an explicit cloud-session recovery limit. Keep route time caps and provider quota distinct; expose actual time/context enforcement without claiming live context measurement for Codex/custom executors.
+- Show public-safe recovery reasons and guidance in the Core viewer and CLI, with expandable limits, preserved focus and status announcements. General recovery stays in the terminal.
+- Add read-only `core doctor` checks for Node, Git, project setup, routing and native executor presence. Do not invoke models, change project files, inspect login credentials or claim account/model/quota readiness.
+
 ## 0.10.3 — Reject unresolved acceptance targets before development
 
 - Validate task checks and caller final checks before spending development attempts. Reject blank executables, NUL bytes and recognizable unresolved target placeholders without executing or rewriting commands.
