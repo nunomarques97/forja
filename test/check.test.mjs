@@ -46,7 +46,7 @@ describe('invisible characters', () => {
     assert.match(lines.find(l => l.includes('.gitignore')), /^invisíveis: \.gitignore:1:5 — soft hyphen \(U\+00AD\)$/);
     assert.match(lines.find(l => l.includes('pre-commit')), /^invisíveis: hooks\/pre-commit:1:10 — form feed \(U\+000C\)$/);
     assert.equal(lines.some(l => l.includes('b.png')), false);
-    for (const ext of ['md', 'mjs', 'js', 'json', 'css', 'html']) assert.ok(TEXT_EXT.test(`x.${ext}`) && isTextFile(`dir/x.${ext}`), ext);
+    for (const ext of ['md', 'mjs', 'js', 'json', 'css', 'html', 'py']) assert.ok(TEXT_EXT.test(`x.${ext}`) && isTextFile(`dir/x.${ext}`), ext);
     for (const f of ['.gitignore', '.gitattributes', '.editorconfig', 'LICENSE', 'hooks/pre-commit']) assert.ok(isTextFile(f), f);
     for (const f of ['x.png', 'tools/a.exe', 'fonts/b.woff2']) assert.equal(isTextFile(f), false, f);
   });

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.0 — Isolate controller checks and automate reviewer-approved delivery
+
+- Add optional Linux/WSL bubblewrap checks with read-only source snapshots, isolated network/process namespaces, bounded scratch/output and deterministic teardown. Refuse unavailable isolation without host fallback; record snapshot evidence for acceptance and final checks.
+- Let the existing final reviewer approve the exact delivery tree and commit message in the same session. The controller creates the approved commit using a separate index; no additional agent, model route or model invocation is introduced.
+- Add explicit per-run commit/push authorization and a protected project deployment contract. Unknown effects and unapproved production block push; exact-commit production approval is available through `core deliver --approve-production`.
+- Refuse unrelated initial edits, changed review inputs, pipeline drift, private snapshot findings and unpublished local ancestry. Preserve receipts and local commits on blocked or uncertain publication; never force-push, merge, tag or bypass server protection.
+- Document prerequisite and deployment limits. Both capabilities are opt-in; active configurations, historical runs and provider models are unchanged.
+
 ## 0.13.0 — Restrict Claude worker file tools
 
 - Add explicit Claude `writePolicy: "restricted"`, requiring CLI 2.1.280 or newer. Limit workers to native file tools within the project and a dedicated scratch directory; planning and review receive only read tools. Disable shell, Git, MCP, subagent and code-execution capabilities in this mode.

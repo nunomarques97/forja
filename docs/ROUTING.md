@@ -53,6 +53,8 @@ This is a native tool boundary, not an OS sandbox, protection from another proce
 
 ## Acceptance checks owned by the caller
 
+Controller checks can separately opt into [bubblewrap isolation](CONTROLLER-DELIVERY.md#isolated-controller-checks). Reviewer-owned automatic delivery is also opt-in and reuses the existing final review route; there is no additional `delivery` model phase.
+
 Add commands to the configuration passed with `--config`:
 
 ```json

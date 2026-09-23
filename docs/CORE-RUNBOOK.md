@@ -18,7 +18,9 @@ node $forja core usage
 node $forja core diagnose
 ```
 
-Claude só muda `--provider claude`. De outra pasta, acrescenta `--project 'C:\caminho\projeto'`. Com alterações pendentes, revê-as e usa `--allow-dirty` para autorizar a execução nesse estado. Os hashes iniciais não são um backup: o agente tem acesso de escrita e deve preservar trabalho existente. Core não faz commits nem publica. Uma decisão pendente sobre tecnologia paga ou custo incerto pode enviar uma notificação de estado ao Sponsor, se o transporte existente estiver configurado.
+Claude só muda `--provider claude`. De outra pasta, acrescenta `--project 'C:\caminho\projeto'`. Com alterações pendentes, revê-as e usa `--allow-dirty` para autorizar a execução nesse estado. Os hashes iniciais não são um backup: o agente tem acesso de escrita e deve preservar trabalho existente. Sem `delivery`, Core não faz commits nem publica. Uma decisão pendente sobre tecnologia paga ou custo incerto pode enviar uma notificação de estado ao Sponsor, se o transporte existente estiver configurado.
+
+As opções `checkIsolation` e `delivery` estão descritas em [isolamento e entrega](CONTROLLER-DELIVERY.md). A primeira executa checks Linux num snapshot só de leitura através de bubblewrap, sem fallback para o host. A segunda acrescenta a decisão de entrega ao reviewer final existente, sem sessão adicional; o controlador faz commit e, quando autorizado, push. A entrega exige arranque limpo, manifesto aprovado e contrato de publicação/produção estável. `core deliver --retry` retoma apenas a entrega após inspeção; `core deliver --approve-production <sha>` autoriza o commit concreto já revisto, sem mudar defaults do projeto.
 
 `core init` é opcional: acrescenta uma referência a CORE.md em blocos geridos de AGENTS/CLAUDE e ignora `.forja/`. Preserva as regras existentes e recusa marcadores inválidos. O arranque direto já envia CORE.md; se dispensares init, acrescenta `.forja/` ao `.gitignore` para não versionar logs privados. Não copies o catálogo antigo de agentes para novos projetos.
 

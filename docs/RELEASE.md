@@ -16,6 +16,8 @@ Obsidian can open either a private knowledge collection or project Markdown. It 
 
 The agent preparing a release owns the proposed file list, staged-diff review and public/private classification. This is a delivery step, not a new mandatory model session for every task. Core workers continue to implement and review without making commits; the delivery agent works after the run, within the user's authorization.
 
+For Core runs with explicit `delivery` configuration, the **existing final reviewer** owns the release decision in its code-review session. There is no separate Git agent: the controller prepares an explicit candidate index/manifest, enforces the privacy and history gates, and executes only the snapshot-bound approved operations. The controller uses the same built-in scanner as this release guard. Deployment effects and production permission remain separate from code approval. See [the delivery contract](CONTROLLER-DELIVERY.md) for exact configuration, prerequisites and recovery. Without this opt-in, delivery remains the caller's responsibility.
+
 1. Inspect existing changes and preserve unrelated user work. Select explicit paths; never use `git add .` or `git add -A` for a release containing private evidence.
 2. Review staged **contents**, including generated docs, screenshots and fixtures. Exclude personal information, user questions/answers, credentials, native transcripts and local home paths. Rename/move private evidence if needed; do not delete it to make a check pass.
 3. Run the appropriate tests, `npm run check`, `npm run release:check` and `git diff --cached --check`. The scanner reads Git's index, not the worktree, and prints finding categories without secret values.

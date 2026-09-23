@@ -96,7 +96,7 @@ export const INVISIBLE = new RegExp(`[${INVISIBLE_RANGES.map(([a, b]) => (a === 
 // that have no extension at all (`hooks/` scripts without a suffix, `LICENSE`)
 // and the dotfiles that are text by definition. Binaries (PNG, fonts) are left
 // alone.
-export const TEXT_EXT = /\.(md|mjs|js|json|css|html)$/i;
+export const TEXT_EXT = /\.(md|mjs|js|json|css|html|py)$/i;
 export const TEXT_DOTFILES = new Set(['.gitignore', '.gitattributes', '.gitmodules', '.editorconfig', '.npmrc', '.nvmrc']);
 export function isTextFile(f) {
   const name = String(f).split('/').pop();

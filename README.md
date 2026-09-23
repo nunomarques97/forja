@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/tree/v0.13.0"><img src="https://img.shields.io/badge/version-0.13.0-ff9955" alt="Version 0.13.0"></a>
+  <a href="https://github.com/nunomarques97/forja/tree/v0.14.0"><img src="https://img.shields.io/badge/version-0.14.0-ff9955" alt="Version 0.14.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -42,7 +42,7 @@ Use `--provider claude` for Claude Code. The project must have a clean working t
 
 `core doctor` checks local prerequisites without model calls or project changes. It does not confirm login, model access or subscription quota.
 
-Workers edit files and execute commands. They are instructed not to commit or publish. Starting an ordinary chat does not automatically start FORJA.
+Workers edit files and execute commands. They are instructed not to commit or publish. With explicit `delivery` configuration, the final reviewer also approves the exact release snapshot in its existing session; the controller performs authorized commit/push operations. Without it, FORJA does not commit or publish. Starting an ordinary chat does not automatically start FORJA.
 
 ## Viewer
 
@@ -70,6 +70,8 @@ flowchart LR
     Build --> Check[Controller checks]
     Check --> Review[Independent review]
     Review --> Done[Task complete]
+    Done -->|Optional, snapshot approved| Commit[Controller commit]
+    Commit -->|Authorized destination and pipeline| Push[Controller push]
     Check -->|Failed, within budget| Build
     Review -->|Rejected, within budget| Build
 ```
@@ -79,6 +81,9 @@ Supply `--plan plan.json` to skip planning. For each task, the developer impleme
 **The controller owns completion.** Source-changing checks, unauthorized review edits, invalid results, timeouts and exhausted limits leave the run blocked with work preserved. An impressive partial implementation is not a successful run.
 
 ## Quality and control
+
+For optional Linux/WSL controller isolation, use `checkIsolation` with bubblewrap and Python 3 already installed. Checks use read-only source, isolated network/process namespaces and disposable scratch; there is no host fallback. For automatic Git delivery, configure `delivery` and an explicit deployment contract per project. Unknown effects or production without authorization block push. See [configuration and limitations](docs/CONTROLLER-DELIVERY.md). The existing final reviewer owns approval; Git requires no additional agent or model invocation.
+
 
 For file-only Claude workers, use `config/core-restricted-claude.json` with `--provider claude` (Claude Code 2.1.280+). Workers have no shell; the controller executes checks. See [access boundaries and limitations](docs/ROUTING.md#restricted-claude-file-tools). This option does not change existing runs or models.
 
@@ -91,6 +96,7 @@ Blocked runs show a safe recovery reason and execution limits in the viewer. Ins
 | **Independent review** | A separate session inspects source, criteria and evidence. Review must preserve project files. |
 | **Paid choices** | Reported paid or unknown-cost alternatives require an explicit Sponsor selection, even when a free alternative is recommended. A selection does not authorize payment. |
 | **Execution access** | Native defaults remain available; opt into full access for **both providers and all phases** with `config/core-full-access.json`. |
+| **Delivery** | Optional commit/push is bound to the final reviewer’s exact snapshot; production permission is independent. No extra model call. |
 | **Models and budgets** | Explicit phase/tier routes, invocation limits, cloud-session limits and per-invocation deadlines. Started failures still consume session allowance. |
 
 Example acceptance configuration, passed through `--config acceptance.json`:
@@ -151,10 +157,11 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.13.0](https://github.com/nunomarques97/forja/tree/v0.13.0)** — Opt into restricted Claude file tools with protected state and acceptance files. Each invocation gets dedicated scratch space. Existing runs and access settings remain unchanged.
+**Current: [v0.14.0](https://github.com/nunomarques97/forja/tree/v0.14.0)** — Optional isolated controller checks and automatic delivery approved by the existing final reviewer. No extra model session; production authorization remains separate.
 
 | Release | Main change |
 |---|---|
+| 0.14.0 | Optional Linux/WSL check isolation and reviewer-approved commit/push with an explicit deployment contract. |
 | 0.13.0 | Opt-in restricted Claude file tools and dedicated invocation scratch. |
 | 0.12.0 | Filter diagnostics by invocation and phase without reading unrelated traces. |
 | 0.11.2 | Recover partial init writes and report incomplete tool lifecycles faithfully. |

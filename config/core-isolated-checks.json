@@ -1,0 +1,9 @@
+{
+  "checkIsolation": {
+    "backend": "bubblewrap",
+    "distribution": "Ubuntu"
+  },
+  "providers": {
+    "claude": { "writePolicy": "restricted", "fullAccess": false }
+  }
+}
