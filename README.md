@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/tree/v0.8.3"><img src="https://img.shields.io/badge/version-0.8.3-ff9955" alt="Version 0.8.3"></a>
+  <a href="https://github.com/nunomarques97/forja/tree/v0.9.0"><img src="https://img.shields.io/badge/version-0.9.0-ff9955" alt="Version 0.9.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -127,10 +127,11 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.8.3](https://github.com/nunomarques97/forja/tree/v0.8.3)** — document the acceptance study and evaluation criteria; runtime unchanged.
+**Current: [v0.9.0](https://github.com/nunomarques97/forja/tree/v0.9.0)** — explicit knowledge references with consultation conditions, complete mandatory notes and compatible automatic retrieval. Specialist document bodies stay out of automatic prompts; workers can read applicable sources on demand. See the [knowledge configuration](docs/CORE-RUNBOOK.md#conhecimento-selecionado).
 
 | Release | Main change |
 |---|---|
+| [0.8.3](https://github.com/nunomarques97/forja/tree/v0.8.3) | Acceptance study decision and evaluation criteria; runtime unchanged from v0.8.2. |
 | [0.8.2](https://github.com/nunomarques97/forja/tree/v0.8.2) | Recover accepted handoffs after controller death and invalidate stale review approval. |
 | [0.8.1](https://github.com/nunomarques97/forja/tree/v0.8.1) | Project presentation and proposed adaptive orchestration; runtime unchanged. |
 | [0.8.0](https://github.com/nunomarques97/forja/tree/v0.8.0) | Explicit full access for every Codex and Claude phase. |

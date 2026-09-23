@@ -229,6 +229,28 @@ Uma nota obrigatória entra inteira; se faltar ou exceder o orçamento, o Core p
 
 Entradas duplicadas, incluindo aliases como `nota.md` e `./nota.md`, são recusadas: mantém uma única entrada com todas as suas restrições.
 
+Para separar excertos automáticos de referências especializadas, usa a versão 2 (FORJA 0.9.0 ou posterior):
+
+```json
+{
+  "version": 2,
+  "documents": [
+    { "path": "docs/CONVENTIONS.md", "required": true },
+    { "path": "decisions/storage.md", "mode": "auto" },
+    { "path": "docs/design/DESIGN.md", "mode": "reference", "when": "Changing visuals, interaction or accessibility." },
+    { "path": "docs/RELEASE.md", "mode": "reference", "when": "Preparing publication or changing delivery policy." }
+  ]
+}
+```
+
+Sem `mode`, a seleção continua automática. `reference` envia sempre o caminho e a condição `when` (1–300 caracteres), sem ler/indexar o corpo do documento nem submetê-lo ao ranking lexical. O worker recebe orientação para consultar as referências aplicáveis ao objetivo, tarefa ou ficheiros alterados em qualquer fase. A condição é uma indicação editorial, não um filtro por palavras-chave nem uma instrução com autoridade superior. Não há inferência automática de relevância nem garantia de que um modelo abrirá a referência. Uma decisão essencial pode continuar `required`, ou `auto` para recuperação lexical, mesmo num ADR ou arquivo fora das pastas habituais.
+
+`required: true` e `reference` são incompatíveis: requisitos obrigatórios têm de entrar completos. O catálogo de referências e as notas obrigatórias reservam primeiro o orçamento de 6.000 caracteres; se não couberem, a execução para em vez de os truncar. Só depois entram excertos opcionais. Referências não consomem o limite de seis excertos e podem apontar para manuais maiores que 128 KB, porque o controlador não lê o corpo. Caminhos continuam limitados ao projeto; referências ausentes ou com `source_hashes` obsoletos são omitidas com aviso. Os hashes de dependências são verificados, mas uma referência não tem hash/linhas do conteúdo que não foi lido.
+
+Manifestos de versão 1 e projetos sem manifesto mantêm a recuperação anterior. Um manifesto vazio desliga a descoberta e emite aviso; um manifesto inválido para a execução, sem procurar outras fontes silenciosamente. Não se cria nem migra um manifesto durante `core init`. A versão 2 exige atualização do runtime: versões antigas recusam-na em vez de ignorarem `reference` e injetarem conteúdo por engano. Revê requisitos de produto, segurança e decisões ainda válidas antes de converter entradas.
+
+`core context` e o ledger expõem `selected` e `references` separadamente. `characters` mede o JSON dos excertos e, quando presentes, das referências com o seu enquadramento; avisos e a descrição do método pertencem à contagem do pacote completo. `indexed_bytes` e `documents_scanned` contam corpos efetivamente lidos para indexação, excluindo referências e leituras de dependências para frescura. Estas métricas não medem tokens reais nem leituras nativas do worker. O mapa de caminhos, instruções AGENTS/CLAUDE, links e pesquisas continuam a permitir outras leituras.
+
 Os trechos são dados com caminho, linhas e hash, não instruções superiores ao objetivo. Não se percorre o vault pessoal nem se geram resumos com IA automaticamente. Markdown pode ser aberto no Obsidian; JSON guarda o estado de execução. A seleção é reconstruída em memória; não há instalação de embeddings, servidor MCP ou base de dados adicional. Fontes e duração de recuperação ficam no ledger da sessão.
 
 A estimativa USD nativa é guardada quando exposta pelo executor, com cobertura própria; não é a fatura de uma subscrição. Valores em falta são desconhecidos, nunca zero.

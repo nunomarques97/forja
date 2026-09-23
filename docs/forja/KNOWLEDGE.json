@@ -1,10 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
   "documents": [
     { "path": "docs/forja/CORE-CONVENTIONS.md", "required": true },
-    "docs/CORE-RUNBOOK.md",
-    "docs/RESEARCH.md",
-    "docs/RELEASE.md",
-    "docs/design/DESIGN.md"
+    { "path": "docs/CORE-RUNBOOK.md", "mode": "reference", "when": "Changing or operating Core commands, configuration, recovery, checks or knowledge retrieval." },
+    { "path": "docs/RESEARCH.md", "mode": "reference", "when": "Evaluating architecture, retrieval or orchestration alternatives, prior design rationale, or explicitly requested research." },
+    { "path": "docs/RELEASE.md", "mode": "reference", "when": "Preparing a commit, version, publication or changes to delivery and privacy policy." },
+    { "path": "docs/design/DESIGN.md", "mode": "reference", "when": "Changing or reviewing viewer UI, visual behavior, accessibility or interaction." }
   ]
 }

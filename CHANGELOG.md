@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 — Explicit on-demand knowledge references
+
+- Add opt-in version 2 knowledge manifests with `mode: "reference"` and a short `when` condition. Every worker phase receives the source path and consultation condition without automatic indexing or injection of the document body. Automatic excerpts and complete required notes remain available, including explicitly listed ADRs outside discovery folders.
+- Reserve the shared context budget for required notes and the reference catalog before ranking optional excerpts. Reject contradictory required/reference policies, invalid modes, duplicate paths and out-of-project sources. Report missing or stale references; preserve mandatory freshness failures and existing version 1/no-manifest retrieval. Empty manifests explicitly report disabled discovery.
+- Configure FORJA's specialist runbook, research, publication and design documents as references while retaining complete Core invariants. Keep reference conditions and excerpts framed as source data, not overriding instructions. No extra model session, agent phase, runtime dependency or model-route change.
+- Cover retrieval noise, requirement preservation, reference discovery across phases, archived ADRs, budgets, freshness, compatibility and prompt framing with deterministic regressions. These checks establish controller behavior, not native model compliance, actual token savings or improved task completion.
+
 ## 0.8.3 — Contract-first acceptance research decision
 
 - Document a frozen, four-session comparison of implementation-aware and contract-only test authors. Both accepted all four correct controls and rejected the same 23 of 24 faulty variants without grading timeout; contract-only authoring took 24.1% longer in this sample.
