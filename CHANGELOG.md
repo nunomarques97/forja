@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.0 — Restrict Claude worker file tools
+
+- Add explicit Claude `writePolicy: "restricted"`, requiring CLI 2.1.280 or newer. Limit workers to native file tools within the project and a dedicated scratch directory; planning and review receive only read tools. Disable shell, Git, MCP, subagent and code-execution capabilities in this mode.
+- Deny native edits to Git, scheduler and tool-configuration metadata and caller-protected files. Reject conflicting full access, extra CLI arguments, nonempty MCP configuration and unsupported providers without falling back. Preserve existing access settings and model routes.
+- Give every invocation its own retained scratch directory and child-only temporary environment; record policy/scratch metadata privately. Direct probes to that directory instead of shared temporary names. Custom executors retain their stdin protocol.
+- Document the native tool boundary, opt-in example and controller-check limitations; add adapter, concurrency, routing and workflow regression coverage. This is not an OS sandbox for arbitrary processes.
+
 ## 0.12.0 — Focus execution diagnostics
 
 - Filter read-only Core diagnostics by invocation ID, phase or both, through the API and `core diagnose --invocation ID --phase PHASE`. Preserve the unfiltered report schema and global ledger warnings; no matches return an empty invocation list.

@@ -33,6 +33,24 @@ Authentication, availability, timeout, schema and local preflight failures block
 
 The usage ledger records requested model, effort, route, provider, backend and local flag; `core usage` aggregates by provider and backend. Missing cost/token observations remain unknown. A local route describes the configured inference backend, not a guarantee of network isolation for all CLI features or custom executables.
 
+## Restricted Claude file tools
+
+For new Claude runs, `config/core-restricted-claude.json` opts into a file-tools-only worker:
+
+```sh
+node bin/forja.mjs start --provider claude --project <project> --config config/core-restricted-claude.json --goal "Implement the change and its tests"
+```
+
+The provider setting is `providers.claude.writePolicy: "restricted"`. It requires Claude Code 2.1.280 or newer and refuses `fullAccess: true`, extra provider CLI arguments, nonempty MCP configuration, and use on Codex/custom. There is no fallback to unrestricted execution. Existing configurations and persisted runs retain their selected access mode; the new example does not change model routing.
+
+The adapter uses Claude's [`--restricted` mode](https://code.claude.com/docs/en/cli-reference), safe mode and noninteractive permission denials. Development exposes Read, Glob, Grep, Write and Edit. Planning/review expose only Read, Glob and Grep. Shells, Git commands, code execution, subagents, MCP tools, web tools and user customizations are unavailable. Workers write test files; the controller executes the scheduled checks with its existing permissions. Tasks requiring browser evidence or worker commands need a separately authorized execution arrangement and must not claim those checks ran.
+
+Native file tools are confined to the project and the invocation's scratch directory. Edit deny rules additionally protect `.forja`, `.git`, `.claude`, `.codex` and caller `protectedFiles`, including writes through the Write tool. This uses the [native permission rules](https://code.claude.com/docs/en/permissions), not a shell-command blacklist or a hook that can time out. Unsupported versions stop before inference.
+
+Every provider process receives a fresh scratch directory through `FORJA_SCRATCH_DIR`, `TMPDIR`, `TEMP` and `TMP`. The parent's environment is unchanged. The private usage ledger records its location and the effective access policy. Scratch is retained as evidence; FORJA does not recursively delete it. Custom stdin remains unchanged. Full-access/default/custom modes get separate scratch but **do not acquire confinement** from environment variables.
+
+This is a native tool boundary, not an OS sandbox, protection from another process running as the same user, or confinement of controller checks. Trusted native executables and administrative policy remain part of the trust boundary. Native Windows probes exercised allowed source/scratch writes, denials of new external files by absolute/traversal/junction paths, Git/scheduler/caller-file protection, and a read-only reviewer tool set. A hard-link write replaced the project link while the external sentinel remained unchanged; do not infer broader filesystem guarantees from this one probe. The [Claude sandbox documentation](https://code.claude.com/docs/en/sandboxing) separately describes OS sandbox support and its native Windows limitation. Codex retains its existing native sandbox/access settings; this option does not claim equivalent qualification for Codex.
+
 ## Acceptance checks owned by the caller
 
 Add commands to the configuration passed with `--config`:

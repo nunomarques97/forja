@@ -1,0 +1,5 @@
+{
+  "providers": {
+    "claude": { "writePolicy": "restricted", "fullAccess": false }
+  }
+}

@@ -128,3 +128,24 @@ test('full access cannot replace a declared acceptance baseline', async () => {
   assert.equal(calls, 2);
   assert.match(readFileSync(join(root, 'value.mjs'), 'utf8'), /value = 2/);
 });
+
+test('restricted access reaches workers with caller protections and still requires controller validation and review', async () => {
+  const root = repo('restricted', { providers: { codex: { fullAccess: true }, claude: { writePolicy: 'restricted' } }, protectedFiles: ['.gitignore'] });
+  const calls = [];
+  const run = await drive(root, { log: () => {}, providerCall: async (provider, options) => {
+    const phase = JSON.parse(options.text).phase; calls.push(phase);
+    assert.deepEqual(options.protectedPaths, ['.gitignore']);
+    if (phase === 'plan') return { code: 0, result: { decisions: [], tasks: [task] } };
+    if (phase === 'develop') writeFileSync(join(root, 'value.mjs'), 'export const value = 2;\n');
+    if (phase === 'review') {
+      assert.equal(provider, 'claude'); assert.equal(options.config.writePolicy, 'restricted');
+      assert.match(options.prompt, /Restricted write policy: no shell/);
+      assert.doesNotMatch(options.prompt, /scratch space outside the project|Your sandbox is read-only/);
+    }
+    return { ...response(phase === 'review' ? 'approve' : 'ready_for_validation'), access: { policy: phase === 'review' ? 'restricted' : 'fullAccess', scratch: 'fixture-scratch' } };
+  } });
+  assert.deepEqual(calls, ['plan', 'develop', 'review']); assert.equal(run.status, 'done');
+  assert.ok(run.tasks[0].validation.every(check => check.passed));
+  const usage = readFileSync(join(root, '.forja/runs', run.run_id, 'usage.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+  assert.ok(usage.some(entry => entry.phase === 'review' && entry.access?.policy === 'restricted'));
+});

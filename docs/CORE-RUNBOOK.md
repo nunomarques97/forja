@@ -91,6 +91,8 @@ O gate é determinístico sobre custos **reportados**. Classificar custos, ident
 
 Há um escritor por projeto. O lock regista controlador e subprocesso; a retoma recusa processos vivos. Recuperação de lock obsoleto é serializada. Estado inválido, paths exteriores/symlinks, alteração do estado pelo worker e commits inesperados interrompem o run. Estas verificações não substituem uma sandbox contra executores maliciosos.
 
+Para novos runs Claude, `config/core-restricted-claude.json` ativa `providers.claude.writePolicy: "restricted"`: desenvolvimento apenas com ferramentas de ficheiros, planeamento/revisão só de leitura, sem shell/Git/MCP/subagentes. Requer CLI 2.1.280+, recusa `fullAccess`, argumentos adicionais e MCP configurado; não enfraquece silenciosamente o modo. Os testes executam no controlador. Todas as invocações recebem temporários exclusivos e retidos, identificados em `access.scratch` no ledger; atribuir temporários não confina os modos anteriores. Ver garantias, limites e exemplo em [Routing](ROUTING.md#restricted-claude-file-tools). A política nova é explícita e não altera runs existentes.
+
 ## Diagnóstico local de execução
 
 `core status` inclui orientação de recuperação com motivos fechados, também visível no viewer sem copiar erros brutos, argumentos ou caminhos privados. Runs antigos sem motivo estruturado mostram orientação genérica, sem inferir uma causa a partir do texto. Um processo ausente num run marcado `running` é apresentado como interrompido; isso não equivale a trabalho concluído.

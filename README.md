@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/tree/v0.12.0"><img src="https://img.shields.io/badge/version-0.12.0-ff9955" alt="Version 0.12.0"></a>
+  <a href="https://github.com/nunomarques97/forja/tree/v0.13.0"><img src="https://img.shields.io/badge/version-0.13.0-ff9955" alt="Version 0.13.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -80,6 +80,8 @@ Supply `--plan plan.json` to skip planning. For each task, the developer impleme
 
 ## Quality and control
 
+For file-only Claude workers, use `config/core-restricted-claude.json` with `--provider claude` (Claude Code 2.1.280+). Workers have no shell; the controller executes checks. See [access boundaries and limitations](docs/ROUTING.md#restricted-claude-file-tools). This option does not change existing runs or models.
+
 Blocked runs show a safe recovery reason and execution limits in the viewer. Inspect preserved work before using `core resume` or `core retry`; checks and independent review remain required. Total sessions, cloud sessions and per-call time limits are separate budgets. Claude context stopping uses observed request input; Codex/custom do not expose an equivalent live context measurement. These limits do not change provider quota.
 
 | What you control | What FORJA enforces |
@@ -149,10 +151,11 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.12.0](https://github.com/nunomarques97/forja/tree/v0.12.0)** — Filter read-only execution diagnostics by invocation or phase, with strict validation and global ledger warnings preserved. Restart existing services from the updated checkout; active run state is preserved.
+**Current: [v0.13.0](https://github.com/nunomarques97/forja/tree/v0.13.0)** — Opt into restricted Claude file tools with protected state and acceptance files. Each invocation gets dedicated scratch space. Existing runs and access settings remain unchanged.
 
 | Release | Main change |
 |---|---|
+| 0.13.0 | Opt-in restricted Claude file tools and dedicated invocation scratch. |
 | 0.12.0 | Filter diagnostics by invocation and phase without reading unrelated traces. |
 | 0.11.2 | Recover partial init writes and report incomplete tool lifecycles faithfully. |
 | 0.11.1 | Preserve concurrent handoffs and align doctor budget validation with startup. |
