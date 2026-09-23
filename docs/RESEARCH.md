@@ -8,7 +8,30 @@ For task-dependent capabilities, see the [adaptive-orchestration proposal and in
 
 Keep concise, reviewed architecture, conventions and consequential decisions in Git Markdown. Execution state belongs in JSON; raw conversations, handovers, prompts, reports and measurements stay in ignored local storage. Promote a useful lesson by rewriting it as a technical invariant, without personal details or dialogue. See [publication policy](RELEASE.md).
 
-Obsidian is an optional interface over Markdown. It does not choose the right excerpts, enforce freshness or determine what may be published. FORJA selects bounded lexical excerpts with path/line/hash provenance and optional required notes. Source remains authoritative. The current declaration map is heuristic, not an AST or dependency graph. Native executors load detailed code on demand.
+Obsidian is an optional interface over Markdown. It does not choose the right excerpts, enforce freshness or determine what may be published. FORJA selects bounded lexical excerpts with path/line/hash provenance and optional required notes. Version 2 manifests also offer explicit source references with consultation conditions, without injecting their document bodies. Source remains authoritative. The current declaration map is heuristic, not an AST or dependency graph. Native executors load detailed code on demand.
+
+### Initial native reference pilot
+
+A frozen four-session comparison used two new Node utility tasks: a small label-parser correction with irrelevant specialist documents, and artifact-retention implementation governed by an accepted ADR. Each task ran once with automatic excerpts and once with explicit references, with reversed arm order for the second task. Both arms used the same current prompt guidance, corpus and acceptance contract; this isolates manifest policy rather than comparing entire runtime versions. Native metadata confirmed `gpt-5.6-terra` with `medium` effort in all four sessions (Codex CLI 0.155.0-alpha.16), each limited to ten minutes, with no retries or repairs. No Claude or local-model session was used.
+
+Before native execution, the external evaluator was checked against two correct controls and eleven seeded defects. Both controls passed and every defect failed. The oracle and fixtures were then frozen; all four generated implementations passed, with seven parser checks and eleven retention checks per arm. Project instructions, documentation and dependencies were preserved. This was one developer session per fixture, not a complete planning/development/independent-review workflow.
+
+| Observed across two tasks per arm | Automatic excerpts | Explicit references |
+|---|---:|---:|
+| Implementations passing external acceptance | 2/2 | 2/2 |
+| Acceptance checks passed | 18/18 | 18/18 |
+| Irrelevant specialist bodies injected (source/task pairs) | 7/7 | 0/7 |
+| Irrelevant specialist reads observed in native tool output | 0/7 | 0/7 |
+| Complete relevant ADR observed in native tool output | 1/1 | 1/1 |
+| Provider-reported input tokens, including cached input | 168,472 | 160,776 |
+| Cached subset of those input tokens | 139,264 | 118,016 |
+| Input tokens excluding the cached subset | 29,208 | 42,760 |
+| Provider-reported output tokens | 2,706 | 2,856 |
+| Total native session time | 79.444 s | 72.585 s |
+
+The reference arm opened the relevant ADR and implemented its requirements without receiving its body in the initial prompt. A successful read had empty output in the CLI's public JSON stream; the exact native session's tool-output record contained the complete ADR. The original stdout-only classification and the supplementary native-record audit were retained separately. A path appearing in a command, or a document appearing in a repository map, is not by itself proof that its contents were returned. Tool-output evidence establishes exposure, not cognitive attention or universal observability.
+
+The result supports retaining the explicit catalog without adding a classifier or a mandatory phase. It does **not** establish superior implementation quality, fewer specialist file reads, lower billed cost or general speedups. Although total input was 4.6% lower in this sample, input excluding cache was 46.4% higher; the parser reference session alone used more total input than its counterpart. Repeated context, tool sequencing and caching prevent attributing session token totals directly to document length. Two task pairs, one attempt each, cannot establish general reliability, prompt-injection resistance, or behavior across models and complex repositories. No runtime change or new release follows from this study.
 
 ## Ruflo / Claude Flow
 
