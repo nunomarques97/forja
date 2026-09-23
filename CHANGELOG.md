@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.2 — Recover initialization and report incomplete tool traces
+
+- Preflight all Core initialization targets before writing. Reject links and unexpected file types; restore original bytes and remove new outputs after an in-process failure, including partial writes and failed directory creation. Preserve existing state and report incomplete recovery without stopping other rollback actions.
+- Keep initialization idempotent and its returned file list independent of future calls. Recovery is best effort, not crash-atomic or safe against concurrent edits.
+- Mark unfinished tool traces as partial, validate lifecycle statuses before counting tools, and retain the first accepted lifecycle when later records contradict it. Compare terminal status and normalized exit code when replaying completions.
+- Ignore malformed end records without closing the trace or hiding later events. Preserve diagnostic privacy, read limits and interval union semantics; add fault-injection and lifecycle regression coverage.
+
 ## 0.11.1 — Preserve handoffs and validate execution budgets
 
 - Apply legacy answers under the driver claim mutex, rereading current state and refusing a replaced run. Preserve concurrent handoff requests, ownership changes and checkpoints.
