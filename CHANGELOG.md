@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.3 — Reject unresolved acceptance targets before development
+
+- Validate task checks and caller final checks before spending development attempts. Reject blank executables, NUL bytes and recognizable unresolved target placeholders without executing or rewriting commands.
+- Keep historical run state readable and abandonable; block execution of invalid saved checks while preserving their commands and evidence.
+- Preserve inline source, HTML, concrete URLs and future helper paths. Report check positions without copying private argument values into diagnostics.
+- Cover plan rejection, legacy recovery, target boundaries and diagnostic privacy with regression tests; document the conservative detection limits.
+
 ## 0.10.2 — Discover existing projects from the Core workspace
 
 - Show a concise notice and legacy viewer link for registered projects without Core state, including when there are no Core runs yet. Keep filter no-results and genuinely empty onboarding distinct.

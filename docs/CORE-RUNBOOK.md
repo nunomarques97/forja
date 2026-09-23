@@ -188,6 +188,28 @@ O Core guarda os hashes dos ficheiros existentes no arranque e verifica-os antes
 
 A lista contém até 100 caminhos relativos de ficheiros regulares, com limite de 8 MiB por ficheiro e 16 MiB no total. Não aceita links, diretórios, duplicados que diferem apenas em maiúsculas, caminhos exteriores, `.git` ou `.forja`. Declara também os dados e auxiliares relevantes: o Core não infere dependências a partir do comando. Esta verificação protege os bytes declarados nas fronteiras de execução; não prova a cobertura dos testes, não substitui a revisão e não deteta alterações restauradas dentro de uma única chamada. Não é uma sandbox contra processos maliciosos.
 
+## Alvos concretos nos checks
+
+Os checks são argv lançados sem shell: um marcador `<nome>` por resolver chega literalmente ao executável e pode desperdiçar trabalho antes de falhar. Por isso, planos fornecidos, planos gerados e `finalChecks` de novos runs são recusados antes de qualquer tarefa quando um check tem executável vazio ou só com espaços, um byte NUL no comando ou num argumento, ou um marcador por resolver (nome começado por letra, como `<port>`, `<authenticated-port>` ou `<viewport>`). O plano inteiro é validado antes da primeira tarefa. A mensagem identifica a tarefa ou `finalChecks[i]` e a posição do comando/argumento, sem copiar valores que possam conter dados privados.
+
+É um contrato conservador sobre tokens, não um parser de shell nem de código. Deteta:
+
+- comando ou argumento igual a `<nome>`;
+- `--flag=<nome>` (o valor depois de `=` é analisado com as mesmas regras);
+- marcadores na autoridade/porta de um URL que ocupa o argumento (`http://127.0.0.1:<authenticated-port>/core`, `https://<host>/health`), em segmentos do caminho ou em valores da query;
+- um segmento de caminho inteiro delimitado pelo início, `/` ou `\` e pelo fim, `/`, `\`, `.`, `:`, `?` ou `#` (`screens/<viewport>.png`).
+
+Analisa apenas valores completos com forma de alvo: aspas, delimitadores de código (parênteses, chavetas, ponto e vírgula), quebras de linha ou outros sinais `<`/`>` fora dos marcadores fazem o valor ser tratado como fonte/dados. Não deteta marcadores colados a identificadores (`shot-<viewport>.png`, `x<port>`) nem templates dentro de código ou HTML inline. URLs concretos, IPv6 (`[::1]`), `{{literal}}`, argumentos vazios e helpers que a tarefa ainda vai criar continuam aceites. Não é uma garantia de executabilidade: também pode deixar passar placeholders em nomes com esses delimitadores. As flags `-e` e `-p` não desativam o guard, pois podem pertencer a outro programa ou ao próprio script. O Core não reescreve comandos, não expande shell, não adivinha portas, não executa checks durante o planeamento e não verifica a existência de ficheiros. Quando um valor só existe em execução (porta, URL, caminho gerado), a tarefa cria um helper que o obtém e o check executa esse helper.
+
+Um plano gerado inválido fica em `call-N-result.json` tal como foi devolvido; o run fica `blocked`, sem tarefas e sem novo planeamento automático. Um novo planeamento só acontece com `resume` explícito.
+
+Estado anterior com estes marcadores continua legível (`status`, `usage`, viewer, `decide`, `abandon`): a leitura de estado aplica apenas as regras estruturais antigas. Ao retomar, o Core verifica todos os checks das tarefas e `finalChecks` antes de planner, developer ou checks; um alvo inválido bloqueia com o motivo, sem consumir invocações nem tentativas e sem alterar checks, `finalChecks` ou evidência. `retry` não altera checks guardados; para corrigir, abandona o run e inicia outro com alvos concretos:
+
+```powershell
+node $forja core abandon --why "Checks com marcadores por resolver; evidência preservada"
+node $forja start --config forja-config.json --plan plan.json --goal "..."
+```
+
 ## Aceitação assíncrona com falhas limitadas
 
 Liga cada cenário a um requisito identificável e controla os acontecimentos que desbloqueiam a operação: libertação de capacidade, cancelamento, fecho ou conclusão de um pedido. Usa Promises controladas e barreiras do event loop para observar a ordem; um `sleep` arbitrário não demonstra causalidade. Verifica também que uma operação permanece pendente quando o contrato o exige, e aceita implementações corretas com diferentes formas válidas de notificar Promises.
