@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/tree/v0.11.2"><img src="https://img.shields.io/badge/version-0.11.2-ff9955" alt="Version 0.11.2"></a>
+  <a href="https://github.com/nunomarques97/forja/tree/v0.12.0"><img src="https://img.shields.io/badge/version-0.12.0-ff9955" alt="Version 0.12.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -149,10 +149,11 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.11.2](https://github.com/nunomarques97/forja/tree/v0.11.2)** — Recover from partial initialization failures and report incomplete or contradictory tool traces. Restart existing services from the updated checkout; active run state is preserved.
+**Current: [v0.12.0](https://github.com/nunomarques97/forja/tree/v0.12.0)** — Filter read-only execution diagnostics by invocation or phase, with strict validation and global ledger warnings preserved. Restart existing services from the updated checkout; active run state is preserved.
 
 | Release | Main change |
 |---|---|
+| 0.12.0 | Filter diagnostics by invocation and phase without reading unrelated traces. |
 | 0.11.2 | Recover partial init writes and report incomplete tool lifecycles faithfully. |
 | 0.11.1 | Preserve concurrent handoffs and align doctor budget validation with startup. |
 | 0.11.0 | Recover checkpoints with explicit limits; diagnose setup and stopped runs. |

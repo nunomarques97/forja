@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0 — Focus execution diagnostics
+
+- Filter read-only Core diagnostics by invocation ID, phase or both, through the API and `core diagnose --invocation ID --phase PHASE`. Preserve the unfiltered report schema and global ledger warnings; no matches return an empty invocation list.
+- Validate selectors before reading project state. Accept canonical decimal CLI IDs from 1 to 200 and known phases; report generic errors without echoing supplied values.
+- Read only selected trace files after reconciling the complete ledger, so unrelated traces do not consume the diagnostic read budget. Preserve pending-record handling, lifecycle checks and privacy.
+- Cover API compatibility, CLI validation, read budgets, global warnings and read-only behavior with regression tests; document selectors and limits.
+
 ## 0.11.2 — Recover initialization and report incomplete tool traces
 
 - Preflight all Core initialization targets before writing. Reject links and unexpected file types; restore original bytes and remove new outputs after an in-process failure, including partial writes and failed directory creation. Preserve existing state and report incomplete recovery without stopping other rollback actions.

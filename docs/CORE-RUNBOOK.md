@@ -101,6 +101,16 @@ Os limites têm âmbitos diferentes: `--max-sessions` limita sessões totais; `-
 
 `node bin/forja.mjs core diagnose --project <projeto>` resume o ledger e os ficheiros `call-N-events.jsonl` do run atual, incluindo runs terminados. É uma leitura pedida explicitamente: não chama modelos, não retoma tarefas e não acrescenta instrumentação ao percurso de execução. Não lê prompts, saídas brutas dos providers nem sessões nativas; não envia notificações.
 
+Para focar uma invocação ou fase, usa seletores opcionais e combináveis (AND):
+
+```powershell
+node $forja core diagnose --invocation 3
+node $forja core diagnose --phase review
+node $forja core diagnose --invocation 3 --phase develop
+```
+
+`--invocation` aceita só decimal canónico de 1 a 200 (sem sinal, espaços, zeros à esquerda, ponto decimal, expoente ou hexadecimal); `--phase` aceita `plan`, `develop` ou `review`. Um valor em falta ou inválido termina com código diferente de zero e a mensagem genérica `Invalid diagnostic filters.`, sem repetir o valor e antes de ler ficheiros do projeto. O filtro aplica-se depois de reconciliar o ledger completo e o registo pendente: os avisos globais (`warnings` do run/ledger, como `missing_invocation_records`) descrevem sempre o ledger completo e não são filtrados. Só os journals das invocações selecionadas são lidos e contam para o limite de leitura. Sem correspondência, o relatório mantém o mesmo formato com `invocations: []`. Com ou sem seletores, o comando continua só de leitura e não invoca nenhum provider.
+
 Por invocação, mostra o resultado do processo e a duração disponível, operações observadas por tipo, falhas, operações sem evento final, primeira alteração de ficheiro concluída e último evento. `observed_tool_span_ms` une intervalos entre eventos de início/fim correspondentes, sem somar duas vezes ferramentas sobrepostas. `outside_observed_tool_spans_ms` é o tempo restante; inclui trabalho e espera que o protocolo não permite atribuir. Não representa tempo desperdiçado, ocioso ou exclusivamente de inferência. Os tempos são de receção de eventos, sujeitos ao buffering do CLI. Um evento de edição não prova código correto, nem um comando com código zero substitui aceitação/revisão. `returned` não significa entrega válida ou aprovação.
 
 `coverage: recorded` significa que não foram detetadas lacunas no journal lido, não que o provider tenha exposto todas as operações nativas. `partial` assinala truncamento, eventos inconsistentes ou dados descartados; `unavailable` mantém métricas desconhecidas. O resumo de ferramentas suporta metadata Codex v1. Outros providers, versões desconhecidas e runs antigos sem journal ficam explicitamente indisponíveis. Uma operação `open` não tem evento final registado; não é prova de que o processo continua vivo. Num run ativo, o relatório é apenas uma fotografia dos ficheiros disponíveis e não inventa duração final.

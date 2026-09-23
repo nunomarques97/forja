@@ -908,7 +908,7 @@ async function delegate(mod, fn, args) {
 const usage = `FORJA core (docs/CORE-RUNBOOK.md)
   start --goal "..." --provider claude|codex [--project <repo>] [--allow-dirty] [--config <json>] [--plan <json>]
   core init | core doctor [--provider claude|codex] [--config file] | core resume | core status | core usage [--details]
-  core diagnose  (read-only execution metadata; no provider calls)
+  core diagnose [--invocation ID] [--phase plan|develop|review]  (read-only execution metadata; no provider calls; ID 1..200; filters combine with AND)
   core context --query "..."  (selected project knowledge with source references)
   core retry --task T1 --why "..." [--max-attempts 3] [--max-sessions 40]
   core abandon --why "..."
