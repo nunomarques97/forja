@@ -1,7 +1,8 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 
 const root = mkdtempSync(join(tmpdir(), 'forja-notify-test-'));
@@ -37,4 +38,25 @@ test('notification destinations remain local, explicit and disabled when absent'
   delete process.env.FORJA_NTFY_TOPIC;
   writeFileSync(join(root, 'notify-config.json'), 'broken');
   assert.equal(topic(), '');
+});
+
+test('the notification log follows FORJA_DATA_DIR set after import and leaves the repository log untouched', async () => {
+  const later = mkdtempSync(join(tmpdir(), 'forja-notify-later-'));
+  const repoLog = join(dirname(dirname(fileURLToPath(import.meta.url))), 'data', 'notify.log');
+  const snapshot = () => existsSync(repoLog) ? readFileSync(repoLog, 'utf8') : null;
+  const before = snapshot();
+  globalThis.fetch = async () => ({ ok: true, status: 200 });
+  try {
+    process.env.FORJA_DATA_DIR = later;
+    process.env.FORJA_NTFY_TOPIC = 'fixture-later';
+    assert.equal((await notify('synthetic late status', { dedup: false })).ok, true);
+    assert.ok(existsSync(join(later, 'notify.log')), 'the entry is logged in the directory set after import');
+    assert.match(readFileSync(join(later, 'notify.log'), 'utf8'), /synthetic late status/);
+    assert.equal(existsSync(join(root, 'notify.log')) && /synthetic late status/.test(readFileSync(join(root, 'notify.log'), 'utf8')), false);
+    assert.equal(snapshot(), before, 'the repository data/notify.log is unchanged');
+  } finally {
+    process.env.FORJA_DATA_DIR = root;
+    delete process.env.FORJA_NTFY_TOPIC;
+    rmSync(later, { recursive: true, force: true });
+  }
 });

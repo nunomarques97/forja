@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, unwatchFile } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, unwatchFile, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -192,6 +193,8 @@ test('planner research is opt-in at adapters and never enables cloud search for 
 test('Sponsor notification uses configured transport with status only and a credential-free Core link', async t => {
   const root = fixture(t), keys = ['FORJA_DATA_DIR', 'FORJA_NTFY_TOPIC', 'FORJA_NTFY_SERVER'];
   const old = Object.fromEntries(keys.map(k => [k, process.env[k]]));
+  const repoLog = join(dirname(dirname(fileURLToPath(import.meta.url))), 'data', 'notify.log');
+  const repoLogBefore = existsSync(repoLog) ? readFileSync(repoLog, 'utf8') : null;
   let received;
   const server = createServer((req, res) => {
     let body = ''; req.on('data', chunk => body += chunk); req.on('end', () => { received = { body, headers: req.headers }; res.end('ok'); });
@@ -207,6 +210,8 @@ test('Sponsor notification uses configured transport with status only and a cred
     assert.equal(received.headers.priority, 'high');
     assert.match(received.body, /trabalho está parado/);
     assert.doesNotMatch(JSON.stringify(received), /secret|private|forja-technology-/);
+    assert.match(readFileSync(join(root, 'notify.log'), 'utf8'), /trabalho está parado/);
+    assert.equal(existsSync(repoLog) ? readFileSync(repoLog, 'utf8') : null, repoLogBefore, 'the repository data/notify.log is unchanged');
     process.env.FORJA_NTFY_TOPIC = '';
     assert.equal((await technologyNotice()).skipped, 'not-configured');
   } finally {
