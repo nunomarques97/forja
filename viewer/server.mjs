@@ -46,6 +46,11 @@ import { appendPeerLog, guardPaths, guardProcessAliveAsync, readUpWatchState, ru
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = dirname(here);
 
+// Notifications leave the machine (ntfy) and are logged: status only. A permission
+// message describes the tool input (commands, URLs, queries), so only the tool name
+// is sent, and only when it has the shape of a tool name.
+const permissionTool = perm => (perm && typeof perm.tool === 'string' && /^[\w.:-]{1,64}$/.test(perm.tool) ? ` (${perm.tool})` : '');
+
 // Pure: the notifications a snapshot warrants right now (docs/ARCHITECTURE.md §10).
 // The timer in startServer fires each key once (data/watchdog.json remembers).
 // `coreProjects`: project keys (state.mjs projectKey) with a running or blocked Core run.
@@ -58,7 +63,10 @@ export function watchdogPlan(snap, now = Date.now(), thresholds = THRESHOLDS, { 
     if (!(now - run.lastEventAt < thresholds.WATCHDOG_IGNORE_AFTER_MS)) continue; // runs silent for half a day are history
     const main = run.roster[0];
     const add = (key, message, priority = 'high') => out.push({ key, message, priority });
-    if (main.state === STATES.SPONSOR) add(`${run.id}|sponsor|${main.since}`, `Forja precisa de ti (${run.project}): ${main.detail || 'a sessão principal parou'}`);
+    // A pending permission is one episode with one notification (the mainperm rule
+    // below, after PERMISSION_NOTIFY_MS); its detail would carry the tool input.
+    const mainPermission = run.main && run.main.permission;
+    if (main.state === STATES.SPONSOR && !mainPermission) add(`${run.id}|sponsor|${main.since}`, `Forja precisa de ti (${run.project}): ${main.detail || 'a sessão principal parou'}`);
     // SEM_RESPOSTA (ainda pode recuperar sozinha) e ESPERA_QUOTA (retoma sozinho) não avisam o
     // telemóvel — nada espera pelo Sponsor ainda. MORTO continua a avisar: nada a relança sozinha.
     if (main.state === STATES.MORTO) add(`${run.id}|main-dead|${main.since}`, `Forja: sessão principal em ${run.project} parece morta (${main.detail})`, 'urgent');
@@ -74,9 +82,9 @@ export function watchdogPlan(snap, now = Date.now(), thresholds = THRESHOLDS, { 
     const deadMatters = !underRunner && !parentGone && !coreDriven;
     for (const c of run.roster.slice(1)) for (const i of c.instances || []) {
       if (i.state === STATES.MORTO && deadMatters) add(`${run.id}|dead|${i.key}`, `Forja: ${c.name} em ${run.project} morto — ${i.task || i.type} sem sinal há mais de 30 min`, 'urgent');
-      if (i.state === STATES.BLOQUEADO && i.permission && now - i.permission.since > thresholds.PERMISSION_NOTIFY_MS) add(`${run.id}|perm|${i.key}|${i.permission.since}`, `Forja precisa de ti (${run.project}): ${c.name} à espera de permissão — ${i.permission.message || ''}`);
+      if (i.state === STATES.BLOQUEADO && i.permission && now - i.permission.since > thresholds.PERMISSION_NOTIFY_MS) add(`${run.id}|perm|${i.key}|${i.permission.since}`, `Forja precisa de ti (${run.project}): ${c.name} à espera de permissão${permissionTool(i.permission)}`);
     }
-    if (main.state === STATES.SPONSOR && run.main && run.main.permission && now - run.main.permission.since > thresholds.PERMISSION_NOTIFY_MS) add(`${run.id}|mainperm|${run.main.permission.since}`, `Forja precisa de ti (${run.project}): permissão pendente — ${run.main.permission.message || ''}`);
+    if (main.state === STATES.SPONSOR && mainPermission && now - mainPermission.since > thresholds.PERMISSION_NOTIFY_MS) add(`${run.id}|mainperm|${mainPermission.since}`, `Forja precisa de ti (${run.project}): permissão pendente${permissionTool(mainPermission)}`);
   }
   return out;
 }

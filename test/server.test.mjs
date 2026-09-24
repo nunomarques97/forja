@@ -325,3 +325,40 @@ describe('watchdog plan (pure)', () => {
     assert.deepEqual(wp2({ runs: [run({ projectKey: 'c:/p/other' })] }, now, undefined, core).map(n => n.key), ['R-x|dead|k1']);
   });
 });
+
+import { createState as createReducer, applyEvent as reduceEvent, snapshot as reducerSnapshot } from '../viewer/lib/state.mjs';
+describe('watchdog permission notifications', () => {
+  const secret = 'curl -H "Authorization: Bearer ghp_EXAMPLEFAKE0000" https://api.example.invalid/deploy';
+  function permissionPlan(toolName, toolInput, ageMs) {
+    const st = createReducer();
+    const now = Date.now();
+    const t0 = now - ageMs - 2000;
+    const iso = ms => new Date(ms).toISOString();
+    const base = { session_id: 'sess-perm', cwd: '/srv/work/acme-private' };
+    reduceEvent(st, { ...base, hook_event_name: 'SessionStart', ts: iso(t0) });
+    reduceEvent(st, { ...base, hook_event_name: 'UserPromptSubmit', prompt: 'x', ts: iso(t0 + 1000) });
+    reduceEvent(st, { ...base, hook_event_name: 'PermissionRequest', tool_name: toolName, tool_input: toolInput, ts: iso(now - ageMs) });
+    return wp2(reducerSnapshot(st, now), now);
+  }
+  test('a pending main-session permission notifies once, after the delay, with status only', () => {
+    const plan = permissionPlan('Bash', { command: secret }, 5 * 60_000);
+    assert.equal(plan.length, 1, 'one notification per permission episode');
+    assert.match(plan[0].key, /\|mainperm\|/);
+    assert.equal(plan[0].message, 'Forja precisa de ti (acme-private): permissão pendente (Bash)');
+    for (const [tool, input, leak] of [['WebFetch', { url: 'https://internal.example.invalid/?key=abc' }, 'internal.example'], ['WebSearch', { query: 'private customer name' }, 'customer'], ['PowerShell', { command: secret }, 'ghp_']]) {
+      const [n] = permissionPlan(tool, input, 5 * 60_000);
+      assert.ok(!n.message.includes(leak), `${tool} input must not reach the notification`);
+      assert.ok(n.message.endsWith(`(${tool})`), n.message);
+    }
+    assert.deepEqual(permissionPlan('Bash', { command: secret }, 30_000), [], 'a permission answered within the delay never notifies');
+  });
+  test('a subagent permission notification carries the tool name, never its message', () => {
+    const now = Date.now();
+    const run = { id: 'R-y', project: 'p', synthetic: false, lastEventAt: now - 1000, main: { permission: null }, forja: { runner: null },
+      roster: [{ state: 'a trabalhar', since: now, detail: '' }, { name: 'Backend Dev', instances: [{ key: 'k2', state: 'bloqueado', permission: { since: now - 5 * 60_000, tool: 'Bash', message: `a correr: ${secret}` } }] }] };
+    const plan = wp2({ runs: [run] }, now);
+    assert.deepEqual(plan.map(n => n.message), ['Forja precisa de ti (p): Backend Dev à espera de permissão (Bash)']);
+    run.roster[1].instances[0].permission.tool = 'Bash; rm -rf /';
+    assert.equal(wp2({ runs: [run] }, now)[0].message, 'Forja precisa de ti (p): Backend Dev à espera de permissão');
+  });
+});
