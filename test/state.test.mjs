@@ -682,3 +682,31 @@ describe('runs verdadeiros e sessões soltas (T-UI-9)', () => {
     assert.equal(snap.runs[0].kind, 'run');
   });
 });
+
+describe('silent subagents of a closed parent are history, not dead', () => {
+  const build = (close) => {
+    const st = createState();
+    const line = (s, fields) => applyLine(st, JSON.stringify({ ts: new Date(at(s)).toISOString(), project: 'p', session_id: 'sess-i', cwd: 'C:\p', ...fields }), 1);
+    line(0, { hook_event_name: 'SessionStart', source: 'startup' });
+    line(1, { hook_event_name: 'Forja', forja: { kind: 'run.start', run_id: 'R-closed', goal: 'x' } });
+    line(2, { hook_event_name: 'SubagentStart', agent_id: 'a-rev', agent_type: 'reviewer' });
+    line(3, { hook_event_name: 'PreToolUse', agent_id: 'a-rev', agent_type: 'reviewer', tool_name: 'Read', tool_input: { file_path: 'a' }, tool_use_id: 'u1' });
+    close(line);
+    return st;
+  };
+  const reviewer = (st, s) => snapshot(st, at(s)).runs[0].roster.find(c => c.key === 'reviewer').instances[0];
+  test('a closed legacy run (run.fail) turns a silent subagent into history', () => {
+    const st = build(line => line(10, { hook_event_name: 'Forja', forja: { kind: 'run.fail', run_id: 'R-closed', why: 'Stopped for Core migration' } }));
+    const i = reviewer(st, 10 + THRESHOLDS.DEAD_MS / 1000 + 60);
+    assert.equal(i.state, STATES.TERMINADO);
+    assert.equal(i.inferred, true);
+  });
+  test('the same subagent in a live run is still dead', () => {
+    const st = build(() => {});
+    assert.equal(reviewer(st, 10 + THRESHOLDS.DEAD_MS / 1000 + 60).state, STATES.MORTO);
+  });
+  test('an ended parent session closes its subagents', () => {
+    const st = build(line => line(10, { hook_event_name: 'SessionEnd', reason: 'prompt_input_exit' }));
+    assert.notEqual(reviewer(st, 10 + THRESHOLDS.DEAD_MS / 1000 + 60).state, STATES.MORTO);
+  });
+});

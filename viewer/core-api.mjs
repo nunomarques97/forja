@@ -4,6 +4,7 @@ import { decideTechnology, CORE_ROOT } from '../lib/core/engine.mjs';
 import { pendingTechnology } from '../lib/core/technology.mjs';
 import { crossSite, readBody } from './runs-api.mjs';
 import { launchCore } from '../lib/spawn-runner.mjs';
+import { projectKey } from '../lib/state-files.mjs';
 
 export function coreSnapshot(dataDir) {
   const registry = loadProjects(dataDir);
@@ -24,6 +25,19 @@ export function coreSnapshot(dataDir) {
     legacy_only_projects: legacyOnlyProjects,
     projects,
   };
+}
+
+// Registered projects whose Core run is running or blocked, as viewer project keys.
+// The watchdog uses it to stop alerting on the legacy crew of a Core-driven project.
+export function coreDrivenProjects(dataDir) {
+  const keys = new Set();
+  try {
+    for (const p of readProjects(dataDir)) {
+      const status = coreObservation(p.path)?.run.status;
+      if (status === 'running' || status === 'blocked') keys.add(projectKey(p.path));
+    }
+  } catch {} // An unreadable registry only means no suppression.
+  return keys;
 }
 
 // Called only after the server's authentication and Host checks.

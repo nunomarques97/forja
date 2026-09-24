@@ -36,7 +36,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createState, applyLine, snapshot, STATES, THRESHOLDS } from './lib/state.mjs';
 import { createFeed, feedApply, feedSnapshot } from './lib/feed.mjs';
 import { handleRunsApi, crossSite } from './runs-api.mjs';
-import { coreSnapshot, handleCoreDecision } from './core-api.mjs';
+import { coreDrivenProjects, coreSnapshot, handleCoreDecision } from './core-api.mjs';
 import { notify, sanitizeClick } from '../lib/notify.mjs';
 // A outra metade da supervisão mútua (docs/ARCHITECTURE.md §12): a guarda vigia
 // o viewer, e o viewer vigia a guarda. Regras, constantes e predicados de vida
@@ -48,7 +48,10 @@ const repoRoot = dirname(here);
 
 // Pure: the notifications a snapshot warrants right now (docs/ARCHITECTURE.md §10).
 // The timer in startServer fires each key once (data/watchdog.json remembers).
-export function watchdogPlan(snap, now = Date.now(), thresholds = THRESHOLDS) {
+// `coreProjects`: project keys (state.mjs projectKey) with a running or blocked Core run.
+// Their legacy crew is not driving the work, so a silent subagent from an old
+// interactive session there is not something the Sponsor can relaunch.
+export function watchdogPlan(snap, now = Date.now(), thresholds = THRESHOLDS, { coreProjects = new Set() } = {}) {
   const out = [];
   for (const run of snap.runs || []) {
     if (run.synthetic) continue;
@@ -62,8 +65,15 @@ export function watchdogPlan(snap, now = Date.now(), thresholds = THRESHOLDS) {
     // Under the runner a dead subagent is handled by the per-session watchdog (the session is
     // killed and the task redone): only the runner/main session dying is worth a notification.
     const underRunner = !!(run.forja && run.forja.runner && !run.forja.runner.exited && ['running', 'blocked'].includes(run.forja.status));
+    // A subagent only counts as dead while whatever launched it can still act on it: not after its
+    // session ended or its legacy run closed, not when the main session is already reported dead
+    // (one alert per session), and not for old legacy sessions of a project that Core now drives.
+    const legacyLive = ['running', 'blocked'].includes(run.forja && run.forja.status);
+    const parentGone = !!run.endedAt || ['finished', 'failed'].includes(run.forja && run.forja.status) || [STATES.MORTO, STATES.TERMINADO, STATES.FALHOU].includes(main.state);
+    const coreDriven = !legacyLive && coreProjects.has(run.projectKey);
+    const deadMatters = !underRunner && !parentGone && !coreDriven;
     for (const c of run.roster.slice(1)) for (const i of c.instances || []) {
-      if (i.state === STATES.MORTO && !underRunner) add(`${run.id}|dead|${i.key}`, `Forja: ${c.name} em ${run.project} morto — ${i.task || i.type} sem sinal há mais de 30 min`, 'urgent');
+      if (i.state === STATES.MORTO && deadMatters) add(`${run.id}|dead|${i.key}`, `Forja: ${c.name} em ${run.project} morto — ${i.task || i.type} sem sinal há mais de 30 min`, 'urgent');
       if (i.state === STATES.BLOQUEADO && i.permission && now - i.permission.since > thresholds.PERMISSION_NOTIFY_MS) add(`${run.id}|perm|${i.key}|${i.permission.since}`, `Forja precisa de ti (${run.project}): ${c.name} à espera de permissão — ${i.permission.message || ''}`);
     }
     if (main.state === STATES.SPONSOR && run.main && run.main.permission && now - run.main.permission.since > thresholds.PERMISSION_NOTIFY_MS) add(`${run.id}|mainperm|${run.main.permission.since}`, `Forja precisa de ti (${run.project}): permissão pendente — ${run.main.permission.message || ''}`);
@@ -184,7 +194,7 @@ export function startServer(opts = {}) {
   function saveWd() { try { writeFileSync(wdPath, JSON.stringify(wd)); } catch {} }
   async function watchdog() {
     const click = mobileUrl();
-    for (const n of watchdogPlan(currentSnapshot(true), Date.now())) {
+    for (const n of watchdogPlan(currentSnapshot(true), Date.now(), THRESHOLDS, { coreProjects: coreDrivenProjects(dataDir) })) {
       if (wd.notified[n.key]) continue;
       wd.notified[n.key] = Date.now(); saveWd();
       await notify(n.message, { click, priority: n.priority, tags: ['eyes'] });

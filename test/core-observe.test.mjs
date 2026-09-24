@@ -10,7 +10,7 @@ import {
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { coreObservation, coreAlive } from '../lib/core/observe.mjs';
-import { coreSnapshot } from '../viewer/core-api.mjs';
+import { coreDrivenProjects, coreSnapshot } from '../viewer/core-api.mjs';
 import { guardPlan, EMPTY_STATE, GUARD_DEAD_GRACE_MS } from '../lib/guard.mjs';
 import { launchCore } from '../lib/spawn-runner.mjs';
 import { upsertProject, projectStatus, runSummary } from '../lib/projects.mjs';
@@ -83,6 +83,18 @@ test('Core projection attributes partial usage and never emits raw evidence or p
   assert.doesNotMatch(JSON.stringify(snap), /PRIVATE|forja-observe-/);
   assert.doesNotMatch(renderProject(snap.projects[0]), /<script>/);
   assert.match(renderProject(snap.projects[0]), /&lt;script&gt;/);
+});
+
+test('coreDrivenProjects lists projects whose Core run is running or blocked', (t) => {
+  const f = fixture(t);
+  const key = f.project.replace(/\\/g, '/').toLowerCase();
+  assert.deepEqual([...coreDrivenProjects(f.data)], [key]);
+  f.state.status = 'blocked';
+  f.save();
+  assert.deepEqual([...coreDrivenProjects(f.data)], [key]);
+  f.state.status = 'done';
+  f.save();
+  assert.deepEqual([...coreDrivenProjects(f.data)], []);
 });
 
 test('validation_summary counts latest records strictly and reports tasks without records', (t) => {

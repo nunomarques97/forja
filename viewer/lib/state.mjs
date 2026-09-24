@@ -685,7 +685,14 @@ export function applyLine(state, line, lineNo = null) {
 }
 
 // ---------- derived states (evaluated at `now`) ----------
-export function instanceState(inst, now) {
+// The session or legacy run that launched a subagent is over: a closed session
+// (SessionEnd) or a run that recorded run.finish/run.fail. Nothing can relaunch
+// its silent subagents, so they are history, never "dead".
+export function parentClosed(run) {
+  return !!(run && (run.endedAt || run.forja?.status === 'finished' || run.forja?.status === 'failed'));
+}
+
+export function instanceState(inst, now, run = null) {
   if (inst.endedAt) {
     if (inst.endReason === 'agent-failed') return { state: STATES.FALHOU, since: inst.endedAt, detail: inst.error || 'a chamada falhou' };
     if (inst.endReason === 'session-ended') return { state: STATES.TERMINADO, since: inst.endedAt, detail: 'sessão fechada' };
@@ -695,6 +702,7 @@ export function instanceState(inst, now) {
   if (inst.handback && age > THRESHOLDS.HANDBACK_SETTLE_MS) return { state: STATES.TERMINADO, since: inst.handback.ts, detail: inst.verdict || inst.handback.status || 'entregou', inferred: true };
   // (endReason 'handback' is never stored: the settle rule above is evaluated at read time only.)
   if (inst.permission) return { state: STATES.BLOQUEADO, since: inst.permission.since, detail: `permissão pendente: ${inst.permission.message || inst.permission.tool || ''}`.trim() };
+  if (age > THRESHOLDS.DEAD_MS && parentClosed(run)) return { state: STATES.TERMINADO, since: inst.lastEventAt, detail: 'sem sinal final; a sessão ou o run que o lançou já fechou', inferred: true };
   if (age > THRESHOLDS.DEAD_MS) return { state: STATES.MORTO, since: inst.lastEventAt, detail: `sem qualquer evento há ${fmtAge(age)}` };
   if (age > THRESHOLDS.UNRESPONSIVE_MS) return { state: STATES.SEM_RESPOSTA, since: inst.lastEventAt, detail: `último sinal há ${fmtAge(age)}` };
   if (age > THRESHOLDS.QUIET_MS) return { state: STATES.TRABALHAR, since: inst.startedAt, detail: inst.progress?.text || inst.lastAction || null, quiet: age };
@@ -765,8 +773,8 @@ export function fmtAge(ms) {
   return `${h}h${String(m % 60).padStart(2, '0')}`;
 }
 
-function instanceView(inst, now) {
-  const st = instanceState(inst, now);
+function instanceView(inst, now, run = null) {
+  const st = instanceState(inst, now, run);
   return {
     key: inst.key, agentId: inst.agentId, type: inst.type, role: inst.role,
     state: st.state, since: st.since, detail: st.detail, quiet: st.quiet || null, inferred: !!st.inferred,
@@ -786,7 +794,7 @@ function rosterView(run, now) {
       cards.push({ key: r.key, name: r.name, role: r.role, core: r.core, state: st.state, since: st.since, detail: st.detail, quiet: st.quiet || null, instances: [], calls: run.main.calls, lastAction: run.main.lastAction, progress: run.progress, refused: run.main.refused, activeMs: Math.max(0, (run.endedAt || now) - run.startedAt), sessions: run.sessions.length, models: run.main.model ? { [run.main.model]: Math.max(0, (run.endedAt || now) - run.startedAt) } : {} });
       continue;
     }
-    const mine = insts.filter(i => i.role === r.key).map(i => instanceView(i, now)).sort((a, b) => b.startedAt - a.startedAt);
+    const mine = insts.filter(i => i.role === r.key).map(i => instanceView(i, now, run)).sort((a, b) => b.startedAt - a.startedAt);
     // Statistics only: how long this role was switched on in this run — the sum of
     // its instances' lifetimes (a live instance counts up to now; a silent one up
     // to its last signal). Evidence-based like everything else here.
@@ -811,7 +819,7 @@ function rosterView(run, now) {
     }
     cards.push(card);
   }
-  const native = insts.filter(i => i.role === 'native').map(i => instanceView(i, now)).sort((a, b) => b.startedAt - a.startedAt);
+  const native = insts.filter(i => i.role === 'native').map(i => instanceView(i, now, run)).sort((a, b) => b.startedAt - a.startedAt);
   return { cards, native };
 }
 

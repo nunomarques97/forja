@@ -311,4 +311,17 @@ describe('watchdog plan (pure)', () => {
     assert.deepEqual(wp2({ runs: [run({ lastEventAt: now - 13 * 3600_000 })] }, now), [], 'runs silent for half a day are history');
     assert.deepEqual(wp2({ runs: [run({ synthetic: true })] }, now), [], 'synthetic runs never notify');
   });
+  test('a dead subagent does not notify once its parent session ended, its legacy run closed or Core drives the project', () => {
+    assert.deepEqual(wp2({ runs: [run({ endedAt: now - 40 * 60_000 })] }, now), [], 'parent session ended');
+    assert.deepEqual(wp2({ runs: [run({ forja: { runner: null, status: 'failed' } })] }, now), [], 'legacy run already failed');
+    assert.deepEqual(wp2({ runs: [run({ forja: { runner: null, status: 'finished' } })] }, now), [], 'legacy run already finished');
+    const mainGone = run({ roster: [{ state: 'terminado', since: now, detail: '' }, { name: 'Reviewer', instances: [{ key: 'k1', state: 'morto', task: 'review' }] }] });
+    assert.deepEqual(wp2({ runs: [mainGone] }, now), [], 'main session closed');
+    const mainDead = run({ roster: [{ state: 'morto', since: now - 1, detail: 'x' }, { name: 'Reviewer', instances: [{ key: 'k1', state: 'morto', task: 'review' }] }] });
+    assert.deepEqual(wp2({ runs: [mainDead] }, now).map(n => n.key), ['R-x|main-dead|' + (now - 1)], 'one alert for the dead session, not one per subagent');
+    const core = { coreProjects: new Set(['c:/p/demo']) };
+    assert.deepEqual(wp2({ runs: [run({ projectKey: 'c:/p/demo' })] }, now, undefined, core), [], 'old interactive session of a Core-driven project');
+    assert.deepEqual(wp2({ runs: [run({ projectKey: 'c:/p/demo', forja: { runner: null, status: 'running' } })] }, now, undefined, core).map(n => n.key), ['R-x|dead|k1'], 'a live legacy run still alerts');
+    assert.deepEqual(wp2({ runs: [run({ projectKey: 'c:/p/other' })] }, now, undefined, core).map(n => n.key), ['R-x|dead|k1']);
+  });
 });
