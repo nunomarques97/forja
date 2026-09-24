@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
 </p>
 
-<p align="center"><a href="#quick-start">Quick start</a> · <a href="#viewer">Viewer</a> · <a href="#how-it-works">Workflow</a> · <a href="#quality-and-control">Quality</a> · <a href="#status-and-evidence">Status</a> · <a href="#releases">Releases</a> · <a href="#documentation">Docs</a></p>
+<p align="center"><a href="#quick-start">Quick start</a> · <a href="#viewer">Viewer</a> · <a href="#how-it-works">Workflow</a> · <a href="#quality-and-control">Quality</a> · <a href="#troubleshooting">Troubleshooting</a> · <a href="#status-and-evidence">Status</a> · <a href="#releases">Releases</a> · <a href="#documentation">Docs</a></p>
 
 FORJA is a **Node.js orchestration CLI** for development in an existing Git project. Each phase starts a fresh native coding-agent session with relevant context; a small controller owns task state, checks, retry limits and recovery.
 
@@ -38,9 +38,18 @@ node $forja core doctor --provider codex
 node $forja start --provider codex --goal "Add name search, preserve existing filters, and test empty results"
 ```
 
-Use `--provider claude` for Claude Code. The project must have a clean working tree unless you explicitly pass `--allow-dirty`. Ignore the project's `.forja/` directory: it contains private run state and logs. Optional `core init` adds the ignore rule and short instruction references; review and commit those setup changes before a clean-tree start.
+Use `--provider claude` for Claude Code; it is also the default when `--provider` is omitted. The project must have a clean working tree unless you explicitly pass `--allow-dirty`. Ignore the project's `.forja/` directory: it contains private run state and logs. Optional `core init` adds the ignore rule and short instruction references; review and commit those setup changes before a clean-tree start. In a project that was prepared for the legacy crew, `core init` also migrates it: see [Core runbook](docs/CORE-RUNBOOK.md#migrar-um-projeto-legado).
 
 `core doctor` checks local prerequisites without model calls or project changes. It does not confirm login, model access or subscription quota.
+
+`start` stays in the foreground until the run finishes or stops, and exits nonzero unless it completed. To follow it, open a second terminal in the same project (set `$forja` there too):
+
+```powershell
+node $forja core status   # run status, tasks, limits, plan_warnings and a recovery reason when stopped
+node $forja serve         # local viewer at http://127.0.0.1:4317/
+```
+
+On first use, `serve` creates an access token in `data/viewer-token.txt` inside the FORJA checkout (or in `FORJA_DATA_DIR` when set); paste it on the viewer's entry page. Use `--port` or the `PORT` environment variable to change the port. If the run stops, see [Troubleshooting](#troubleshooting).
 
 Workers edit files and execute commands. They are instructed not to commit or publish. With explicit `delivery` configuration, the final reviewer also approves the exact release snapshot in its existing session; the controller performs authorized commit/push operations. Without it, FORJA does not commit or publish. Starting an ordinary chat does not automatically start FORJA.
 
@@ -165,6 +174,22 @@ Since **0.8.2**, a recorded valid developer handoff can survive controller death
 
 Run `node $forja serve` from the FORJA checkout to open the local viewer. The responsive workspace at `/` (also `/core` and `/m`) prioritizes projects needing attention, with search, status filters and expandable task/session evidence. It accepts pending Sponsor choices; the previous event/roster pages are available through a secondary compatibility link. A configured notification transport can alert the Sponsor. See the [runbook](docs/CORE-RUNBOOK.md) for project/run selection, notification setup and recovery.
 
+## Troubleshooting
+
+Start with `node $forja core status`. When a run stops, its `recovery` field (also shown in the viewer) gives a fixed reason code, guidance and the current limits. Work on disk is preserved: inspect the diff before choosing an action. Recovery commands can only raise budgets; `retry` and `abandon` require `--why`.
+
+| `recovery.code` | What to do |
+|---|---|
+| `context`, `rotations` | A task reached the context limit or used its continuation budget. Inspect the checkpoint, then `core resume --max-rotations N` continues in a fresh session. |
+| `no_progress_between_rotations` | Consecutive context-limit sessions changed no source and no progress notes. Split the task: `core abandon --why "..."`, then start a run with narrower tasks. Resume only with a larger `--max-context-tokens`. |
+| `repeated_context_limit` | Three consecutive sessions hit the context limit without a handoff. Inspect the work, then narrow the task or explicitly raise its context budget. |
+| `attempts`, `sessions`, `cloud_sessions`, `timeout` | Raise the matching limit (`--max-attempts`, `--max-sessions`, `--max-cloud-sessions`, `--max-minutes`) with `core resume` or `core retry --task T1 --why "..."`. If the implementation is already complete, `core retry --task T1 --validate-only --why "..."` goes straight to checks and review. |
+| `provider`, `provider_limit` | Authentication, availability or quota failed. Fix it in the provider CLI, then `core resume`. FORJA does not retry or switch providers automatically, and larger budgets do not add provider quota. |
+| `interrupted` | The controller process ended while the run was marked running. Check `core status` and the diff, then `core resume`. |
+| `check_targets` | A check still contains a placeholder such as `<port>`. Abandon the run and start a new one with concrete check commands. |
+
+A pending technology or cost decision is answered in the viewer or with `core decide`; `resume` and `retry` never choose for you. A blocked task needs `core retry --task ID --why "..."`. `core abandon --why "..."` ends the run as `failed`, keeps files and evidence, and lets you start a new goal. `core diagnose` and `core usage --details` show what each session did without calling a model. Full procedures: [resume and blocked runs](docs/CORE-RUNBOOK.md#retomar-e-resolver-bloqueios) and [repeated context stops](docs/CORE-RUNBOOK.md#paragens-repetidas-por-contexto) (Portuguese).
+
 ## Status and evidence
 
 | Available now | Still experimental or proposed |
@@ -230,6 +255,7 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 |---|---|
 | [Execution contract](docs/CORE.md) | [Core runbook — Portuguese](docs/CORE-RUNBOOK.md) |
 | [Routing, models and presets](docs/ROUTING.md) | [Scheduler](lib/core/engine.mjs) · [Adapters](lib/core/providers.mjs) |
+| [Isolated checks and delivery](docs/CONTROLLER-DELIVERY.md) | [Specialist methods](docs/CORE-SPECIALISTS.md) |
 | [Adaptive orchestration proposal](docs/ADAPTIVE-ORCHESTRATION.md) | [Selected architecture research](docs/RESEARCH.md) |
 | [Release and privacy policy](docs/RELEASE.md) | [Changelog](CHANGELOG.md) |
 
