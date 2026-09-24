@@ -349,3 +349,11 @@ test('legacy generated run state is not discovered by default but stays selectab
   assert.equal(explicit.selected[0].path, 'docs/forja/HANDOVER.md');
   assert.equal(explicit.excluded_legacy_state, undefined);
 });
+
+test('archived legacy crew agents are not discovered as knowledge', (t) => {
+  const f = fixture(t);
+  mkdirSync(join(f.root, 'docs/forja/legacy-agents'), { recursive: true });
+  f.put('docs/forja/legacy-agents/architect.md', '# Architect\nDecompose pagination into TASKS.json.\n');
+  f.put('docs/notes.md', '# Notes\nPagination uses cursors.\n');
+  assert.deepEqual(retrieveKnowledge(f.root, 'pagination').selected.map((e) => e.path), ['docs/notes.md']);
+});

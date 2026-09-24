@@ -80,7 +80,7 @@ describe('the sample project is a byte-identical copy of the crew', () => {
     write(join(dst, 'forja-velho', 'SKILL.md'), 'legado\n');
     const lines = sampleDivergences(src, dst, 'skills');
     assert.equal(lines.length, 3);
-    assert.match(lines[0], /^sample: \.claude\/skills\/forja-crew\/SKILL\.md difere da cópia em examples\/sample-project — corre `node bin\/forja\.mjs bootstrap examples\/sample-project`$/);
+    assert.match(lines[0], /^sample: \.claude\/skills\/forja-crew\/SKILL\.md difere da cópia em examples\/sample-project — corre `node bin\/forja\.mjs bootstrap examples\/sample-project --legacy`$/);
     assert.match(lines[1], /^sample: falta \.claude\/skills\/forja-qa\/SKILL\.md em examples\/sample-project/);
     assert.match(lines[2], /^sample: examples\/sample-project\/\.claude\/skills\/forja-velho\/SKILL\.md não existe em \.claude\/skills\//);
   });

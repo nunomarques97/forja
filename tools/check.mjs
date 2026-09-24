@@ -48,7 +48,7 @@ export function walk(dir, base = dir, out = []) {
 
 // ---------- 1. the sample project is a byte-identical copy of the crew ----------
 export const CREW_DIRS = ['agents', 'skills'];
-const BOOTSTRAP_HINT = 'corre `node bin/forja.mjs bootstrap examples/sample-project`';
+const BOOTSTRAP_HINT = 'corre `node bin/forja.mjs bootstrap examples/sample-project --legacy`';
 
 // Returns one line per divergence, in reading order. `[]` = the copy is exact.
 export function sampleDivergences(srcDir, dstDir, kind = 'skills') {

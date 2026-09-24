@@ -938,7 +938,7 @@ forja — comandos (docs/ARCHITECTURE.md §7b)
   ask "…" --default "…" --why "…" | answers
   fallback <papel> <de> <para> --why "…" | progress "…" [--as papel] | notify "…" [--priority high] | status | resume
   report "…"   (sessão à mão, sem run: regista o fim e o relatório entregue ao Sponsor numa linha — o viewer mostra-o no feed; dentro de um run usa-se \`run finish\`)
-  serve | up [--port N] [--no-tunnel] | down | token rotate | autostart install|remove | bootstrap <repo> [--dry-run] [--keep-legacy]
+  serve | up [--port N] [--no-tunnel] | down | token rotate | autostart install|remove | bootstrap <repo> [--dry-run] [--legacy [--keep-legacy]]
   guard [run] [--poll-ms 60000] | guard stop | guard status   (guarda dos runners: processo à parte que relança um runner morto a meio de um run — 3 tentativas, 15 min entre elas; \`forja guard\` sem subcomando é o mesmo que \`guard run\` e fica a correr; "status" só simula e não lança nada)
   projects list | projects prune   (registo de projetos preparados: lista com pasta e run; prune tira os que já não têm pasta)`;
 

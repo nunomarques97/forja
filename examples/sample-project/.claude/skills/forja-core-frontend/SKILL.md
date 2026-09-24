@@ -1,6 +1,7 @@
 ---
 name: forja-core-frontend
 description: Implement or repair browser interactions and UI within the accepted design, including asynchronous state and accessibility.
+disable-model-invocation: true
 ---
 
 Implement the accepted visual and interaction contract. Read the existing components, styles and state owner before changing them. Preserve recognizable layout and content for a bounded fix. Seek design exploration only when the task needs a new direction; a frontend task is not automatically a redesign.

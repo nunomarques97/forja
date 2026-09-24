@@ -1,6 +1,7 @@
 ---
 name: forja-core-design
 description: Develop a visual direction and inspect rendered compositions for open visual briefs; preserve approved designs.
+disable-model-invocation: true
 ---
 
 Establish a visual direction for an open brief, or develop the existing approved direction when one exists. Start with the audience's concrete question and the content that must answer it. Pick a spatial organizing rule drawn from that content: the relationships between elements must do work, not merely decorate a conventional hero. Compare a few viable arrangements briefly, then draw one coherent proposal. Do not spend the deliverable on persuasive design prose.

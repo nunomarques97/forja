@@ -20,7 +20,10 @@ const forja = join(here, '..');
 const cli = join(forja, 'bin', 'forja.mjs');
 const root = mkdtempSync(join(tmpdir(), 'forja-bootstrap-'));
 const env = { ...process.env, FORJA_DATA_DIR: join(root, 'data'), FORJA_NTFY_SERVER: 'http://127.0.0.1:9' };
-const run = (...args) => { const r = spawnSync(process.execPath, [cli, 'bootstrap', ...args], { env, encoding: 'utf8', cwd: root }); return { code: r.status, out: r.stdout, err: r.stderr, json: (() => { try { return JSON.parse(r.stdout); } catch { return null; } })() }; };
+// The legacy crew install needs --legacy; `runCore` is the default Core preparation.
+const cliRun = (args) => { const r = spawnSync(process.execPath, [cli, 'bootstrap', ...args], { env, encoding: 'utf8', cwd: root }); return { code: r.status, out: r.stdout, err: r.stderr, json: (() => { try { return JSON.parse(r.stdout); } catch { return null; } })() }; };
+const run = (...args) => cliRun([...args, '--legacy']);
+const runCore = (...args) => cliRun(args);
 after(() => rmSync(root, { recursive: true, force: true }));
 
 // { relPath: sha256 } of every file under dir
@@ -161,6 +164,42 @@ describe('bootstrap into a temp target with its own CLAUDE.md, settings.json and
   });
 });
 
+describe('default bootstrap prepares Core only', () => {
+  test('no crew, skills or hooks are installed; legacy crew agents are archived; the project is registered', () => {
+    const t = makeTarget('core-app');
+    const crew = '---\nname: architect\ndescription: Architect of the Forja crew.\n---\n';
+    writeFileSync(join(t, '.claude', 'agents', 'architect.md'), crew);
+    const settings = readFileSync(join(t, '.claude', 'settings.json'), 'utf8');
+    const r = runCore(t);
+    assert.equal(r.code, 0, r.err);
+    assert.equal(r.json.mode, 'core');
+    assert.equal(r.json.dryRun, false);
+    assert.equal(r.json.registry.registered, true);
+    assert.deepEqual(r.json.legacy_agents.archived, [{ from: '.claude/agents/architect.md', to: 'docs/forja/legacy-agents/architect.md' }]);
+    assert.equal(readFileSync(join(t, 'docs', 'forja', 'legacy-agents', 'architect.md'), 'utf8'), crew);
+    assert.deepEqual(readdirSync(join(t, '.claude', 'agents')), ['mine.md']);
+    assert.ok(!existsSync(join(t, '.claude', 'skills')), 'no skills copied');
+    assert.equal(readFileSync(join(t, '.claude', 'settings.json'), 'utf8'), settings, 'no hooks merged');
+    assert.ok(!existsSync(join(t, 'docs', 'forja', 'TASKS.json')), 'no legacy run state');
+    const claude = readFileSync(join(t, 'CLAUDE.md'), 'utf8');
+    assert.ok(claude.startsWith(CUSTOM_CLAUDE));
+    assert.match(claude, /<!-- forja-core:begin -->\n## FORJA core/);
+    assert.match(readFileSync(join(t, '.gitignore'), 'utf8'), /^\.forja\/$/m);
+    const again = runCore(t);
+    assert.equal(again.code, 0, again.err);
+    assert.deepEqual(again.json.legacy_agents.archived, []);
+  });
+  test('--dry-run reports the Core changes and writes nothing', () => {
+    const t = makeTarget('core-dry'); const before = fingerprint(t);
+    const r = runCore(t, '--dry-run');
+    assert.equal(r.code, 0, r.err);
+    assert.equal(r.json.mode, 'core'); assert.equal(r.json.dryRun, true);
+    assert.deepEqual(r.json.changes, ['AGENTS.md', 'CLAUDE.md', '.gitignore', '.forja']);
+    assert.equal(r.json.registry, undefined);
+    assert.deepEqual(fingerprint(t), before);
+  });
+});
+
 describe('dry-run and refusals', () => {
   test('--dry-run prints the same plan and writes nothing', () => {
     const t = makeTarget('dry'); const before = fingerprint(t);
@@ -204,7 +243,7 @@ describe('legacy forge-named files', () => {
       writeFileSync(join(root, '.claude', 'agents', 'bigorna.md'), '# old\nskills:\n  - forja-crew');
       writeFileSync(join(root, '.claude', 'agents', 'mine.md'), '# not ours');
       writeFileSync(join(root, '.claude', 'skills', 'forja-decide', 'SKILL.md'), '# old skill (forja)');
-      const r = spawnSync(process.execPath, [join(here, '..', 'bin', 'forja.mjs'), 'bootstrap', root], { env, encoding: 'utf8' });
+      const r = spawnSync(process.execPath, [join(here, '..', 'bin', 'forja.mjs'), 'bootstrap', root, '--legacy'], { env, encoding: 'utf8' });
       assert.equal(r.status, 0, r.stdout + r.stderr);
       const s = JSON.parse(r.stdout);
       assert.ok(s.removed.includes('.claude/agents/bigorna.md') && s.removed.includes('.claude/skills/forja-decide'), JSON.stringify(s.removed));
@@ -224,7 +263,7 @@ describe('legacy names that are not ours', () => {
       mkdirSync(join(root, '.claude', 'skills', 'forja-decide'), { recursive: true });
       writeFileSync(join(root, '.claude', 'agents', 'contraste.md'), '# my own contraste agent');
       writeFileSync(join(root, '.claude', 'skills', 'forja-decide', 'SKILL.md'), '# my own decide skill');
-      const r = spawnSync(process.execPath, [join(here, '..', 'bin', 'forja.mjs'), 'bootstrap', root], { env, encoding: 'utf8' });
+      const r = spawnSync(process.execPath, [join(here, '..', 'bin', 'forja.mjs'), 'bootstrap', root, '--legacy'], { env, encoding: 'utf8' });
       assert.equal(r.status, 0, r.stdout + r.stderr);
       const s = JSON.parse(r.stdout);
       assert.deepEqual(s.removed, []);

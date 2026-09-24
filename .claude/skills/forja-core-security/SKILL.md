@@ -1,6 +1,7 @@
 ---
 name: forja-core-security
 description: Implement or review a change that crosses an actual trust boundary, such as user or tenant authorization, untrusted content reaching an interpreter, filesystem access or secret handling. Use for relevant security work, not as an automatic audit of every task.
+disable-model-invocation: true
 ---
 
 Identify the boundary changed by this task: who controls the input, which

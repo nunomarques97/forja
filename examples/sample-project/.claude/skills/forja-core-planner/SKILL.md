@@ -1,6 +1,7 @@
 ---
 name: forja-core-planner
 description: Plan cohesive work and select only specialist context required by the task decisions.
+disable-model-invocation: true
 ---
 
 Turn the requested outcome into the smallest set of cohesive, independently verifiable tasks. Do not split solely because files span frontend and backend; split when contracts, ownership or distinct deliverables justify it. Preserve accepted designs and technology. Request only missing decisions that block the actual work.

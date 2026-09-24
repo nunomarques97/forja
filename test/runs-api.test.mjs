@@ -512,7 +512,7 @@ describe('`forja bootstrap` registers the project', () => {
     assert.equal(summary.registry.file, file, 'diz qual é o ficheiro a corrigir');
     assert.match(summary.warnings.join(' '), /telemóvel/);
     assert.equal(readFileSync(file, 'utf8'), garbage, 'o registo partido ficou exatamente como estava');
-    assert.ok(existsSync(join(target, '.claude')), 'o projeto foi mesmo preparado');
+    assert.match(readFileSync(join(target, 'CLAUDE.md'), 'utf8'), /forja-core:begin/, 'o projeto foi mesmo preparado');
   });
 });
 

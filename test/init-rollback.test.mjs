@@ -298,7 +298,8 @@ test('success keeps the result shape, leaves no temp files and is byte-idempoten
   assert.deepEqual(result, {
     project: resolve(root),
     files: ['AGENTS.md', 'CLAUDE.md', '.gitignore'],
-    note: 'Existing instructions retained; no role catalog or settings copied.',
+    legacy_agents: { archived: [], kept: [] },
+    note: 'Existing instructions retained; legacy crew agents archived, never deleted; no role catalog or settings copied.',
   });
   assert.deepEqual(fs.readdirSync(root).sort(), ['.forja', '.gitignore', 'AGENTS.md', 'CLAUDE.md', 'unrelated.txt']);
   for (const n of ['AGENTS.md', 'CLAUDE.md']) {
@@ -405,3 +406,76 @@ for (const existing of [true, false]) {
     assert.deepEqual(inventory(root), before);
   });
 }
+
+// Legacy crew agents: archived reversibly, never deleted.
+const CREW = '---\nname: architect\ndescription: Architect of the Forja crew.\n---\nBody\n';
+function seedCrew(root) {
+  fs.mkdirSync(join(root, '.claude/agents'), { recursive: true });
+  fs.writeFileSync(join(root, '.claude/agents/architect.md'), CREW);
+  fs.writeFileSync(join(root, '.claude/agents/qa.md'), CREW.replace('architect', 'qa'));
+  fs.writeFileSync(join(root, '.claude/agents/reviewer.md'), '# my own reviewer\n');
+  fs.writeFileSync(join(root, '.claude/agents/helper.md'), '# helper for forja\n');
+}
+
+test('init archives legacy crew agents, keeps user agents and is idempotent', (t) => {
+  const root = fixture(t);
+  seedCrew(root);
+  const result = initCore(root);
+  assert.deepEqual(result.legacy_agents, {
+    archived: [
+      { from: '.claude/agents/architect.md', to: 'docs/forja/legacy-agents/architect.md' },
+      { from: '.claude/agents/qa.md', to: 'docs/forja/legacy-agents/qa.md' },
+    ],
+    kept: [],
+  });
+  assert.deepEqual(fs.readdirSync(join(root, '.claude/agents')).sort(), ['helper.md', 'reviewer.md']);
+  assert.equal(fs.readFileSync(join(root, 'docs/forja/legacy-agents/architect.md'), 'utf8'), CREW);
+  const first = inventory(root);
+  assert.deepEqual(initCore(root).legacy_agents, { archived: [], kept: [] });
+  assert.deepEqual(inventory(root), first);
+});
+
+test('init keeps crew agents while a legacy run is active and refuses a conflicting archive', (t) => {
+  const root = fixture(t);
+  seedCrew(root);
+  fs.mkdirSync(join(root, 'docs/forja'), { recursive: true });
+  fs.writeFileSync(join(root, 'docs/forja/RUN.json'), '{"status":"running"}');
+  const kept = initCore(root);
+  assert.deepEqual(kept.legacy_agents, { archived: [], kept: ['.claude/agents/architect.md', '.claude/agents/qa.md'], reason: 'active legacy run' });
+  assert.ok(fs.existsSync(join(root, '.claude/agents/architect.md')));
+  fs.writeFileSync(join(root, 'docs/forja/RUN.json'), '{"status":"failed"}');
+  fs.mkdirSync(join(root, 'docs/forja/legacy-agents'));
+  fs.writeFileSync(join(root, 'docs/forja/legacy-agents/qa.md'), 'different');
+  const before = inventory(root);
+  assert.throws(() => initCore(root), /legacy-agents\/qa\.md already exists with different content.*Nothing was written/);
+  assert.deepEqual(inventory(root), before);
+});
+
+test('a failure while archiving restores agents and removes the archive', (t) => {
+  const root = fixture(t);
+  seedCrew(root);
+  const before = inventory(root);
+  const r = withFaults(root, [{ op: 'unlinkSync', target: 'qa.md' }]);
+  assert.equal(r.ok, false);
+  assert.equal(r.message, 'synthetic I/O failure');
+  assert.deepEqual(inventory(root), before);
+});
+
+test('dry run reports the changes and writes nothing', (t) => {
+  const root = fixture(t);
+  seedCrew(root);
+  const before = inventory(root);
+  const report = initCore(root, { dryRun: true });
+  assert.equal(report.dryRun, true);
+  assert.deepEqual(report.changes, ['AGENTS.md', 'CLAUDE.md', '.gitignore', '.forja']);
+  assert.equal(report.legacy_agents.archived.length, 2);
+  assert.deepEqual(inventory(root), before);
+});
+
+test('project copies of Core methods become manual-only', (t) => {
+  const root = fixture(t);
+  fs.mkdirSync(join(root, '.claude/skills/forja-core-planner'), { recursive: true });
+  fs.writeFileSync(join(root, '.claude/skills/forja-core-planner/SKILL.md'), '---\nname: forja-core-planner\ndescription: Plan cohesive work.\n---\nBody\n');
+  initCore(root);
+  assert.equal(fs.readFileSync(join(root, '.claude/skills/forja-core-planner/SKILL.md'), 'utf8'), '---\nname: forja-core-planner\ndescription: Plan cohesive work.\ndisable-model-invocation: true\n---\nBody\n');
+});

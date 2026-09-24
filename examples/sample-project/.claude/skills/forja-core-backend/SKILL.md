@@ -1,6 +1,7 @@
 ---
 name: forja-core-backend
 description: Implement server or data behavior with explicit validation, concurrency, side-effect and failure contracts.
+disable-model-invocation: true
 ---
 
 Implement the external contract and its failure semantics. Identify the authoritative state, identity key and boundaries where values leave the process. Validate values that determine authorization, identity or resource consumption before the corresponding side effect. Normalize only when the contract permits it; do not silently reinterpret input.
