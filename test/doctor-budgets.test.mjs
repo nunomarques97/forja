@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { coreBudgets } from '../lib/core/budgets.mjs';
 import { doctor } from '../lib/core/doctor.mjs';
+import { core } from '../lib/core/engine.mjs';
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'forja-doctor-budgets-'));
@@ -148,4 +149,20 @@ test('doctor checks every budget boundary and leaves project files and index unt
   }
   assert.deepEqual(readdirSync(root), files);
   assert.deepEqual(readFileSync(join(root, '.git/index')), index);
+});
+
+test('budgets accept only integers and digit strings, and a limit flag needs a value', async (t) => {
+  for (const value of [true, false, null, [3], '0x5', '1e2', ' 5', '5 ', '5.0', '+5', '-1', '', {}])
+    assert.throws(() => coreBudgets({ maxSessions: value }), /Budget must be an integer/, JSON.stringify(value));
+  assert.equal(coreBudgets({ maxSessions: 7 }).sessions, 7);
+  assert.equal(coreBudgets({ maxSessions: '07' }).sessions, 7);
+  const root = fixture(t);
+  // The plan path does not exist: even a regression cannot reach a provider.
+  const opt = { project: root, goal: 'Budget flag', provider: 'custom', plan: join(root, 'missing-plan.json') };
+  for (const flag of ['max-sessions', 'max-attempts', 'max-minutes', 'max-rotations', 'max-context-tokens', 'max-cloud-sessions']) {
+    await assert.rejects(core({ pos: ['start'], opt: { ...opt, [flag]: true } }), new RegExp(`--${flag} needs an integer value`));
+    await assert.rejects(core({ pos: ['resume'], opt: { project: root, [flag]: true } }), new RegExp(`--${flag} needs an integer value`));
+  }
+  await assert.rejects(core({ pos: ['start'], opt: { ...opt, 'max-cloud-sessions': '0x5' } }), /Budget must be an integer in 0\.\.200/);
+  assert.equal(existsSync(join(root, '.forja', 'current.json')), false);
 });
