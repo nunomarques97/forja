@@ -51,6 +51,13 @@ function fixture(t) {
   return { root, project, data, state, save };
 }
 
+test('an unreadable project does not suppress inspection of later Core projects', (t) => {
+  const broken = fixture(t), healthy = fixture(t);
+  writeFileSync(join(broken.project, '.forja/current.json'), '{');
+  upsertProject({ name: 'Healthy', path: healthy.project }, broken.data);
+  assert.equal(coreDrivenProjects(broken.data).size, 1);
+});
+
 test('Core projection attributes partial usage and never emits raw evidence or paths', (t) => {
   const f = fixture(t);
   writeFileSync(

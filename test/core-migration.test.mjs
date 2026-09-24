@@ -102,3 +102,10 @@ test('every bundled skill and agent header is valid YAML in the supported subset
         assert.deepEqual(frontmatterProblems(header), [], file);
       }
 });
+
+test('invalid YAML escapes, tab indentation and typed collections refuse repair', () => {
+  for (const header of ['description: "bad\\q"', 'description: "bad\\Uffffffff"', 'tools:\n\t- Read', 'allowed-tools: [Read, Write]'])
+    assert.throws(() => disableLegacySkill(`---\nname: forja-lead\n${header}\n---\nBody\n`, 'forja-lead'), /Invalid YAML/);
+  const repaired = disableLegacySkill('---\nname: forja-lead\ndescription: a:\tb\n---\nBody\n', 'forja-lead');
+  assert.match(repaired, /description: "a:\\tb"/);
+});

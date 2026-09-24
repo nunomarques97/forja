@@ -63,6 +63,7 @@ for (const op of ['writeFileSync', 'mkdirSync', 'unlinkSync', 'rmdirSync', 'rena
     if (!fault) return original.call(this, p, ...rest);
     if (fault.when === 'after') original.call(this, p, ...rest);
     if (fault.when === 'partial') original.call(this, p, 'partial write');
+    if (fault.when === 'collision') original.call(this, p, 'concurrent owner', { flag: 'wx' });
     if (fault.populate) fs.writeFileSync(String(p) + '/keep.txt', 'preserve');
     throw Object.assign(new Error('synthetic I/O failure'), { code: fault.code || 'EIO' });
   };
@@ -478,4 +479,38 @@ test('project copies of Core methods become manual-only', (t) => {
   fs.writeFileSync(join(root, '.claude/skills/forja-core-planner/SKILL.md'), '---\nname: forja-core-planner\ndescription: Plan cohesive work.\n---\nBody\n');
   initCore(root);
   assert.equal(fs.readFileSync(join(root, '.claude/skills/forja-core-planner/SKILL.md'), 'utf8'), '---\nname: forja-core-planner\ndescription: Plan cohesive work.\ndisable-model-invocation: true\n---\nBody\n');
+});
+
+test('unknown or malformed legacy run states keep the crew in place', (t) => {
+  for (const state of ['{}', 'null', '[]', '{"status":"paused"}', '{"status":true}', '{']) {
+    const root = fixture(t);
+    seedCrew(root);
+    fs.mkdirSync(join(root, 'docs/forja'), { recursive: true });
+    fs.writeFileSync(join(root, 'docs/forja/RUN.json'), state);
+    const report = initCore(root);
+    assert.equal(report.legacy_agents.archived.length, 0, state);
+    assert.equal(report.legacy_agents.kept.length, 2, state);
+    assert.equal(fs.readFileSync(join(root, '.claude/agents/architect.md'), 'utf8'), CREW);
+  }
+});
+
+test('an archive collision after preflight never removes the other writer file', (t) => {
+  const root = fixture(t);
+  seedCrew(root);
+  fs.mkdirSync(join(root, 'docs/forja/legacy-agents'), { recursive: true });
+  const result = withFaults(root, [{ op: 'writeFileSync', target: 'qa.md', when: 'collision', code: 'EEXIST' }]);
+  assert.equal(result.ok, false);
+  assert.equal(fs.readFileSync(join(root, 'docs/forja/legacy-agents/qa.md'), 'utf8'), 'concurrent owner');
+  assert.equal(fs.readFileSync(join(root, '.claude/agents/qa.md'), 'utf8'), CREW.replace('architect', 'qa'));
+  assert.equal(fs.readFileSync(join(root, '.claude/agents/architect.md'), 'utf8'), CREW);
+  assert.equal(fs.existsSync(join(root, 'AGENTS.md')), false);
+});
+
+test('a user agent mentioning FORJA is not evidence of crew ownership', (t) => {
+  const root = fixture(t);
+  fs.mkdirSync(join(root, '.claude/agents'), { recursive: true });
+  const text = '---\nname: reviewer\ndescription: Review FORJA integrations for this product.\n---\nCustom reviewer.\n';
+  fs.writeFileSync(join(root, '.claude/agents/reviewer.md'), text);
+  assert.equal(initCore(root).legacy_agents.archived.length, 0);
+  assert.equal(fs.readFileSync(join(root, '.claude/agents/reviewer.md'), 'utf8'), text);
 });

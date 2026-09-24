@@ -176,15 +176,30 @@ test('consecutive context rotations without source or notes changes stop before 
   assert.match(recoveryInfo(blocked).guidance, /Split the task/);
 });
 
-test('a context rotation that only updates its notes counts as progress', async t => {
+test('changing notes does not permit endless forced context rotations', async t => {
   const root = fixture(t, { maxRotations: 2 });
   let calls = 0;
   const blocked = await drive(root, { log: () => {}, providerCall: async (_, options) => {
     calls++;
     return { code: 1, contextExceeded: true, lastContextTokens: 120001, progressNotes: `${options.progressNotes}step ${calls}\n` };
   } });
-  assert.equal(blocked.stopCode, 'rotations');
+  assert.equal(blocked.stopCode, 'repeated_context_limit');
   assert.equal(calls, 3);
   assert.equal(blocked.tasks[0].stalled_rotations, 0);
   assert.equal(blocked.tasks[0].progress_notes.text, 'step 1\nstep 2\nstep 3\n');
+});
+
+test('one-line source changes cannot bypass the forced context stop bound', async t => {
+  const root = fixture(t, { maxRotations: 5 });
+  let calls = 0;
+  const blocked = await drive(root, { log: () => {}, providerCall: async () => {
+    calls++;
+    writeFileSync(join(root, 'value.mjs'), `export const value = ${calls};\n`);
+    return { code: 1, contextExceeded: true, progressNotes: `Read source ${calls}` };
+  } });
+  assert.equal(blocked.stopCode, 'repeated_context_limit');
+  assert.equal(calls, 3);
+  assert.equal(blocked.tasks[0].context_limit_streak, 3);
+  assert.equal(readFileSync(join(root, 'value.mjs'), 'utf8'), 'export const value = 3;\n');
+  assert.equal(recoveryInfo(blocked).code, 'repeated_context_limit');
 });

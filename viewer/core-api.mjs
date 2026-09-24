@@ -33,7 +33,7 @@ export function coreDrivenProjects(dataDir) {
   const keys = new Set();
   try {
     for (const p of readProjects(dataDir)) {
-      const status = coreObservation(p.path)?.run.status;
+      const status = coreObservation(p.path)?.run?.status;
       if (status === 'running' || status === 'blocked') keys.add(projectKey(p.path));
     }
   } catch {} // An unreadable registry only means no suppression.

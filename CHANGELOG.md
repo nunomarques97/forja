@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.18.0 — Reliable Core entrypoints and bounded continuation
+
+- Prepare Core projects by default with `bootstrap`; retain crew installation behind explicit `--legacy`. Repair skill description quoting, keep workflow methods manual-only, and reversibly archive recognized legacy agents only when their run is known to be inactive.
+- Preserve bounded private progress notes across development sessions. Stop unchanged context rotations and bound repeated forced stops even when superficial edits or notes keep changing.
+- Give planning explicit context estimates and the no-intermediate-commits delivery contract, with advisory scope and Git-state warnings. Keep legacy handovers and archived agents out of automatic knowledge discovery.
+- Suppress obsolete dead-subagent alerts after their parent closes or Core takes over. Continue inspecting healthy projects when another project's state is unreadable.
+- Harden migration preflight, YAML validation and rollback against unknown run states, custom agents and concurrent archive collisions. Preserve existing work, run state and model profiles.
+
 ## 0.17.1 — Core entrypoint migration
 
 - Migrate legacy project instruction blocks to Core without changing product rules, unfinished work, model profiles or run state.

@@ -42,6 +42,12 @@ If `docs/forja/RUN.json` still records a running or blocked run, close it explic
 
 Guidance is portable: resolve the installation from the caller, `FORJA_ROOT`, or an existing FORJA hook path. Do not commit a local home path. Historical references to crew roles do not authorize manual delegation in a Core run; map applicable product constraints to the controller's phases.
 
+Migration only archives recognized FORJA crew definitions, not a user agent that merely mentions FORJA. A missing or unknown status in an existing legacy run file is treated as active; only explicit terminal states permit archival. Archive collisions preserve the other writer's file. The YAML checker supports a conservative header subset, repairs plain descriptions and rejects unsupported structures rather than changing their types.
+
+## Repeated context stops
+
+Context rotations also have a hard bound: three consecutive forced context stops block with `repeated_context_limit`, even if each session changes a source line or rewrites its notes. These signals are retained evidence, not proof of useful progress. An intentional worker handoff resets this streak; the ordinary session and rotation budgets still apply. Inspect the work and narrow the task or explicitly revise its context budget before resuming. The planner's 35,000-token baseline is a Claude reference estimate, not a measurement or a context guarantee for other providers.
+
 ## Acesso completo dos executores
 
 Para permitir acesso completo em **plan, develop e review**, seleciona o perfil [core-full-access.json](../config/core-full-access.json):
