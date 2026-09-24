@@ -1063,3 +1063,20 @@ test('guard recovery checks run identity and running status under the project lo
   );
   assert.equal(JSON.parse(readFileSync(current(p))).invocations, 0);
 });
+
+test('a refusal before launch spends no implementation attempt, however often it is resumed', async () => {
+  const p = repo();
+  // T2's remaining criteria enter T1's task scope and overflow the develop packet.
+  const big = ['x', 'y', 'z', 'w', 'v', 'u', 't'].map(c => c.repeat(7000));
+  createRun(p, { goal: 'Oversized scope', provider: 'custom', plan: { decisions: [], tasks: [task(), { ...task(), id: 'T2', after: ['T1'], criteria: big }] } });
+  let calls = 0;
+  let r;
+  for (let i = 0; i < 3; i++) {
+    r = await drive(p, { log: () => {}, providerCall: async () => { calls++; return result(); } });
+    assert.equal(r.status, 'blocked');
+    assert.match(r.failure, /48,000/);
+    assert.notEqual(r.stopCode, 'attempts');
+    assert.deepEqual([r.tasks[0].status, r.tasks[0].attempts, r.invocations], ['todo', 0, 0], `drive ${i + 1} spent an attempt without launching`);
+  }
+  assert.equal(calls, 0);
+});
