@@ -265,6 +265,8 @@ A lista contém até 100 caminhos relativos de ficheiros regulares, com limite d
 
 Os checks são argv lançados sem shell: um marcador `<nome>` por resolver chega literalmente ao executável e pode desperdiçar trabalho antes de falhar. Por isso, planos fornecidos, planos gerados e `finalChecks` de novos runs são recusados antes de qualquer tarefa quando um check tem executável vazio ou só com espaços, um byte NUL no comando ou num argumento, ou um marcador por resolver (nome começado por letra, como `<port>`, `<authenticated-port>` ou `<viewport>`). O plano inteiro é validado antes da primeira tarefa. A mensagem identifica a tarefa ou `finalChecks[i]` e a posição do comando/argumento, sem copiar valores que possam conter dados privados.
 
+No Windows, sem shell, só executáveis `.exe`/`.com` podem ser lançados. `node` e `npm` são mapeados para o Node em execução (o `npm-cli.js` junto do `node.exe` ou de um `npm.cmd` no PATH). Um check cujo comando é um shim `.cmd`/`.bat` (`npx`, `pnpm`, `yarn`, `tsc` e semelhantes) é recusado antes de qualquer tarefa: no `start` com plano ou `finalChecks`, logo após o planeamento (o run fica bloqueado sem tarefas; `core resume` volta a planear) e no preflight de runs existentes, com `check_targets`. O planner recebe esta regra no Windows e `core doctor` assinala `finalChecks` nestas condições. Usa `node` com o ponto de entrada JavaScript da ferramenta (por exemplo `node node_modules/typescript/bin/tsc`) ou `npm` com um script do `package.json`. Não se aplica a checks isolados em bubblewrap.
+
 É um contrato conservador sobre tokens, não um parser de shell nem de código. Deteta:
 
 - comando ou argumento igual a `<nome>`;

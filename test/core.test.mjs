@@ -1147,3 +1147,34 @@ test('review preparation handles more changed paths than one Windows command lin
   assert.deepEqual(list.files, r.tasks[0].files_changed);
   assert.equal(list.new_files.length, 1500);
 });
+
+test('Windows: a check through a .cmd shim is refused at start and after planning, before any task', { skip: process.platform !== 'win32' && 'Windows command resolution' }, async () => {
+  const shims = mkdtempSync(join(tmpdir(), 'forja-shims-'));
+  dirs.push(shims);
+  writeFileSync(join(shims, 'forja-fixture-shim.cmd'), '@exit /b 0\r\n');
+  const pathKey = Object.keys(process.env).find(key => key.toUpperCase() === 'PATH');
+  const original = process.env[pathKey];
+  process.env[pathKey] = `${shims};${original}`;
+  try {
+    const shimTask = { ...task(), checks: [{ command: 'forja-fixture-shim', args: ['--version'] }] };
+    const p = repo();
+    assert.throws(() => createRun(p, { goal: 'Shim check', provider: 'custom', plan: { decisions: [], tasks: [shimTask] } }), /Task T1 checks\[0\] command is a \.cmd\/\.bat shim on Windows/);
+    assert.equal(existsSync(join(p, '.forja', 'current.json')), false);
+
+    createRun(p, { goal: 'Shim check', provider: 'custom' });
+    const phases = [];
+    let planPrompt = '';
+    const r = await drive(p, { log: () => {}, providerCall: async (_, o) => {
+      const phase = JSON.parse(o.text).phase;
+      phases.push(phase);
+      if (phase === 'plan') { planPrompt = o.prompt; return { code: 0, result: { decisions: [], tasks: [shimTask] }, usage: null }; }
+      return result();
+    } });
+    assert.equal(r.status, 'blocked');
+    assert.match(r.failure, /^Plan refused before any task: Task T1 checks\[0\] command is a \.cmd\/\.bat shim/);
+    assert.deepEqual([phases, r.tasks.length], [['plan'], 0], 'no developer session or failed check is spent');
+    assert.match(planPrompt, /\.cmd\/\.bat shims such as npx, pnpm, yarn or tsc cannot be launched/);
+  } finally {
+    process.env[pathKey] = original;
+  }
+});
