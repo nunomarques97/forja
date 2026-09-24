@@ -3,7 +3,7 @@
 > Compatibility reference for `forja runner`, the legacy crew, viewer and guard. New runs use [FORJA Core](CORE-RUNBOOK.md). Legacy model/autonomy contracts below continue to govern existing legacy runs.
 
 
-Fonte de verdade única do desenho do Forja (reescrita em 16 set 2026 na sessão de hardening; o histórico de correções de rumo anteriores vive em `docs/FORJA-POC-LOG.md`, `proposta-arquitetura-agentes.md` é contexto histórico). Quando este ficheiro e o código discordam, o código está errado ou este ficheiro está desatualizado — nunca se escolhe em silêncio; corrige-se um dos dois e regista-se no log.
+Fonte de verdade única do desenho do fluxo legado do Forja; as alterações entre versões estão no [CHANGELOG](../CHANGELOG.md). Quando este ficheiro e o código discordam, o código está errado ou este ficheiro está desatualizado — nunca se escolhe em silêncio; corrige-se um dos dois.
 
 ## 1. O que é o Forja
 
@@ -383,7 +383,7 @@ Notifications are reserved for actionable intervention: open questions, blocked 
 
 ## 13. Portabilidade
 
-(Fase 5 desta sessão de hardening — `docs/RUNBOOK-UNATTENDED.md` e `examples/sample-project` são criados nessa fase.) Desde a 0.18.0, `bootstrap <repo>` sem opções faz o mesmo que `core init` (preparação Core); a instalação da crew legada descrita a seguir exige `--legacy`. `node <forja>/bin/forja.mjs bootstrap <repo> --legacy` (idempotente, nunca reescreve conteúdo alheio): instala `.claude/agents/{product-manager,backend-dev,frontend-dev,reviewer}.md`, `.claude/skills/forja-*/`, funde os hooks em `.claude/settings.json` (comando com caminho absoluto para `hooks/log-event.mjs` deste repo; entradas existentes preservadas; `env` do Forja acrescentado), cria `docs/forja/` com ficheiros vazios, e acrescenta ao `CLAUDE.md` do projeto uma secção `## Forja` delimitada por marcadores (só essa secção é gerida; o resto do ficheiro nunca é tocado). Valida-se em `examples/sample-project` (nunca num projeto real).
+Desde a 0.18.0, `bootstrap <repo>` sem opções faz o mesmo que `core init` (preparação Core); a instalação da crew legada descrita a seguir exige `--legacy`. `node <forja>/bin/forja.mjs bootstrap <repo> --legacy` (idempotente, nunca reescreve conteúdo alheio): instala os nove agentes da crew em `.claude/agents/` (`architect`, `product-manager`, `product-designer`, `technology-scout`, `backend-dev`, `frontend-dev`, `reviewer`, `qa`, `security-reviewer`), remove as cópias com nomes antigos que mencionem Forja (salvo com `--keep-legacy`), copia `.claude/skills/forja-*/`, funde os hooks em `.claude/settings.json` (comando com caminho absoluto para `hooks/log-event.mjs` deste repo; entradas existentes preservadas; `env` do Forja acrescentado), cria `docs/forja/` com ficheiros vazios, e mantém no `CLAUDE.md` do projeto um bloco gerido entre `<!-- forja:begin -->` e `<!-- forja:end -->`, com a mesma orientação Core de `core init` (só esse bloco é gerido; o resto do ficheiro nunca é tocado). Valida-se em `examples/sample-project` (nunca num projeto real).
 
 ## 14. Bugs conhecidos do Claude Code que este desenho contorna
 
@@ -408,4 +408,4 @@ Core now registers projects through the existing registry. The authenticated rea
 
 The existing guard recognizes driver `core`, uses the same grace/retry/cap policy and launches `core resume --expected-run ID` outside the viewer process tree. It skips blocked/terminal state, live owner/worker and unreadable locks. The engine checks expected identity/status while holding its project lock. Viewer shutdown preserves Core executor subtrees as well as old runner subtrees.
 
-Project knowledge is plain Markdown selected through `lib/core/knowledge.mjs`, optionally controlled by `docs/forja/KNOWLEDGE.json`. It is not imported from the personal Obsidian vault. The bounded in-memory sparse index provides line/hash references, optional source-dependency freshness checks and packet attribution. Details and measured limits: [KNOWLEDGE-CONTEXT.md](KNOWLEDGE-CONTEXT.md), [CONTINUATION-VALIDATION.md](CONTINUATION-VALIDATION.md).
+Project knowledge is plain Markdown selected through `lib/core/knowledge.mjs`, optionally controlled by `docs/forja/KNOWLEDGE.json`. It is not imported from the personal Obsidian vault. The bounded in-memory sparse index provides line/hash references, optional source-dependency freshness checks and packet attribution. Details and limits: [selected knowledge in the Core runbook](CORE-RUNBOOK.md#conhecimento-selecionado).

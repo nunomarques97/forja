@@ -2,7 +2,7 @@
 
 Persisted knowledge is not automatically public. Keep three distinct kinds of material:
 
-Notification destinations are local configuration: set `FORJA_NTFY_TOPIC` or put `{"topic":"your-topic"}` in ignored `data/notify-config.json`. New clones do not send notifications until configured. An explicitly empty environment value disables notifications even when a local configuration exists.
+Notification destinations are local configuration: set `FORJA_NTFY_TOPIC` or put `{"topic":"your-topic"}` in ignored `data/notify-config.json` (under `FORJA_DATA_DIR` instead, when set). New clones do not send notifications until configured. An explicitly empty environment value disables notifications even when a local configuration exists. Send attempts are logged to `notify.log` in the same data directory; like the rest of `data/`, it is private.
 
 | Material | Location | Git policy |
 |---|---|---|

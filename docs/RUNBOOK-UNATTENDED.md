@@ -8,10 +8,10 @@ Requires Node 24, Git and an authenticated Claude Code CLI. From the FORJA check
 
 ```powershell
 npm test
-node bin/forja.mjs bootstrap 'C:\projects\example'
+node bin/forja.mjs bootstrap 'C:\projects\example' --legacy
 ```
 
-Review bootstrap changes and stage only the intended integration files. Never automatically stage a project's private run state or unrelated edits. From the project root:
+Since 0.18.0, `bootstrap` without `--legacy` prepares the project for Core only and installs no crew. Review bootstrap changes and stage only the intended integration files. Never automatically stage a project's private run state or unrelated edits. From the project root:
 
 ```powershell
 $forja = 'C:\tools\forja\bin\forja.mjs'
