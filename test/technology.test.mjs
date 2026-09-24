@@ -253,3 +253,27 @@ test('authenticated decision API rejects stale/cross-site input and launches onl
     await new Promise(resolve => server.server.close(resolve));
   }
 });
+
+test('a plan with case-only duplicate capabilities is rejected atomically and never bypasses the Sponsor gate', async t => {
+  const root = fixture(t);
+  createRun(root, { goal: 'Add hosted search', provider: 'custom' });
+  const phases = [];
+  let notices = 0;
+  const options = { ...quiet, notifySponsor: async () => { notices++; return { ok: true }; }, providerCall: async (_, o) => {
+    const ctx = JSON.parse(o.text);
+    phases.push(ctx.phase);
+    if (ctx.phase === 'plan') return output({ ...plan([assessment('paid', 'Search engine'), assessment('paid', 'search engine')]) });
+    if (ctx.phase === 'develop') writeFileSync(join(root, 'value.mjs'), 'export const value = 2;\n');
+    return result(ctx.phase === 'review' ? 'approve' : 'done');
+  } };
+  const first = await drive(root, options);
+  assert.equal(first.status, 'blocked');
+  assert.equal(first.tasks.length, 0, 'a rejected plan must not leave runnable tasks');
+  assert.deepEqual(first.technology, []);
+  const resumed = await drive(root, options);
+  assert.equal(resumed.status, 'blocked');
+  assert.equal(resumed.tasks.length, 0);
+  assert.deepEqual(phases, ['plan', 'plan'], 'no development may start without the recorded paid decision');
+  assert.equal(notices, 0);
+  assert.throws(() => validateTechnology([assessment('paid', 'Search engine'), assessment('paid', 'search engine')]), /Duplicate technology capability/);
+});
