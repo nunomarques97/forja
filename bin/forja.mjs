@@ -916,6 +916,7 @@ const usage = `FORJA core (docs/CORE-RUNBOOK.md)
   core context --query "..."  (selected project knowledge with source references)
   core retry --task T1 --why "..." [--max-attempts 3] [--max-sessions 40]
   core abandon --why "..."
+  core stop [--after-task]  (asks the running controller to stop at the next invocation boundary, or after the current task; never kills a live worker; core resume continues)
   Budgets: --max-sessions 30 --max-cloud-sessions N --max-attempts 2 --max-minutes 30 --max-rotations 2 --max-context-tokens 120000
 
 Observability: serve, then /core; guard supports Core and legacy runs.

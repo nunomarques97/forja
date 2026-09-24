@@ -227,6 +227,21 @@ node $forja core abandon --why "Objetivo substituído"
 
 Não apagues um lock que indica processo vivo: inspeciona os PIDs em `.forja/lock.json`. Um `takeover.json` deixado por recuperação interrompida exige verificar o PID e lock antes de remover apenas esse guard. `call-N-stream.json` explica erros do provider; `<tarefa>-aN-check-K.log` explica checks; `core usage --details` mostra invocações. A guarda reconhece Core e só retoma runs interrompidos ainda marcados como ativos, com os intervalos e limites existentes; nunca reabre um bloqueio explícito nem compete com um worker vivo.
 
+### Parar o controlador de forma limpa
+
+Para terminar a sessão sem matar o worker nem transformar a paragem numa falha do provider, pede a paragem noutro terminal, na raiz do projeto:
+
+```powershell
+node $forja core stop               # para na próxima fronteira entre invocações
+node $forja core stop --after-task  # termina a tarefa atual e para antes da tarefa seguinte
+```
+
+O pedido fica em `.forja/stop-request.json`, fora do estado que o controlador escreve sob o lock; só o controlador o consome, entre invocações. Nenhum processo vivo é interrompido. Sem opção, a invocação em curso termina e o seu resultado é registado e validado; os checks determinísticos que se seguem ainda correm, mas nenhuma nova invocação é lançada. Com `--after-task`, a tarefa em curso continua pelos checks, revisão e reparações dentro dos orçamentos existentes; o controlador para antes da primeira invocação de outra tarefa. Pedido durante o planeamento, `--after-task` deixa o plano terminar. Se a tarefa esgotar tentativas ou outro limite antes disso, o run bloqueia por esse motivo, como sem pedido.
+
+Ao parar, o run fica `blocked` com o motivo `operator_stop` e a orientação para retomar com `core resume`; `operatorStop` no estado regista o modo, a tarefa e as horas. Nenhuma tentativa, rotação ou sessão é gasta pela paragem. `core resume` continua exatamente de onde parou e limpa qualquer pedido anterior a essa sessão do controlador. Um run que termina `done` antes da fronteira também descarta o pedido.
+
+Enquanto o pedido espera, `core status` e a API do viewer (`stop_request`) mostram o modo, a tarefa e a hora. Repetir o pedido não muda nada; `core stop` sem opção antecipa um `--after-task` pendente, mas um `--after-task` posterior nunca adia um pedido sem opção. Sem controlador vivo (run `blocked`, terminado ou interrompido) o comando falha com uma mensagem clara e não escreve nada.
+
 ## Proteger o contrato de aceitação
 
 Para um novo run, declara em `--config` os ficheiros de aceitação que devem permanecer intactos:
