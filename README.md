@@ -187,6 +187,7 @@ Start with `node $forja core status`. When a run stops, its `recovery` field (al
 | `provider`, `provider_limit` | Authentication, availability or quota failed. Fix it in the provider CLI, then `core resume`. FORJA does not retry or switch providers automatically, and larger budgets do not add provider quota. |
 | `interrupted` | The controller process ended while the run was marked running. Check `core status` and the diff, then `core resume`. |
 | `check_targets` | A check still contains a placeholder such as `<port>`. Abandon the run and start a new one with concrete check commands. |
+| `operator_stop` | You asked the controller to stop with `core stop` (at the next invocation boundary) or `core stop --after-task` (after the current task's checks, review and repairs). No attempt was consumed; `core resume` continues from the next step. |
 
 A pending technology or cost decision is answered in the viewer or with `core decide`; `resume` and `retry` never choose for you. A blocked task needs `core retry --task ID --why "..."`. `core abandon --why "..."` ends the run as `failed`, keeps files and evidence, and lets you start a new goal. `core diagnose` and `core usage --details` show what each session did without calling a model. Full procedures: [resume and blocked runs](docs/CORE-RUNBOOK.md#retomar-e-resolver-bloqueios) and [repeated context stops](docs/CORE-RUNBOOK.md#paragens-repetidas-por-contexto) (Portuguese).
 
