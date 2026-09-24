@@ -22,6 +22,7 @@ import {
   write,
   lockProject,
   recoverRun,
+  validateState,
 } from '../lib/core/engine.mjs';
 import {
   changedFiles,
@@ -1079,4 +1080,29 @@ test('a refusal before launch spends no implementation attempt, however often it
     assert.deepEqual([r.tasks[0].status, r.tasks[0].attempts, r.invocations], ['todo', 0, 0], `drive ${i + 1} spent an attempt without launching`);
   }
   assert.equal(calls, 0);
+});
+
+test('a link replacing a tracked directory leaves status and abandon usable', async () => {
+  const p = repo();
+  mkdirSync(join(p, 'docs'));
+  writeFileSync(join(p, 'docs/notes.md'), 'notes\n');
+  createRun(p, { goal: 'Link escape', provider: 'custom', plan: plan(), config: { allowDirty: true } });
+  const outside = mkdtempSync(join(tmpdir(), 'forja-outside-'));
+  dirs.push(outside);
+  const r = await drive(p, { log: () => {}, providerCall: async () => {
+    // A worker (or a tool it ran) swaps a directory for a link elsewhere.
+    rmSync(join(p, 'docs'), { recursive: true });
+    symlinkSync(outside, join(p, 'docs'), 'junction');
+    writeFileSync(join(p, 'value.mjs'), 'export const value = 2;\n');
+    return result();
+  } });
+  assert.equal(r.status, 'blocked');
+  assert.match(r.failure, /Symlink\/junction outside project/);
+  assert.throws(() => inside(p, 'docs/notes.md'), /Symlink\/junction outside project/, 'file access still refuses the link');
+  const persisted = JSON.parse(readFileSync(join(p, '.forja/current.json'), 'utf8'));
+  assert.equal(validateState(persisted, p).run_id, r.run_id, 'status can read the run');
+  const abandoned = recoverRun(p, { action: 'abandon', reason: 'Unsafe link left by a worker' });
+  assert.equal(abandoned.status, 'failed');
+  rmSync(join(p, 'docs'), { recursive: true, force: true });
+  assert.equal(createRun(p, { goal: 'Next goal', provider: 'custom', plan: plan(), config: { allowDirty: true } }).status, 'running');
 });
