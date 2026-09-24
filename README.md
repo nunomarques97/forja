@@ -185,7 +185,7 @@ Start with `node $forja core status`. When a run stops, its `recovery` field (al
 | `repeated_context_limit` | Three consecutive sessions hit the context limit without a handoff. Inspect the work, then narrow the task or explicitly raise its context budget. |
 | `attempts`, `sessions`, `cloud_sessions`, `timeout` | Raise the matching limit (`--max-attempts`, `--max-sessions`, `--max-cloud-sessions`, `--max-minutes`) with `core resume` or `core retry --task T1 --why "..."`. If the implementation is already complete, `core retry --task T1 --validate-only --why "..."` goes straight to checks and review. |
 | `provider`, `provider_limit` | Authentication, availability or quota failed. Fix it in the provider CLI, then `core resume`. FORJA does not retry or switch providers automatically, and larger budgets do not add provider quota. |
-| `interrupted` | The controller process ended while the run was marked running. Check `core status` and the diff, then `core resume`. |
+| `interrupted` | The controller process ended while the run was marked running, or Ctrl+C stopped a check or a worker session. An interrupted check records no result and spends no attempt. Check `core status` and the diff, then `core resume`. |
 | `check_targets` | A check still contains a placeholder such as `<port>`. Abandon the run and start a new one with concrete check commands. |
 | `operator_stop` | You asked the controller to stop with `core stop` (at the next invocation boundary) or `core stop --after-task` (after the current task's checks, review and repairs). No attempt was consumed; `core resume` continues from the next step. |
 

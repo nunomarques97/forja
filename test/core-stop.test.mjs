@@ -8,6 +8,7 @@ import { createRun, drive, core } from '../lib/core/engine.mjs';
 import { recoveryInfo } from '../lib/core/recovery.mjs';
 import { requestStop, readStopRequest, stopRequestPath } from '../lib/core/stop.mjs';
 import { coreAlive, coreObservation } from '../lib/core/observe.mjs';
+import { execute } from '../lib/core/providers.mjs';
 
 const valueCheck = n => [{ command: 'node', args: ['--input-type=module', '-e', `import {value} from './${n}.mjs'; if(value!==2)process.exit(1)`] }];
 function fixture(t, config = {}) {
@@ -148,4 +149,47 @@ test('a stop request left from an earlier controller session is cleared by resum
   assert.equal(done.status, 'done', done.failure);
   assert.equal(calls.length, 4);
   assert.equal(existsSync(stopRequestPath(root)), false);
+});
+
+// Emits the operator's Ctrl+C as soon as the command is running. process.emit only
+// reaches listeners, so nothing outside execute() reacts to it.
+const ctrlC = (execute) => (command, args, options) => execute(command, args, { ...options, onLaunch: pid => { options.onLaunch?.(pid); setImmediate(() => process.emit('SIGINT', 'SIGINT')); } });
+
+test('execute reports an operator interruption separately from a command failure', async () => {
+  const slow = [process.execPath, ['-e', 'setTimeout(() => {}, 20000)']];
+  const interrupted = await ctrlC(execute)(...slow, { cwd: process.cwd(), timeoutMs: 30000 });
+  assert.equal(interrupted.interrupted, true);
+  const failed = await execute(process.execPath, ['-e', 'process.exit(3)'], { cwd: process.cwd() });
+  assert.deepEqual([failed.code, failed.interrupted], [3, false]);
+});
+
+test('Ctrl+C during a controller check pauses the run without a check result or a new attempt', async t => {
+  const root = fixture(t);
+  const calls = [];
+  const stopped = await drive(root, { ...quiet, providerCall: worker(root, calls), runCheck: ctrlC(execute) });
+  assert.equal(stopped.status, 'blocked');
+  assert.equal(stopped.stopCode, 'interrupted', stopped.failure);
+  assert.deepEqual(calls, ['develop T1']);
+  assert.deepEqual([stopped.tasks[0].status, stopped.tasks[0].attempts, stopped.tasks[0].validation], ['validate', 1, []]);
+  assert.equal(stopped.tasks[0].feedback.status, 'ready_for_validation', 'no failed-check feedback is recorded');
+  assert.equal(stopped.invocations, 1);
+  assert.equal(recoveryInfo(stopped, { alive: false }).code, 'interrupted');
+
+  const resumed = await drive(root, { ...quiet, providerCall: worker(root, calls) });
+  assert.equal(resumed.status, 'done', resumed.failure);
+  assert.deepEqual(calls, ['develop T1', 'review T1', 'develop T2', 'review T2'], 'resume re-runs the checks, not the developer');
+  assert.deepEqual(resumed.tasks.map(x => x.attempts), [1, 1]);
+});
+
+test('Ctrl+C during a provider call pauses as interrupted and refunds the developer attempt', async t => {
+  const root = fixture(t);
+  const calls = [];
+  const stopped = await drive(root, { ...quiet, providerCall: async () => { calls.push('develop T1'); return { code: 1, interrupted: true, stdout: '', stderr: 'FORJA execution interrupted', usage: null }; } });
+  assert.equal(stopped.stopCode, 'interrupted', stopped.failure);
+  assert.doesNotMatch(stopped.failure, /authentication|quota/);
+  assert.deepEqual([stopped.tasks[0].status, stopped.tasks[0].attempts], ['todo', 0]);
+  assert.equal(stopped.invocations, 1);
+  const resumed = await drive(root, { ...quiet, providerCall: worker(root, calls) });
+  assert.equal(resumed.status, 'done', resumed.failure);
+  assert.deepEqual(resumed.tasks.map(x => x.attempts), [1, 1]);
 });
