@@ -61,3 +61,35 @@ test('the planner receives the context contract and plan warnings are logged and
   assert.equal(status.status, 0, status.stderr);
   assert.deepEqual(JSON.parse(status.stdout).plan_warnings.map((w) => w.code), ['context_scope']);
 });
+
+test('a later task that needs committed HEAD is flagged with the delivery mode of the run', (t) => {
+  const root = repo(t);
+  const build = task({ id: 'build' });
+  const exporter = task({ id: 'export', title: 'Export the public edition', criteria: ['The export reads committed content (HEAD) and includes the work of earlier tasks.'], after: ['build'] });
+  const warnings = planWarnings({ limits: {}, config: {}, tasks: [build, exporter] }, root);
+  assert.deepEqual(warnings.map((w) => [w.code, w.task]), [['head_dependency', 'export']]);
+  assert.match(warnings[0].message, /no commit happens between tasks; this run has no delivery and creates no commit/);
+  const delivered = planWarnings({ limits: {}, config: { delivery: { mode: 'commit' } }, tasks: [build, exporter] }, root);
+  assert.match(delivered[0].message, /delivery commit creates at most one commit after the run/);
+  const first = task({ id: 'diff', criteria: ['Compare the working tree with HEAD before editing'] });
+  assert.deepEqual(planWarnings({ limits: {}, config: {}, tasks: [first] }, root), [], 'the first task sees the starting HEAD');
+  assert.deepEqual(planningContract({ limits: {}, config: { delivery: { mode: 'push' } } }).delivery, 'push');
+  assert.equal(planningContract({ limits: {}, config: {} }).delivery, 'none');
+  assert.equal(planningContract({ limits: {}, config: {} }).commits_during_run, false);
+});
+
+test('the planner is told that no commit happens between tasks', async (t) => {
+  const root = repo(t);
+  createRun(root, { goal: 'Build then export HEAD', provider: 'custom' });
+  let input;
+  await drive(root, { log: () => {}, providerCall: async (_, options) => {
+    if (JSON.parse(options.text).phase === 'plan') {
+      input = options.input;
+      return { code: 0, result: { decisions: [], tasks: [task()] } };
+    }
+    return { code: 0, result: { status: 'blocked', summary: 'Stop here', findings: [] } };
+  } });
+  assert.match(input, /"planning_contract":\{[^}]*"delivery":"none","commits_during_run":false\}/);
+  assert.match(input, /Workers never commit and no commit happens between tasks/);
+  assert.match(input, /defer them to a later run and say so in decisions/);
+});
