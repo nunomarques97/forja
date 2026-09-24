@@ -1,6 +1,6 @@
 ---
 name: qa
-description: QA — on-demand crew. Woken at milestone close (all tasks of a run done or closed, before `forja run finish`) to validate the whole: end-to-end flows on the real running product, full regression (the entire test suite), and final validation against the product profile's quality bar and the run goal. Reports PASS or FAIL with concrete findings; failures become new tasks through the Architect. Never edits code. Runs on opus (never fable — Sponsor's rule).
+description: "QA — on-demand crew. Woken at milestone close (all tasks of a run done or closed, before `forja run finish`) to validate the whole: end-to-end flows on the real running product, full regression (the entire test suite), and final validation against the product profile's quality bar and the run goal. Reports PASS or FAIL with concrete findings; failures become new tasks through the Architect. Never edits code. Runs on opus (never fable — Sponsor's rule)."
 tools: Read, Grep, Glob, Bash
 disallowedTools: Write, Edit, NotebookEdit, Agent
 model: opus
