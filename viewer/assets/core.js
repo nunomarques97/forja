@@ -31,6 +31,19 @@ export function renderOverview(projects) {
   return [[projects.length, 'Projects', 'total'], [groups.filter(s => s.group === 'running').length, 'In progress', 'running'], [groups.filter(s => s.group === 'attention').length, 'Needs attention', 'attention'], [groups.filter(s => s.group === 'done').length, 'Completed', 'done']]
     .map(([n, label, kind]) => `<div class="overview-item ${kind}"><span>${label}</span><strong>${number(n)}</strong></div>`).join('');
 }
+const validationFields = [['passed', 'passed'], ['failed', 'failed'], ['unknown', 'unknown'], ['tasks_without_records', 'tasks without records']];
+// Untrusted server data: only a plain object with four nonnegative safe integers is shown.
+function validationSummary(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return validationFields.every(([k]) => Object.hasOwn(value, k) && Number.isSafeInteger(value[k]) && value[k] >= 0) ? value : null;
+}
+function renderValidation(name, value) {
+  const summary = validationSummary(value);
+  const body = summary
+    ? `<dl class="validation-counts">${validationFields.map(([k, label]) => `<div class="${k}${k === 'failed' && summary[k] ? ' has-failures' : ''}"><dt>${label}</dt><dd>${number(summary[k])}</dd></div>`).join('')}</dl><p class="hint">Latest checks for each task, not release approval or a history.</p>`
+    : '<p class="hint">Validation evidence unavailable. This server did not provide usable check counts.</p>';
+  return `<section class="validation-evidence" aria-label="Validation evidence for ${esc(name)}"><h4>Validation evidence</h4>${body}</section>`;
+}
 const decisions = (name, c) => (c.technology || []).map(d => `<form class="technology" data-project="${esc(name)}" data-run="${esc(c.run.run_id)}" data-decision="${esc(d.id)}">
   <p class="eyebrow">YOUR DECISION · WORK PAUSED</p><fieldset><legend>${esc(d.capability)}</legend><p>${esc(d.constraints)}</p>
   <div class="options">${d.options.map(o => `<div class="option"><label class="technology-option"><input type="radio" name="choice" value="${esc(o.id)}" required><span><strong>${esc(o.name)}</strong><span class="cost">${esc(costs[o.cost])}</span><span>${esc(o.cost_basis)}</span><span>${esc(o.tradeoffs)}</span>${o.id === d.recommended ? '<span class="recommendation">Recommended by FORJA</span>' : ''}</span></label>${(o.sources || []).map(s => `<a class="source" href="${esc(s)}" target="_blank" rel="noopener noreferrer">View source ↗</a>`).join('')}</div>`).join('')}</div></fieldset>
@@ -47,6 +60,7 @@ export function renderProject(p) {
     <div class="work-progress"><div><p class="activity"><span class="activity-mark ${state.key}" aria-hidden="true"></span>${esc(activity)}</p><p class="muted">${r.status === 'blocked' && !c.technology?.length ? 'Check the tasks and review before resuming in the terminal.' : `${number(c.invocations)} session${c.invocations === 1 ? '' : 's'} started`}</p></div><div class="progress-summary"><span><strong>${completed}</strong> / ${tasks.length} tasks completed</span><progress max="${Math.max(tasks.length, 1)}" value="${completed}" aria-label="Completed tasks in ${esc(name)}"></progress></div></div>
     ${decisions(name, c)}
     ${c.recovery ? `<aside class="recovery-note" aria-label="Recovery guidance"><strong>${esc(c.recovery.title)}</strong><p>${esc(c.recovery.guidance)}</p><p class="hint">Recovery is performed in the terminal. Saved work still needs validation and independent review.</p><details data-section="budgets"><summary data-focus="budgets">Execution limits</summary><p>Total sessions: ${number(c.recovery.sessions?.used)} / ${number(c.recovery.sessions?.limit)} · Cloud sessions: ${number(c.recovery.cloud_sessions?.used)} / ${number(c.recovery.cloud_sessions?.limit)}</p><p>Run time cap: ${number(c.recovery.minutes_per_call)} minutes per call. A route may set a lower cap.</p><p>Configured context threshold: ${number(c.recovery.context_tokens)} tokens.</p><p class="hint">${esc(c.recovery.context_note)}</p></details></aside>` : ''}
+    ${renderValidation(name, c.validation_summary)}
     <div class="project-details"><details data-section="tasks"><summary data-focus="tasks">Tasks and validation <span class="detail-count">${tasks.length}</span></summary><div class="task-list">${tasks.length ? tasks.map(t => `<div class="task"><span class="task-id">${esc(t.id)}</span><div class="task-title">${esc(t.title)}<small>${t.checks_passed}/${t.checks_total} checks · Review ${esc(labels[t.review] || t.review || 'pending')} · ${t.attempts} attempt${t.attempts === 1 ? '' : 's'}${t.rotations ? ` · ${t.rotations} rotation${t.rotations === 1 ? '' : 's'}` : ''}</small></div>${status(t.status)}</div>`).join('') : '<p class="muted">The task plan is not available yet.</p>'}</div></details>
     <details data-section="sessions"><summary data-focus="sessions">Sessions and usage <span class="detail-count">${c.usage.rows.length}</span></summary>
     <div class="metrics">${[[u.input_tokens_including_cache, 'Input (including cache)'], [u.output_tokens, 'Output'], [u.cached_input_tokens, 'Cached input']].map(([n, label]) => `<div><strong>${number(n)}</strong><span>${label}</span></div>`).join('')}</div>

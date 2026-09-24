@@ -85,6 +85,87 @@ test('Core projection attributes partial usage and never emits raw evidence or p
   assert.match(renderProject(snap.projects[0]), /&lt;script&gt;/);
 });
 
+test('validation_summary counts latest records strictly and reports tasks without records', (t) => {
+  const f = fixture(t);
+  f.state.tasks = [
+    {
+      id: 'mixed',
+      title: 'Mixed',
+      status: 'done',
+      attempts: 1,
+      rotations: 0,
+      checks: [{}, {}],
+      validation: [{ passed: true }, { passed: false }, { passed: 'true' }, null, {}],
+      review: { status: 'approve' },
+    },
+    { id: 'empty', validation: [] },
+    {},
+    { id: 'invalid', checks: 'abc', validation: 'invalid' },
+    { id: 'nullish', validation: [{ passed: null }, { passed: 1 }] },
+  ];
+  f.save();
+  const c = coreObservation(f.project, { details: true });
+  assert.equal(c.error, undefined);
+  assert.deepEqual(c.validation_summary, {
+    passed: 1,
+    failed: 1,
+    unknown: 5,
+    tasks_without_records: 3,
+  });
+  assert.deepEqual(Object.keys(c.validation_summary), ['passed', 'failed', 'unknown', 'tasks_without_records']);
+  assert.deepEqual(c.tasks[0], {
+    id: 'mixed',
+    title: 'Mixed',
+    status: 'done',
+    attempts: 1,
+    rotations: 0,
+    checks_total: 5,
+    checks_passed: 1,
+    review: 'approve',
+  });
+  assert.deepEqual(c.tasks.map((x) => [x.checks_total, x.checks_passed]), [[5, 1], [0, 0], [0, 0], [0, 0], [2, 0]]);
+
+  f.state.tasks = [{ validation: [{ passed: true }, { passed: false }, { passed: 'true' }, null, {}] }, { validation: [] }, {}, { validation: 'invalid' }];
+  f.save();
+  assert.deepEqual(coreObservation(f.project, { details: true }).validation_summary, {
+    passed: 1,
+    failed: 1,
+    unknown: 3,
+    tasks_without_records: 3,
+  });
+});
+
+test('validation_summary is all zeros for zero tasks and absent from brief and error projections', (t) => {
+  const f = fixture(t);
+  f.state.tasks = [];
+  f.save();
+  const detailed = coreObservation(f.project, { details: true });
+  assert.deepEqual(detailed.validation_summary, { passed: 0, failed: 0, unknown: 0, tasks_without_records: 0 });
+  assert.deepEqual(detailed.tasks, []);
+  assert.equal('validation_summary' in coreObservation(f.project), false);
+  writeFileSync(join(f.project, '.forja/current.json'), '{');
+  const error = coreObservation(f.project, { details: true });
+  assert.match(error.error, /unreadable/);
+  assert.equal('validation_summary' in error, false);
+});
+
+test('Core snapshot exposes only validation counts, never commands, logs, paths or output', (t) => {
+  const f = fixture(t);
+  f.state.tasks[0].validation = [
+    { passed: false, command: 'PRIVATE_SENTINEL', log: 'PRIVATE_SENTINEL', output: 'PRIVATE_SENTINEL', path: 'PRIVATE_SENTINEL', args: ['PRIVATE_SENTINEL'] },
+    { passed: true, stdout: 'PRIVATE_SENTINEL', stderr: 'PRIVATE_SENTINEL' },
+  ];
+  f.state.tasks[0].checks = [{ command: 'PRIVATE_SENTINEL', args: ['PRIVATE_SENTINEL'] }];
+  f.save();
+  const snap = coreSnapshot(f.data),
+    c = snap.projects[0].core;
+  assert.deepEqual(c.validation_summary, { passed: 1, failed: 1, unknown: 0, tasks_without_records: 0 });
+  assert.equal(c.tasks[0].checks_passed, 1);
+  assert.equal(c.tasks[0].checks_total, 2);
+  assert.doesNotMatch(JSON.stringify(snap), /PRIVATE_SENTINEL/);
+  assert.doesNotMatch(renderProject(snap.projects[0]), /PRIVATE_SENTINEL/);
+});
+
 test('Core snapshot counts only existing projects with absent Core state', (t) => {
   const f = fixture(t);
   const legacy = join(f.root, 'legacy-private-name');
@@ -256,7 +337,14 @@ test('Core viewer uses existing authentication and refuses legacy launch on a Co
     }
     const response = await fetch(base + '/api/core', { headers });
     assert.equal(response.status, 200);
-    assert.equal((await response.json()).projects[0].core.run.driver, 'core');
+    const body = await response.json();
+    assert.equal(body.projects[0].core.run.driver, 'core');
+    assert.deepEqual(body.projects[0].core.validation_summary, {
+      passed: 1,
+      failed: 0,
+      unknown: 0,
+      tasks_without_records: 0,
+    });
     assert.equal(
       (
         await fetch(base + '/runs', {

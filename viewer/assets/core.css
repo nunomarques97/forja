@@ -571,6 +571,49 @@ details summary::marker {
   margin-top:6px;
 }
 
+.validation-evidence {
+  border-top:1px solid var(--border);
+  padding:14px 0 4px;
+}
+
+.validation-evidence h4 {
+  margin:0 0 10px;
+  color:var(--text);
+  font-size:12px;
+  font-weight:550;
+}
+
+.validation-counts {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:18px;
+  margin:0 0 12px;
+}
+
+.validation-counts div {
+  min-width:0;
+}
+
+.validation-counts dt {
+  font-size:11px;
+  color:var(--muted);
+}
+
+.validation-counts dd {
+  margin:4px 0 0;
+  font:500 18px ui-monospace,monospace;
+  letter-spacing:-.05em;
+  font-variant-numeric:tabular-nums;
+}
+
+.validation-counts .has-failures dd {
+  color:var(--bad);
+}
+
+.validation-evidence .hint {
+  margin-bottom:8px;
+}
+
 .hint {
   font-size:12px;
   line-height:1.6;
@@ -1032,6 +1075,13 @@ footer {
   }
   .metrics span {
     font-size:10px;
+  }
+  .validation-counts {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+  }
+  .validation-counts dd {
+    font-size:16px;
   }
   .legacy-discovery {
     align-items:flex-start;

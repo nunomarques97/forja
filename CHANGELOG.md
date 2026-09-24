@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.0 — Visible validation and attempt evidence
+
+- Add read-only task-attempt accounting to model evidence, with explicit unknown coverage and no attribution of retries to model defects. Preserve historical triage behavior.
+- Show the latest validation counts in the Core viewer, separating passed, failed, unknown and missing records. Missing or malformed summaries remain unavailable rather than implying zero failures.
+- Require readable desktop/mobile section evidence in the existing planning, frontend and review methods; distinguish full-page composition from text-level inspection and delegate capture to controller checks when workers are restricted. Existing runs retain their frozen methods.
+
 ## 0.16.0 — Selective specialist methods
 
 - Supply concise planning, design, frontend, backend, security and review methods within the existing Core phases, with explicit conditional reads compatible with restricted workers. Mixed tasks can use multiple methods without extra model sessions.

@@ -35,6 +35,16 @@ The existing palette lives in `viewer/assets/viewer.css`: background `#0E0C0B`, 
 
 Viewer changes require desktop and narrow mobile inspection, keyboard navigation, loading/error/empty state checks and a check for page overflow. Store screenshots and real run evidence locally in ignored storage. Publish concise technical findings only; conversation history and raw screenshots do not belong in the release.
 
+Provide viewport-height captures of the changed sections and relevant interaction states at each tested width. Keep a full-page image for composition when useful, but do not use its downscaled text as proof of legibility. Name each capture with width and section/state; recapture affected views after repairs. Restricted workers delegate capture to a controller-executable browser helper and receive the image paths for review. Missing readable evidence must be reported explicitly.
+
+The existing `tools/shot.mjs` defaults to a viewport capture. For a local fixture, a section can be brought into view before capture; use a concrete selector for the changed section:
+
+```sh
+node tools/shot.mjs http://127.0.0.1:4173 data/visual/validation-390.png --width 390 --height 844 --eval "document.querySelector('.validation-evidence').scrollIntoView({block:'start',behavior:'instant'})"
+```
+
+The URL and selector must match the running fixture. This helper captures images; it does not replace interaction assertions or visual inspection. Use fictional data without authentication tokens in captures.
+
 Curated documentation screenshots may be published under `docs/assets/` when explicitly requested, captured with fictional projects, and reviewed for private data, credentials and local paths. Label them as illustrative examples. Keep raw QA captures and browser profiles in ignored storage.
 
 The API contract is in [viewer/README.md](../../viewer/README.md). Core operation is described in [CORE-RUNBOOK.md](../CORE-RUNBOOK.md).

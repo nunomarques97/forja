@@ -6,6 +6,7 @@ import { join, resolve, delimiter } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { modelEvidence } from '../lib/core/model-evidence.mjs';
 import { createRun, drive } from '../lib/core/engine.mjs';
+import { evaluationPlan } from '../lib/core/evaluation-plan.mjs';
 
 const row = { id: 1, phase: 'develop', provider: 'claude', model: 'example-v1', reported_model: 'example-v1', effort: 'high', result: 'returned', duration_ms: 20,
   usage: { input_tokens: 2, cache_creation_input_tokens: 3, cached_input_tokens: 5, output_tokens: 7 } };
@@ -146,6 +147,116 @@ test('latest checks stay at run level and incomplete task validation is explicit
   assert.equal(r.groups[0].checks, undefined);
 });
 
+const attemptTask = attempts => ({ status: 'done', attempts, validation: [{ passed: true }] });
+const unknownAttempts = { recorded_tasks: 0, unknown_tasks: 1, total_attempts: null, retried_tasks: null, extra_attempts: null };
+
+test('valid task attempts are summed within the 0..5 budget, including boundaries', t => {
+  const { root } = fixture(t, [row], { tasks: [0, 1, 2, 5].map(attemptTask) });
+  const r = modelEvidence(root);
+  assert.deepEqual(r.tasks, { total: 4, done: 4, blocked: 0, other: 0, latest_checks: { passed: 4, failed: 0, unknown: 0, tasks_without_records: 0 },
+    attempts: { recorded_tasks: 4, unknown_tasks: 0, total_attempts: 8, retried_tasks: 2, extra_attempts: 5 } });
+  assert.deepEqual(r.warnings, []);
+  assert.ok(!r.signals.includes('measurement_gaps'));
+  for (const [value, expected] of [[0, [0, 0, 0]], [5, [5, 1, 4]]]) {
+    const one = fixture(t, [row], { tasks: [attemptTask(value)] });
+    const [total_attempts, retried_tasks, extra_attempts] = expected;
+    assert.deepEqual(modelEvidence(one.root).tasks.attempts, { recorded_tasks: 1, unknown_tasks: 0, total_attempts, retried_tasks, extra_attempts });
+  }
+});
+
+test('invalid attempts and malformed tasks are unknown and never coerced', t => {
+  const invalid = [undefined, null, '2', '0', true, false, -1, 1.5, 6, 2 ** 53, {}, [], [2], { value: 2 }];
+  for (const value of invalid) {
+    const { root } = fixture(t, [row], { tasks: [attemptTask(value)] });
+    const r = modelEvidence(root);
+    assert.deepEqual(r.tasks.attempts, unknownAttempts, JSON.stringify(value));
+    assert.ok(r.warnings.includes('incomplete_attempt_evidence'));
+  }
+  for (const task of [null, 'task', 3, [], true]) {
+    const { root } = fixture(t, [row], { tasks: [task] });
+    const r = modelEvidence(root);
+    assert.deepEqual(r.tasks.attempts, unknownAttempts, JSON.stringify(task));
+    assert.equal(r.tasks.other, 1);
+    assert.equal(r.tasks.latest_checks.tasks_without_records, 1);
+  }
+});
+
+test('empty task list has zero attempt counts without an attempt warning', t => {
+  const { root } = fixture(t, [row], { tasks: [] });
+  const r = modelEvidence(root);
+  assert.deepEqual(r.tasks.attempts, { recorded_tasks: 0, unknown_tasks: 0, total_attempts: 0, retried_tasks: 0, extra_attempts: 0 });
+  assert.ok(!r.warnings.includes('incomplete_attempt_evidence'));
+  assert.deepEqual(r.warnings, []);
+});
+
+test('all-unknown attempts report null sums instead of zeros', t => {
+  const { root } = fixture(t, [row], { tasks: [attemptTask(null), attemptTask('3'), { status: 'blocked' }] });
+  const r = modelEvidence(root);
+  assert.deepEqual(r.tasks.attempts, { recorded_tasks: 0, unknown_tasks: 3, total_attempts: null, retried_tasks: null, extra_attempts: null });
+  assert.ok(r.warnings.includes('incomplete_attempt_evidence'));
+});
+
+test('partial attempts report observed sums, explicit unknowns and count tasks without validation records', t => {
+  const { root } = fixture(t, [row], { tasks: [
+    attemptTask(3),
+    { status: 'todo', attempts: 1 },
+    attemptTask(null),
+    { status: 'blocked', attempts: 2, validation: [{ passed: false }] },
+  ] });
+  const r = modelEvidence(root);
+  assert.deepEqual(r.tasks.attempts, { recorded_tasks: 3, unknown_tasks: 1, total_attempts: 6, retried_tasks: 2, extra_attempts: 3 });
+  assert.deepEqual(r.tasks.latest_checks, { passed: 2, failed: 1, unknown: 0, tasks_without_records: 1 });
+  assert.deepEqual([r.tasks.total, r.tasks.done, r.tasks.blocked, r.tasks.other], [4, 2, 1, 1]);
+  assert.ok(r.warnings.includes('incomplete_attempt_evidence'));
+  assert.ok(r.warnings.includes('incomplete_check_evidence'));
+  assert.ok(r.signals.includes('inspect_check_failures'));
+});
+
+test('missing attempts alone do not add measurement gaps, retry signals or change historical triage', t => {
+  const legacy = fixture(t);
+  const r = modelEvidence(legacy.root);
+  assert.deepEqual(r.warnings, ['incomplete_attempt_evidence']);
+  assert.deepEqual(r.signals, []);
+  assert.deepEqual(evaluationPlan(legacy.root, ['F-test']).runs[0].blockers, []);
+  const retried = fixture(t, [row], { tasks: [attemptTask(5)] });
+  const known = modelEvidence(retried.root);
+  assert.deepEqual(known.warnings, []);
+  assert.deepEqual(known.signals, []);
+  assert.deepEqual({ ...known, tasks: null, interpretation: null }, { ...r, tasks: null, warnings: [], interpretation: null });
+  // Other warnings still produce measurement gaps alongside the attempt warning.
+  const gaps = fixture(t, [{ ...row, reported_model: null }]);
+  assert.ok(modelEvidence(gaps.root).signals.includes('measurement_gaps'));
+});
+
+test('missing, non-array or oversized task state still returns tasks:null without attempt accounting', t => {
+  for (const tasks of [undefined, null, 'PRIVATE', {}, { length: 1 }, Array.from({ length: 31 }, () => attemptTask(1))]) {
+    const { root } = fixture(t, [row], { tasks });
+    const r = modelEvidence(root);
+    assert.equal(r.tasks, null);
+    assert.ok(r.warnings.includes('task_state_unavailable'));
+    assert.ok(!r.warnings.includes('incomplete_attempt_evidence'));
+    assert.doesNotMatch(JSON.stringify(r), /PRIVATE/);
+  }
+  const { root } = fixture(t, [row], { tasks: Array.from({ length: 30 }, () => attemptTask(1)) });
+  assert.equal(modelEvidence(root).tasks.attempts.recorded_tasks, 30);
+});
+
+test('attempt accounting exports only counts, never raw task content, and leaves files unchanged', t => {
+  const { root } = fixture(t, [row], { tasks: [
+    { ...attemptTask(2), id: 'PRIVATE_SENTINEL_ID', title: 'PRIVATE_SENTINEL_TITLE', review: { summary: 'PRIVATE_SENTINEL_REVIEW', findings: ['PRIVATE_SENTINEL'] },
+      feedback: { summary: 'PRIVATE_SENTINEL_FEEDBACK' }, criteria: ['PRIVATE_SENTINEL'], files: ['PRIVATE_SENTINEL.mjs'] },
+    attemptTask('PRIVATE_SENTINEL_ATTEMPTS'),
+    attemptTask({ PRIVATE_SENTINEL: 1 }),
+  ] });
+  const before = snapshot(root), r = modelEvidence(root);
+  assert.deepEqual(r.tasks.attempts, { recorded_tasks: 1, unknown_tasks: 2, total_attempts: 2, retried_tasks: 1, extra_attempts: 1 });
+  assert.doesNotMatch(JSON.stringify(r), /PRIVATE/);
+  assert.match(r.interpretation, /attempts are latest per-task counters, not proof of bugs, autonomous fixes or model blame/);
+  assert.match(r.interpretation, /Latest checks are not a check history/);
+  assert.match(r.interpretation, /not a benchmark or model ranking/);
+  assert.deepEqual(snapshot(root), before);
+});
+
 test('CLI reports current/archive evidence without invoking native providers or changing files', t => {
   const { root } = fixture(t), shims = join(root, 'shims'), marker = join(shims, 'called');
   mkdirSync(shims);
@@ -204,6 +315,9 @@ test('real scheduler rejection and repair remain separate review responses after
   assert.deepEqual(r.groups.filter(g => g.phase === 'develop').map(g => g.effort), ['medium', 'high']);
   assert.equal(r.tasks.done, 1);
   assert.equal(r.tasks.latest_checks.failed, 0);
+  // One rejection led to a second implementation attempt; the counter is not a defect attribution.
+  assert.deepEqual(r.tasks.attempts, { recorded_tasks: 1, unknown_tasks: 0, total_attempts: 2, retried_tasks: 1, extra_attempts: 1 });
+  assert.ok(!r.warnings.includes('incomplete_attempt_evidence'));
   assert.ok(r.signals.includes('inspect_review_findings'));
   assert.deepEqual(modelEvidence(root, { runId: initial.run_id }), r);
   assert.deepEqual(snapshot(join(root, '.forja')), before);

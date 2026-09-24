@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createCoreClient } from '../viewer/assets/core-client.js';
 import { projectState, selectProjects, renderOverview, renderProject, renderLegacyNotice, renderEmptyState } from '../viewer/assets/core.js';
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => {resolve=a; reject=b}); return { promise, resolve, reject }; };
@@ -71,6 +72,52 @@ test('Core overview prioritizes attention, separates interrupted runs, and filte
  assert.equal(selectProjects(rows,'done').length,1);assert.match(renderOverview(rows),/Needs attention/);
  const html=renderProject(project('<script>alert(1)</script>','running',false));
  assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;/);assert.match(html,/No active process/);assert.match(html,/data-section="sessions"/);assert.doesNotMatch(html,/<details[^>]*\bopen\b/);
+});
+const region=html=>html.match(/<section class="validation-evidence"[\s\S]*?<\/section>/)?.[0];
+const withSummary=(summary,name='Example')=>{const p=project(name,'done');if(summary!==undefined)p.core.validation_summary=summary;return p;};
+test('Validation evidence shows labelled latest counts outside collapsed details',()=>{
+ const html=renderProject(withSummary({passed:3,failed:1,unknown:2,tasks_without_records:1234}));
+ const r=region(html);assert.ok(r);
+ assert.match(r,/<h4>Validation evidence<\/h4>/);
+ assert.match(r,/<dt>passed<\/dt><dd>3<\/dd>/);assert.match(r,/<dt>failed<\/dt><dd>1<\/dd>/);
+ assert.match(r,/<dt>unknown<\/dt><dd>2<\/dd>/);assert.match(r,/<dt>tasks without records<\/dt><dd>1,234<\/dd>/);
+ assert.match(r,/latest checks/i);assert.match(r,/not release approval or a history/);
+ assert.match(r,/aria-label="Validation evidence for Example"/);
+ assert.doesNotMatch(r,/tabindex|\bid=|<details|<button|<a |<input/);assert.doesNotMatch(r,/unavailable/);
+ assert.ok(html.indexOf('class="validation-evidence"')<html.indexOf('<details'));
+ assert.doesNotMatch(html,/<details[^>]*\bopen\b/);
+ assert.match(r,/class="failed has-failures"/);
+});
+test('Validation evidence renders a valid all-zero summary as zeros',()=>{
+ const r=region(renderProject(withSummary({passed:0,failed:0,unknown:0,tasks_without_records:0})));
+ for(const label of ['passed','failed','unknown','tasks without records'])assert.match(r,new RegExp(`<dt>${label}</dt><dd>0</dd>`));
+ assert.doesNotMatch(r,/unavailable|has-failures/);
+});
+test('Validation evidence treats missing or invalid summaries from older servers as unavailable',()=>{
+ const valid={passed:0,failed:0,unknown:0,tasks_without_records:0};
+ const variants=[undefined,null,[],Object.assign([],valid),{},'summary',5,
+  {...valid,passed:-1},{...valid,failed:1.5},{...valid,unknown:'1'},{...valid,tasks_without_records:Number.MAX_SAFE_INTEGER+1},
+  {...valid,passed:NaN},{...valid,failed:Infinity},{...valid,unknown:null},{passed:0,failed:0,unknown:0},
+  {...valid,passed:'<img src=x onerror=alert(1)>'},{...valid,tasks_without_records:{toString:()=>'<img src=x>'}},Object.create(valid)];
+ for(const summary of variants){
+  const html=renderProject(withSummary(summary,'<img src=x onerror=alert(2)>')),r=region(html);
+  assert.ok(r,JSON.stringify(summary));
+  assert.match(r,/Validation evidence unavailable/);
+  assert.doesNotMatch(r,/<dl|<dd|<dt|all passed|0 failed|latest checks/i);
+  assert.ok(!html.includes('<img'),JSON.stringify(summary));
+ }
+});
+test('Validation evidence is absent from error cards',()=>{
+ const html=renderProject({name:'Broken',core:{run:null,runnerAlive:true,error:'Core state is unreadable; check locally before recovering.',validation_summary:{passed:1,failed:0,unknown:0,tasks_without_records:0}}});
+ assert.doesNotMatch(html,/Validation evidence|validation-evidence/);assert.match(html,/Status unavailable/);
+});
+test('Validation evidence styles extend the card tokens and wrap to two columns on narrow screens',()=>{
+ const css=readFileSync(new URL('../viewer/assets/core.css',import.meta.url),'utf8');
+ const rules=css.match(/\.validation-[^{]*\{[^}]*\}/g)||[];assert.ok(rules.length>0);
+ assert.ok(rules.every(rule=>!/text-transform/.test(rule)));
+ assert.match(css,/\.validation-counts \{\s*display:grid;\s*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+ const narrow=css.slice(css.indexOf('@media(max-width:540px)'));
+ assert.match(narrow,/\.validation-counts \{\s*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 });
 test('Legacy-only discovery is safe, pluralized, and distinct from Core and filter empty states',()=>{
  assert.equal(renderLegacyNotice(undefined),'');
