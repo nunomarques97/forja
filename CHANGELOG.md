@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.19.0 — Clean stops and reliability fixes
+
+- Add `core stop` (next invocation boundary) and `core stop --after-task` (after the current task's checks, review and repairs). The run pauses with recovery reason `operator_stop`, spends no attempt, and `core resume` continues.
+- Pause with `interrupted` when Ctrl+C stops a check or provider call, instead of recording a failed check or a provider failure; an interrupted developer session keeps its attempt.
+- Reject plans with duplicate technology capabilities atomically, so a paid choice can never skip the Sponsor gate.
+- Keep watchdog notifications status-only (tool name at most) and send one notification per permission episode.
+- Spend no implementation attempt when the developer call is refused before launch (packet size, knowledge, protected files).
+- Keep status and abandon usable when a worker leaves a link to outside the project; record dangling symlinks by target instead of failing.
+- Parse budgets strictly (integers or digit strings) and refuse a limit flag without a value.
+- Build review patches and delivery staging without exceeding the Windows command-line limit; bound the changed-file list in the review packet and keep the full list in run evidence.
+- Refuse Windows checks that only resolve to `.cmd`/`.bat` shims before any task, with planner guidance; find `npm-cli.js` beside an `npm.cmd` on PATH.
+- Document first runs, troubleshooting by recovery code, notifications and legacy bootstrap more accurately.
+
 ## 0.18.1 — Notification log follows the data directory
 
 - Resolve the notification log path on every send instead of at import, so a data directory configured later (tests, alternate installations) receives its own log entries and deduplication reads the same file it writes.

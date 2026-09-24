@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.18.1"><img src="https://img.shields.io/badge/version-0.18.1-ff9955" alt="Version 0.18.1"></a>
+  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.19.0"><img src="https://img.shields.io/badge/version-0.19.0-ff9955" alt="Version 0.19.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -205,10 +205,11 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.18.1](https://github.com/nunomarques97/forja/releases/tag/v0.18.1)** - Notification log follows the configured data directory. Builds on 0.18.0: Core by default in `bootstrap`, bounded progress notes across context rotations, explicit context and delivery contracts for planning, and no false dead-subagent alerts after a session closes.
+**Current: [v0.19.0](https://github.com/nunomarques97/forja/releases/tag/v0.19.0)** - Stop a running controller cleanly with `core stop` or `core stop --after-task`, pause instead of failing on Ctrl+C, and eight more reliability and privacy fixes.
 
 | Release | Main change |
 |---|---|
+| [0.19.0](https://github.com/nunomarques97/forja/releases/tag/v0.19.0) | Clean operator stops, Ctrl+C pauses, strict plan and budget validation, Windows check and path-length fixes, status-only watchdog notifications. |
 | [0.18.1](https://github.com/nunomarques97/forja/releases/tag/v0.18.1) | Resolve the notification log path per call, so tests and other data directories never write into the installation log. |
 | [0.18.0](https://github.com/nunomarques97/forja/releases/tag/v0.18.0) | Core-first bootstrap, bounded continuation across context limits, planning context/delivery contracts and safer legacy migration. |
 | [0.17.1](https://github.com/nunomarques97/forja/releases/tag/v0.17.1) | Migrate legacy project instructions to Core and make legacy methods manual-only. |
