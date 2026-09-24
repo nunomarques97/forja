@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.0 — Model evidence, bounded comparisons and creative planning
+
+- Add read-only `core evidence` reports for current or explicitly selected archived runs, separating model identities, execution failures, recorded review responses and measurement coverage.
+- Add `core evaluation-plan` to triage explicit run selections and prepare a comparison protocol. Repeated concerns request investigation; they do not establish model degradation or change routing.
+- Add explicit, budgeted `core benchmark` comparisons through Claude with frozen inputs, alternating candidates, retained results and isolated Python checks. Creative assessment remains manual; recommendations are scoped to the selected synthetic tasks and never promote profiles automatically.
+- Explore a small set of viable art directions within the existing planner for open visual briefs. Preserve approved designs, connect the chosen direction to task acceptance criteria, and add no agent or mandatory review session.
+- Preserve existing models, configurations and active run state. Research transcripts and private evaluation results are excluded from the release.
+
 ## 0.14.0 — Isolate controller checks and automate reviewer-approved delivery
 
 - Add optional Linux/WSL bubblewrap checks with read-only source snapshots, isolated network/process namespaces, bounded scratch/output and deterministic teardown. Refuse unavailable isolation without host fallback; record snapshot evidence for acceptance and final checks.

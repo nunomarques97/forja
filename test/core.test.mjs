@@ -515,6 +515,33 @@ test('high-level goal plans once, then directly develops and reviews', async () 
   assert.equal(planning, 1);
   assert.equal(r.invocations, 3);
 });
+test('planning decisions and acceptance constraints survive both worker handoffs without extra sessions', async () => {
+  const p = repo();
+  const decision = 'Use the existing module interface without adding a dependency.';
+  const criterion = 'Existing importers can still read the exported value.';
+  const planned = plan(); planned.decisions.push(decision); planned.tasks[0].criteria.push(criterion);
+  createRun(p, { goal: 'Return two while preserving the approved interface' });
+  const phases = [];
+  const r = await drive(p, {
+    log: () => {},
+    providerCall: async (_, options) => {
+      if (options.input.includes('"phase":"plan"')) {
+        phases.push('plan');
+        return { code: 0, result: planned };
+      }
+      phases.push(options.readOnly ? 'review' : 'develop');
+      assert.ok(options.input.includes(decision));
+      assert.ok(options.input.includes(criterion));
+      if (!options.readOnly) writeFileSync(join(p, 'value.mjs'), 'export const value = 2;');
+      return result(options.readOnly ? 'approve' : 'ready_for_validation');
+    },
+  });
+  assert.equal(r.status, 'done');
+  assert.deepEqual(phases, ['plan', 'develop', 'review']);
+  assert.deepEqual(r.decisions, [decision]);
+  assert.ok(r.tasks[0].criteria.includes(criterion));
+});
+
 test('final regression reopens an earlier task when a later task invalidates it', async () => {
   const p = repo(),
     x = plan();

@@ -910,6 +910,9 @@ const usage = `FORJA core (docs/CORE-RUNBOOK.md)
   core init | core doctor [--provider claude|codex] [--config file] | core resume | core status | core usage [--details]
   core deliver [--retry | --approve-production <reviewed-commit-sha>]
   core diagnose [--invocation ID] [--phase plan|develop|review]  (read-only execution metadata; no provider calls; ID 1..200; filters combine with AND)
+  core evidence [--run ID]  (read-only model/effort evidence for the current or an archived run; no model ranking or automatic changes)
+  core evaluation-plan --runs ID,ID  (read-only triage of 1..10 explicit archived runs; prepares a comparison protocol, never executes it)
+  core benchmark --config file  (executes a bounded comparison through Claude; explicit profiles/budgets and bubblewrap required; private artifacts outside project)
   core context --query "..."  (selected project knowledge with source references)
   core retry --task T1 --why "..." [--max-attempts 3] [--max-sessions 40]
   core abandon --why "..."

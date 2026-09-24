@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/tree/v0.14.0"><img src="https://img.shields.io/badge/version-0.14.0-ff9955" alt="Version 0.14.0"></a>
+  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.15.0"><img src="https://img.shields.io/badge/version-0.15.0-ff9955" alt="Version 0.15.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -157,10 +157,11 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.14.0](https://github.com/nunomarques97/forja/tree/v0.14.0)** — Optional isolated controller checks and automatic delivery approved by the existing final reviewer. No extra model session; production authorization remains separate.
+**Current: [v0.15.0](https://github.com/nunomarques97/forja/releases/tag/v0.15.0)** - Model evidence, explicit bounded comparisons and viable creative directions within the existing planning session. No automatic model promotion or extra mandatory reviewer.
 
 | Release | Main change |
 |---|---|
+| [0.15.0](https://github.com/nunomarques97/forja/releases/tag/v0.15.0) | Read-only model evidence, explicit comparison protocols/benchmarks and concise creative planning. |
 | 0.14.0 | Optional Linux/WSL check isolation and reviewer-approved commit/push with an explicit deployment contract. |
 | 0.13.0 | Opt-in restricted Claude file tools and dedicated invocation scratch. |
 | 0.12.0 | Filter diagnostics by invocation and phase without reading unrelated traces. |
