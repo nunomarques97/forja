@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.18.1 — Notification log follows the data directory
+
+- Resolve the notification log path on every send instead of at import, so a data directory configured later (tests, alternate installations) receives its own log entries and deduplication reads the same file it writes.
+- Add regression coverage that the installation's notification log stays unchanged when the data directory changes after import.
+
 ## 0.18.0 — Reliable Core entrypoints and bounded continuation
 
 - Prepare Core projects by default with `bootstrap`; retain crew installation behind explicit `--legacy`. Repair skill description quoting, keep workflow methods manual-only, and reversibly archive recognized legacy agents only when their run is known to be inactive.
