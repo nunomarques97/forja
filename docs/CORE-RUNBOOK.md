@@ -30,6 +30,16 @@ Os bytes originais de cada saída são guardados em memória antes da escrita; a
 
 Limites: a reposição é de melhor esforço e não é atómica entre vários ficheiros. Um crash do processo, corte de energia ou falha do sistema a meio pode deixar escritas parciais. Init também não protege contra editores ou processos externos a alterar os mesmos caminhos em simultâneo, nem contra corridas entre a verificação inicial e a escrita (TOCTOU). Corre-o com o projeto parado e revê o diff resultante.
 
+## Migrating a legacy project
+
+Stop the project's executors first, preserving unfinished changes. Run `node <forja>/bin/forja.mjs core init` from the project root. Init replaces the old `forja:begin` managed block with Core guidance, consolidates it with an existing Core block, and retains all instructions outside those blocks. It disables automatic invocation of recognized legacy skills using `disable-model-invocation: true`, preserving their bodies for explicit legacy use. It does not copy a crew, alter model profiles, close runs, launch workers or change publication permission.
+
+Malformed, duplicate or overlapping markers and unrecognized legacy skill files fail before writing. Existing skill destinations receive containment and rollback protection. Review the resulting diff; restart the conversation so a previously loaded Lead method cannot continue driving it. Legacy skills remain readable as files or explicitly invocable by the user; see [Claude skill invocation control](https://code.claude.com/docs/en/skills#control-who-invokes-a-skill).
+
+If `docs/forja/RUN.json` still records a running or blocked run, close it explicitly after confirming its executors have stopped. Use `run fail --why "Stopped for Core migration; unfinished work preserved"` for an interrupted run; never mark incomplete work finished. Migration alone leaves that state intact, and Core continues to refuse an active legacy run. Supply the selected `--config` profile on the new Core run and inspect pending changes before using `--allow-dirty`.
+
+Guidance is portable: resolve the installation from the caller, `FORJA_ROOT`, or an existing FORJA hook path. Do not commit a local home path. Historical references to crew roles do not authorize manual delegation in a Core run; map applicable product constraints to the controller's phases.
+
 ## Acesso completo dos executores
 
 Para permitir acesso completo em **plan, develop e review**, seleciona o perfil [core-full-access.json](../config/core-full-access.json):

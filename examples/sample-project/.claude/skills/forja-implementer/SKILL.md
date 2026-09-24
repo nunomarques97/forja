@@ -1,6 +1,7 @@
 ---
 name: forja-implementer
 description: Definition of done and working method for Forja's implementers (Backend Dev, Frontend Dev) — one task at a time, acceptance criteria, real tests, no placeholders, no new dependencies, visual verification for anything a person sees, evidence in the report, and how to handle a REJECT from Reviewer. Loaded by backend-dev and frontend-dev.
+disable-model-invocation: true
 ---
 
 # Forja implementer — definition of done

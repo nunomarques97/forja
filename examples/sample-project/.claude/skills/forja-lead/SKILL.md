@@ -1,6 +1,7 @@
 ---
 name: forja-lead
 description: The Lead's manual — how the lead session runs a Forja run from the Sponsor's goal to a clean finish without a human, in two modes: interactive (one long session, checkpoints and handover) and runner (one fresh session per phase, everything on disk). Run lifecycle and the forja CLI, the ten-role crew and the deterministic trigger table for on-demand roles (Product Manager, Product Designer, Technology Scout, QA, Security Reviewer), delegation with explicit models and effort, the model-fallback protocol (Fable → Opus), the 3-strike rule, dead-subagent duties, notification moments, and the rule that the Lead never decides product and never reviews its own work. Invoke at the start of any Forja run (/forja-lead) and after any compaction.
+disable-model-invocation: true
 ---
 
 # Forja lead — the Lead's manual

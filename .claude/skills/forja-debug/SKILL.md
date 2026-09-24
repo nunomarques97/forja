@@ -1,6 +1,7 @@
 ---
 name: forja-debug
 description: Bug investigation method for Forja's Devs and Reviewer — reproduce first, isolate, diagnose with evidence, fix the cause not the symptom, verify with the original reproduction plus a regression test, report honestly. Loaded by backend-dev, frontend-dev and reviewer.
+disable-model-invocation: true
 ---
 
 # Forja debug — reproduce → isolate → diagnose → fix → verify

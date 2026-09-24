@@ -1,6 +1,7 @@
 ---
 name: forja-product
 description: The Product Manager's method — the product profile every agent reads before a trade-off, the decision criteria and the three categories (specialist decides / Product Manager decides and logs / only the Sponsor), the safest-reversible-default rule, the forja CLI commands that record decisions and Sponsor questions, mid-run questions, and the end-of-run report. Loaded by product-manager.
+disable-model-invocation: true
 ---
 
 # Forja product — product-owner authority inside a run

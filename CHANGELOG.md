@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.1 — Core entrypoint migration
+
+- Migrate legacy project instruction blocks to Core without changing product rules, unfinished work, model profiles or run state.
+- Make legacy methods manual-only and default newly bootstrapped project guidance to the Core controller, preventing conversational agents from selecting the old Lead workflow automatically.
+- Keep initialization idempotent, portable and recoverable; validate legacy markers and skill destinations before any writes.
+
 ## 0.17.0 — Visible validation and attempt evidence
 
 - Add read-only task-attempt accounting to model evidence, with explicit unknown coverage and no attribution of retries to model defects. Preserve historical triage behavior.

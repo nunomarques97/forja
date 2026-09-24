@@ -1,6 +1,7 @@
 ---
 name: forja-release
 description: Release and devops method for Forja's Devs — the pre-release checklist (tests, build, lint, changelog, version, tag, reproducible run instructions), what a release commit contains, and the hard line that publishing, deploying, pushing or anything external is a Sponsor-queue matter, never done by a Dev. Loaded by backend-dev and frontend-dev.
+disable-model-invocation: true
 ---
 
 # Forja release — ready to ship, never shipped by us

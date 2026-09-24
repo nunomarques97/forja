@@ -1,6 +1,7 @@
 ---
 name: forja-visual-check
 description: How Forja verifies anything a person will see, for real, while it is being built — run the app, take actual screenshots at 1440 and 390 wide (mobile: emulator), critique them against DESIGN.md and the slop list, fix, re-shoot, and put the final paths in the report. Used by Frontend Dev and Backend Dev when they build, and by Reviewer when it judges. Exists because a project was once built end to end without looking at it and came out "horrenda".
+disable-model-invocation: true
 ---
 
 # Forja visual check

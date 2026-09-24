@@ -2,7 +2,9 @@
 
 For the provider-neutral core (`forja start`, `lib/core/`), use `AGENTS.md` and
 `docs/CORE.md`. The crew lifecycle below applies to legacy `forja runner` runs;
-do not load that crew for a core worker task.
+do not load that crew for a core worker task. Legacy skills are manual-only;
+when explicitly running this compatibility workflow, read their SKILL.md files
+directly. New conversation-driven work uses the Core controller, not a Lead.
 
 Forja's legacy runner automates a planning, implementation and review workflow on top of Claude Code, with desktop/mobile observation and optional ntfy notifications. Technical references: `docs/ARCHITECTURE.md`, `docs/design/DESIGN.md` and `docs/RUNBOOK-UNATTENDED.md`. Per-project execution state is generated locally under `docs/forja/`; it is not part of the release. New workflows start with the Core described in `docs/CORE-RUNBOOK.md`.
 

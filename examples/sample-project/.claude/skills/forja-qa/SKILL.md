@@ -1,6 +1,7 @@
 ---
 name: forja-qa
 description: QA's method at milestone close — end-to-end flows on the real running product, full regression, visual pass on every touched screen at 1440 and 390, non-functional checks from the product profile (performance budget, accessibility, cost), and the QA report whose findings become new tasks. Loaded by qa.
+disable-model-invocation: true
 ---
 
 # Forja QA — validate the whole, not the task

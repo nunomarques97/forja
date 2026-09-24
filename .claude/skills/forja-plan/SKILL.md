@@ -1,6 +1,7 @@
 ---
 name: forja-plan
 description: Architect's planning method — how to decompose a run goal ONCE into docs/forja/TASKS.json (small verifiable tasks with definition of done, order, dependencies, owner, technology decided), the forja task CLI calls that record it, and how to re-plan only the tasks still to do when Lead reports the plan is broken. Loaded by architect.
+disable-model-invocation: true
 ---
 
 # Forja plan — the plan file a stateless Lead can execute

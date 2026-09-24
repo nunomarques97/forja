@@ -325,6 +325,34 @@ test('fresh project init creates outputs and state, then is byte-idempotent', (t
   assert.deepEqual(inventory(root), first);
 });
 
+test('a failed legacy skill write restores instructions and every changed skill', (t) => {
+  const root = fixture(t);
+  seed(root, { outputs: true, state: true });
+  for (const skill of ['forja-lead', 'forja-crew']) {
+    fs.mkdirSync(join(root, '.claude/skills', skill), { recursive: true });
+    fs.writeFileSync(join(root, '.claude/skills', skill, 'SKILL.md'), `---\nname: ${skill}\n---\nCustomized method\n`);
+  }
+  const before = inventory(root);
+  const result = withFaults(root, [{ op: 'writeFileSync', target: 'SKILL.md', nth: 2, when: 'after' }]);
+  assert.equal(result.ok, false);
+  assert.deepEqual(inventory(root), before);
+});
+
+test('unrecognized legacy skill and linked skill ancestor refuse before writing', (t) => {
+  const root = fixture(t);
+  fs.mkdirSync(join(root, '.claude/skills/forja-lead'), { recursive: true });
+  fs.writeFileSync(join(root, '.claude/skills/forja-lead/SKILL.md'), '# User-owned file\n');
+  const before = inventory(root);
+  assert.throws(() => initCore(root), /Unrecognized legacy skill/);
+  assert.deepEqual(inventory(root), before);
+  const linked = fixture(t), outside = fixture(t);
+  fs.mkdirSync(join(linked, '.claude'));
+  fs.symlinkSync(outside, join(linked, '.claude/skills'), 'junction');
+  const linkedBefore = inventory(linked);
+  assert.throws(() => initCore(linked), /[Ss]ymlink|[Jj]unction|[Ll]ink|outside/);
+  assert.deepEqual(inventory(linked), linkedBefore);
+});
+
 test('mutating the returned files list cannot affect future initialization', (t) => {
   const root = fixture(t);
   const first = initCore(root);

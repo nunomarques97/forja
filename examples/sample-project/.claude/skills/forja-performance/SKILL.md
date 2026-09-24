@@ -1,6 +1,7 @@
 ---
 name: forja-performance
 description: Performance method for Forja's Devs and Reviewer — measure against the budget in the product profile first, profile the real path, fix the top item only, re-measure, and never trade correctness or the design contract for speed. Loaded by backend-dev, frontend-dev and reviewer.
+disable-model-invocation: true
 ---
 
 # Forja performance — measure, then fix the top item

@@ -1,3 +1,4 @@
 node_modules/
 data/
 token.local.txt
+.forja/

@@ -1,6 +1,7 @@
 ---
 name: forja-security
 description: The Security Reviewer's checklist — triggered by auth/sessions, secrets, network exposure, new dependencies or execution of external input: injection, traversal, SSRF/DNS rebinding, secrets in code/logs/events/notifications, auth on every route, token handling, dependency risk, least privilege, data exposure — with the SECURITY-APPROVE / SECURITY-REJECT contract. Loaded by security-reviewer.
+disable-model-invocation: true
 ---
 
 # Forja security — the second gate for risky tasks

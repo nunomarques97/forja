@@ -1,6 +1,7 @@
 ---
 name: forja-scout
 description: The Technology Scout's mandate — time-boxed research per capability, an honest comparison of real options (maturity, license, $0, adoption, fit with the stack, size, security), the choice a top-tier product would make today, and the binding decision record in docs/forja/TECHNOLOGY.md that no Dev may bypass. Loaded by technology-scout.
+disable-model-invocation: true
 ---
 
 # Forja scout — decide the technology once, on evidence

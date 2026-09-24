@@ -73,7 +73,7 @@ describe('pure merge helpers', () => {
   test('upsertManagedBlock: append when absent, replace in place when present, collapse duplicates, never touch other text', () => {
     const block = managedBlock('C:\\f');
     assert.ok(block.startsWith(MARK_BEGIN) && block.endsWith(MARK_END));
-    assert.ok(block.includes('## Forja') && block.includes('`C:\\f`') && block.includes('RUNBOOK-UNATTENDED.md') && block.includes('Lead') && block.includes('Reviewer') && block.includes('All Forja runs keep state in docs/forja/.'));
+    assert.ok(block.includes('## FORJA core') && block.includes('start --goal') && block.includes('controller'));
     const once = upsertManagedBlock(CUSTOM_CLAUDE, block);
     assert.ok(once.startsWith(CUSTOM_CLAUDE)); assert.equal(once, CUSTOM_CLAUDE + '\n' + block + '\n');
     assert.equal(upsertManagedBlock(once, block), once);
@@ -85,14 +85,14 @@ describe('pure merge helpers', () => {
     assert.equal(upsertManagedBlock('', block), block + '\n');
     assert.equal(upsertManagedBlock('no newline at end', block), 'no newline at end\n\n' + block + '\n');
   });
-  test('the block separates preparing the project from choosing who drives a run (§3c): both ways, as equals', () => {
+  test('bootstrap selects Core without silently resuming a legacy run', () => {
     const block = managedBlock('C:\\f');
-    assert.match(block, /prepared for Forja; that does not start anything/);
-    assert.match(block, /ONE driver, recorded in `docs\/forja\/RUN.json` \(`driver`\)/);
-    assert.match(block, /In a conversation .*run start --goal "<goal>".*`interactive`, and the guard never launches a runner on it/);
-    assert.match(block, /Unattended: .*runner --goal "<goal>".*the run is `runner`, and the guard recovers it/);
-    assert.match(block, /run driver show\|set interactive\|runner/);
-    assert.doesNotMatch(block, /Start an unattended run from this folder/, 'the old block sent every run to the runner');
+    assert.match(block, /New FORJA tasks use Core/);
+    assert.match(block, /does not act as Lead/);
+    assert.match(block, /start --goal/);
+    assert.match(block, /Legacy .*compatibility commands only when explicitly requested/);
+    assert.doesNotMatch(block, /load skill|In a conversation .*Lead/);
+    assert.doesNotMatch(block, /C:\\f/);
   });
   test('a CRLF CLAUDE.md gets the block in CRLF (no bare LF), is idempotent, and a replaced block keeps CRLF', () => {
     const block = managedBlock('C:\\f');
@@ -124,7 +124,7 @@ describe('bootstrap into a temp target with its own CLAUDE.md, settings.json and
     const claude = readFileSync(join(t, 'CLAUDE.md'), 'utf8');
     assert.ok(claude.startsWith(CUSTOM_CLAUDE), 'custom text intact at the top');
     assert.equal((claude.match(/forja:begin/g) || []).length, 1);
-    assert.ok(claude.includes(`- Forja repo: \`${forja}\``) || claude.includes('- Forja repo: `'));
+    assert.ok(claude.includes('Resolve `<forja>`'));
     const s = JSON.parse(readFileSync(join(t, '.claude', 'settings.json'), 'utf8'));
     assert.equal(s.env.MY_FLAG, 'yes'); assert.equal(s.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS, '0'); assert.equal(s.env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH, '1');
     assert.deepEqual(s.permissions, CUSTOM_SETTINGS.permissions); assert.deepEqual(s.fallbackModel, ['opus']);

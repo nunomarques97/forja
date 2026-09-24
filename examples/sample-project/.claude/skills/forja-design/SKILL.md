@@ -1,6 +1,7 @@
 ---
 name: forja-design
 description: The Product Designer's method — the ui-kickoff run end to end without the Sponsor: inventory, brief from the product profile, three genuinely different directions as static mocks with real screenshots at 1440 and 390, the slop list, the pick with written reasons, and the DESIGN.md contract that binds the Frontend Dev. Loaded by product-designer.
+disable-model-invocation: true
 ---
 
 # Forja design — the kickoff, decided without the Sponsor

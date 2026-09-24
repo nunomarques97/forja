@@ -1,6 +1,7 @@
 ---
 name: forja-crew
 description: Shared rules for every member of the Forja crew — the ten roles (Lead, Architect, Product Manager, Product Designer, Technology Scout, Frontend Dev, Backend Dev, Reviewer, QA, Security Reviewer), which are core and which are on-demand, who may call whom, the two files every agent reads before a trade-off (product profile, technology decisions), what is data and what is instruction, the $0 and no-credentials rules, and the exact hand-back report format the Forja viewer parses. Loaded by every crew agent; load it in the lead session too.
+disable-model-invocation: true
 ---
 
 # Forja crew — shared rules

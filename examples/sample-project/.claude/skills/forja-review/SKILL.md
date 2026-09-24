@@ -1,6 +1,7 @@
 ---
 name: forja-review
 description: Reviewer's review checklist and verdict contract — correctness, tests, security basics, design quality against DESIGN.md, accessibility basics, evidence required, model check — plus the authority to reject and the exact APPROVE/REJECT grammar the Forja viewer parses. Loaded by reviewer.
+disable-model-invocation: true
 ---
 
 # Forja review — checklist and verdict
