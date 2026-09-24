@@ -6,6 +6,7 @@ import { join, resolve, sep } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { createRun, drive, recoverRun, current } from '../lib/core/engine.mjs';
+import { recoveryInfo } from '../lib/core/recovery.mjs';
 
 const result = status => ({ code: 0, result: { status, summary: 'Continue preserved work', findings: [] } });
 function fixture(t, config = {}) {
@@ -137,4 +138,53 @@ await drive(${JSON.stringify(root)},{log:()=>{},providerCall:async()=>{fs.writeF
   assert.equal(done.tasks[0].rotations, 1);
   assert.equal(done.tasks[0].attempts, 1);
   assert.equal(done.invocations, 3);
+});
+
+test('a read-only task rotated by the context guard hands its progress notes to the next session', async t => {
+  const root = fixture(t, { maxRotations: 2 });
+  const seeds = [], packets = [];
+  const done = await drive(root, { log: () => {}, providerCall: async (_, options) => {
+    if (options.readOnly) return result('approve');
+    seeds.push(options.progressNotes);
+    packets.push(options.input);
+    if (seeds.length === 1) return { code: 1, contextExceeded: true, lastContextTokens: 120001, progressNotes: 'Read value.mjs: returns 1. Remaining: return 2.' };
+    writeFileSync(join(root, 'value.mjs'), 'export const value = 2;\n');
+    return { ...result('ready_for_validation'), progressNotes: options.progressNotes + '\nDone.' };
+  } });
+  assert.equal(done.status, 'done', done.failure);
+  assert.deepEqual(seeds, ['', 'Read value.mjs: returns 1. Remaining: return 2.']);
+  assert.doesNotMatch(packets[0], /"progress_notes"/);
+  assert.match(packets[1], /"progress_notes":\{"text":"Read value.mjs: returns 1. Remaining: return 2.","from_invocation":1/);
+  assert.equal(done.tasks[0].rotations, 1);
+  assert.equal(done.tasks[0].stalled_rotations, 0);
+  assert.equal(done.tasks[0].progress_notes.invocation, 2);
+});
+
+test('consecutive context rotations without source or notes changes stop before another rotation', async t => {
+  const root = fixture(t, { maxRotations: 5 });
+  let calls = 0;
+  const blocked = await drive(root, { log: () => {}, providerCall: async (_, options) => {
+    calls++;
+    return { code: 1, contextExceeded: true, lastContextTokens: 120001, progressNotes: options.progressNotes };
+  } });
+  assert.equal(blocked.status, 'blocked');
+  assert.equal(blocked.stopCode, 'no_progress_between_rotations');
+  assert.equal(calls, 2, 'the third rotation is not spent');
+  assert.equal(blocked.tasks[0].rotations, 2);
+  assert.equal(blocked.tasks[0].stalled_rotations, 2);
+  assert.equal(recoveryInfo(blocked).code, 'no_progress_between_rotations');
+  assert.match(recoveryInfo(blocked).guidance, /Split the task/);
+});
+
+test('a context rotation that only updates its notes counts as progress', async t => {
+  const root = fixture(t, { maxRotations: 2 });
+  let calls = 0;
+  const blocked = await drive(root, { log: () => {}, providerCall: async (_, options) => {
+    calls++;
+    return { code: 1, contextExceeded: true, lastContextTokens: 120001, progressNotes: `${options.progressNotes}step ${calls}\n` };
+  } });
+  assert.equal(blocked.stopCode, 'rotations');
+  assert.equal(calls, 3);
+  assert.equal(blocked.tasks[0].stalled_rotations, 0);
+  assert.equal(blocked.tasks[0].progress_notes.text, 'step 1\nstep 2\nstep 3\n');
 });

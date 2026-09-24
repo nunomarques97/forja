@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { invocation, runProvider } from '../lib/core/providers.mjs';
 import { validateRouting, routeFor } from '../lib/core/routing.mjs';
-import { restrictedSettings, workerAccessPrompt } from '../lib/core/worker-access.mjs';
+import { restrictedSettings, workerAccessPrompt, progressNotesPrompt } from '../lib/core/worker-access.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'forja-access-test-'));
 const owned = [root];
@@ -80,4 +80,24 @@ test('concurrent child processes get distinct real scratch directories and the p
   }
   assert.notEqual(results[0].access.scratch, results[1].access.scratch);
   assert.deepEqual(Object.fromEntries(['TMPDIR', 'TMP', 'TEMP'].map(k => [k, process.env[k]])), before);
+});
+
+test('develop sessions receive a seeded progress notes file in scratch and the controller reads it back', async () => {
+  const fixture = join(root, 'notes.mjs');
+  writeFileSync(fixture, `import{readFileSync,appendFileSync}from'node:fs';for await(const s of process.stdin);const path=process.env.FORJA_PROGRESS_NOTES;const seed=readFileSync(path,'utf8');appendFileSync(path,'second session\\n');console.log(JSON.stringify({result:{status:'checkpoint',summary:seed,findings:[path]}}));`);
+  const out = await runProvider('custom', { cwd: root, input: 'x', progressNotes: 'first session\n', config: { command: process.execPath, args: [fixture] }, logPath: join(root, 'notes-log.json'), resultPath: join(root, 'notes-result.json') });
+  owned.push(resolve(out.access.scratch, '..'));
+  assert.equal(out.result.summary, 'first session\n');
+  assert.equal(out.result.findings[0], join(out.access.scratch, 'progress-notes.md'));
+  assert.equal(out.progressNotes, 'first session\nsecond session\n');
+  const review = await runProvider('custom', { cwd: root, input: 'x', readOnly: true, progressNotes: 'ignored', config: { command: process.execPath, args: [join(root, 'child.mjs')] }, logPath: join(root, 'notes-log-2.json'), resultPath: join(root, 'notes-result-2.json') });
+  owned.push(resolve(review.access.scratch, '..'));
+  assert.equal(review.progressNotes, undefined, 'read-only phases get no notes channel');
+});
+
+test('progress notes prompt names the file and the context stop', () => {
+  const text = progressNotesPrompt('/tmp/s/progress-notes.md', 120000);
+  assert.match(text, /progress-notes\.md/);
+  assert.match(text, /120000 tokens/);
+  assert.match(text, /never write them into project files/);
 });
