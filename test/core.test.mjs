@@ -1106,3 +1106,18 @@ test('a link replacing a tracked directory leaves status and abandon usable', as
   rmSync(join(p, 'docs'), { recursive: true, force: true });
   assert.equal(createRun(p, { goal: 'Next goal', provider: 'custom', plan: plan(), config: { allowDirty: true } }).status, 'running');
 });
+
+test('a dangling symlink is snapshotted by its target and does not stop a run', async (t) => {
+  const p = repo();
+  try { symlinkSync('missing-target.txt', join(p, 'dangling-link'), 'file'); }
+  catch (error) { t.skip(`symbolic links unavailable here (${error.code})`); return; }
+  assert.equal(snapshot(p)['dangling-link'], 'link:missing-target.txt');
+  assert.throws(() => inside(p, 'dangling-link'), (error) => error.message === 'Dangling symlink/junction: dangling-link');
+  createRun(p, { goal: 'Dangling link', provider: 'custom', plan: plan(), config: { allowDirty: true } });
+  const r = await drive(p, { log: () => {}, providerCall: async (_, o) => {
+    if (!o.readOnly) writeFileSync(join(p, 'value.mjs'), 'export const value = 2;\n');
+    return result(o.readOnly ? 'approve' : 'done');
+  } });
+  assert.equal(r.status, 'done', r.failure);
+  assert.deepEqual(r.tasks[0].files_changed, ['value.mjs']);
+});
