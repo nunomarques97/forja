@@ -352,7 +352,7 @@ Novas invocações guardam também `call-N-events.jsonl` incrementalmente: tempo
 
 ## Conhecimento selecionado
 
-`node $forja core context --query "pagination stale responses"` mostra os trechos que o Core recuperaria. Por omissão, pesquisa Markdown do projeto (até 200 documentos / 2 MB; 128 KB por documento), excluindo instruções nativas e pastas de relatórios/arquivo. O pacote recebe até seis trechos, com orçamento de 6.000 caracteres serializados. Texto sem correspondência não é incluído. O mapa continua limitado a 6.000 caracteres; o pacote completo a 48.000, sem cortar critérios.
+`node $forja core context --query "pagination stale responses"` mostra os trechos que o Core recuperaria. Por omissão, pesquisa Markdown do projeto (até 200 documentos / 2 MB; 128 KB por documento), excluindo instruções nativas, pastas de relatórios/arquivo e o estado gerado pelo fluxo legado (`docs/forja/HANDOVER.md`, `SPONSOR-QUEUE.md`, `SPONSOR-ROADMAP.md`, `REPORT-*.md`), que fica congelado depois da migração e não é conhecimento do projeto. O resultado lista esses ficheiros em `excluded_legacy_state`; uma entrada explícita em `KNOWLEDGE.json` continua a selecioná-los. O pacote recebe até seis trechos, com orçamento de 6.000 caracteres serializados. Texto sem correspondência não é incluído. O mapa continua limitado a 6.000 caracteres; o pacote completo a 48.000, sem cortar critérios.
 
 Para controlar as fontes, cria `docs/forja/KNOWLEDGE.json` versionado:
 

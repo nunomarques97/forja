@@ -326,3 +326,26 @@ test('reference aliases and traversal cannot evade project boundaries', (t) => {
   f.manifest([{...ref, path:'linked/note.md'}], 2);
   assert.throws(() => retrieveKnowledge(f.root, ''), /outside project/);
 });
+
+test('legacy generated run state is not discovered by default but stays selectable through the manifest', (t) => {
+  const f = fixture(t);
+  mkdirSync(join(f.root, 'docs/forja/reports'), { recursive: true });
+  const legacy = '# Handover\nRun failed: stopped for migration. Pagination tasks T1-T9 pending.\n';
+  f.put('docs/forja/HANDOVER.md', legacy);
+  f.put('docs/forja/SPONSOR-QUEUE.md', '# Queue\nPagination question for the sponsor.\n');
+  f.put('docs/forja/REPORT-2026-09-19.md', '# Report\nPagination was reviewed.\n');
+  f.put('docs/forja/reports/audit.md', '# Audit\nPagination audit notes.\n');
+  f.put('docs/forja/RUN.json', '{"goal":"pagination"}');
+  f.put('docs/forja/DECISIONS.md', '# Decisions\nUse cursors for pagination.\n');
+  const r = retrieveKnowledge(f.root, 'pagination tasks');
+  assert.deepEqual(r.selected.map((e) => e.path), ['docs/forja/DECISIONS.md']);
+  assert.deepEqual(r.excluded_legacy_state, [
+    'docs/forja/HANDOVER.md',
+    'docs/forja/REPORT-2026-09-19.md',
+    'docs/forja/SPONSOR-QUEUE.md',
+  ]);
+  f.manifest(['docs/forja/HANDOVER.md']);
+  const explicit = retrieveKnowledge(f.root, 'pagination tasks');
+  assert.equal(explicit.selected[0].path, 'docs/forja/HANDOVER.md');
+  assert.equal(explicit.excluded_legacy_state, undefined);
+});
