@@ -7,7 +7,7 @@
 <p align="center">Turn a goal into code changes, executable checks, and a separate review.<br>Claude Code and Codex do the engineering. FORJA keeps the work moving and the evidence on disk.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.15.0"><img src="https://img.shields.io/badge/version-0.15.0-ff9955" alt="Version 0.15.0"></a>
+  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.17.0"><img src="https://img.shields.io/badge/version-0.17.0-ff9955" alt="Version 0.17.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -127,6 +127,28 @@ The same profile supports `--provider codex`. It removes the native sandbox/appr
 | Custom executor | Caller-supplied executable using the result contract | Adapter-defined behavior and permissions. |
 
 Hard work, architecture/security signals and implementation retries select stronger tiers; security-sensitive review selects `critical`. These are routing signals, not calibrated difficulty estimates. See [routing and presets](docs/ROUTING.md) before selecting experimental economy or Ollama configurations. A session limit is not a token or currency ceiling.
+
+### Selected Claude profile
+
+This diagram shows an **explicit, opt-in Claude profile**. Configure its model and effort routes for each new run; installing or updating FORJA does not apply this profile automatically. The built-in Claude defaults still use Sonnet for fast/normal tiers and Opus for strong/critical tiers.
+
+```mermaid
+flowchart TD
+    P["Planning, architecture and creative direction<br/>Opus 5.5 (high)"]
+    D["Development: Frontend / Backend / Full-stack<br/>Opus 5.5 (high)<br/>Simple tasks: medium"]
+    C["Checks and tests<br/>Controller and tools (no AI model)"]
+    R["Independent review<br/>Opus 5.5 (high)<br/>Separate session"]
+    G["Optional commit and push<br/>Controller (no AI model)"]
+
+    P --> D
+    D --> C
+    C -->|Passed| R
+    C -->|Failed, within budget| D
+    R -->|Changes needed, within budget| D
+    R -->|Approved, delivery configured| G
+```
+
+`high` and `medium` are effort levels. Design, frontend, backend and security are [specialist methods](docs/CORE-SPECIALISTS.md) loaded when relevant within these phases; they do not require a permanent team or extra model sessions. Implementation retries and security/architecture risks use `high` in this profile. Fable is not part of it. See the [routing configuration](docs/CORE-RUNBOOK.md) to set explicit model IDs and effort.
 
 ## Know what happened
 
