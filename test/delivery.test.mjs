@@ -1,6 +1,6 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -197,4 +197,19 @@ test('editing the deployment contract in development cannot grant production per
   } });
   assert.equal(result.status, 'blocked'); assert.match(result.failure, /Protected file changed/);
   assert.equal(git(f.root, ['rev-parse', 'HEAD']), f.base);
+});
+
+test('delivery stages more paths than one Windows command line holds', async () => {
+  const f = repo();
+  const corpus = 'fixtures/generated-corpus-with-a-descriptive-directory-name';
+  const { result } = await run(f, { develop: () => {
+    mkdirSync(join(f.root, corpus), { recursive: true });
+    for (let i = 0; i < 300; i++) writeFileSync(join(f.root, corpus, `generated-sample-file-with-a-long-descriptive-name-${String(i).padStart(4, '0')}.json`), '{}\n');
+  } });
+  assert.equal(result.status, 'done', result.failure);
+  assert.equal(result.delivery.status, 'committed', result.delivery.reason);
+  const committed = git(f.root, ['ls-tree', '-r', '--name-only', 'HEAD', '--', corpus]).split('\n');
+  assert.equal(committed.length, 300);
+  assert.ok(committed.join(' ').length > 32767, 'the paths exceed one Windows command line');
+  assert.equal(git(f.root, ['status', '--porcelain']), '');
 });

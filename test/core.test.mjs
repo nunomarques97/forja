@@ -1121,3 +1121,29 @@ test('a dangling symlink is snapshotted by its target and does not stop a run', 
   assert.equal(r.status, 'done', r.failure);
   assert.deepEqual(r.tasks[0].files_changed, ['value.mjs']);
 });
+
+test('review preparation handles more changed paths than one Windows command line holds', async () => {
+  const p = repo();
+  createRun(p, { goal: 'Generate a corpus', provider: 'custom', plan: plan() });
+  const corpus = 'fixtures/generated-corpus-with-a-descriptive-directory-name';
+  let review;
+  const r = await drive(p, { log: () => {}, providerCall: async (_, o) => {
+    if (!o.readOnly) {
+      mkdirSync(join(p, corpus), { recursive: true });
+      for (let i = 0; i < 1500; i++) writeFileSync(join(p, corpus, `sample-${String(i).padStart(4, '0')}.json`), '{}\n');
+      writeFileSync(join(p, 'value.mjs'), 'export const value = 2;\n');
+    } else review = JSON.parse(o.text).changes;
+    return result(o.readOnly ? 'approve' : 'done');
+  } });
+  assert.equal(r.status, 'done', r.failure);
+  assert.equal(r.tasks[0].files_changed.length, 1501);
+  assert.ok(r.tasks[0].files_changed.join(' ').length > 32767, 'the paths exceed one Windows command line');
+  const patch = readFileSync(join(p, '.forja/runs', r.run_id, 'T1-change.patch'), 'utf8');
+  assert.match(patch, /^\+export const value = 2;$/m);
+  // The review packet lists a bounded prefix and points to the complete list.
+  assert.deepEqual([review.files_total, review.new_files_total], [1501, 1500]);
+  assert.ok(review.files.length > 0 && review.files.length < 1501);
+  const list = JSON.parse(readFileSync(review.file_list, 'utf8'));
+  assert.deepEqual(list.files, r.tasks[0].files_changed);
+  assert.equal(list.new_files.length, 1500);
+});
