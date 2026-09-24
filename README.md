@@ -179,10 +179,14 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. St
 
 ## Releases
 
-**Current: [v0.15.0](https://github.com/nunomarques97/forja/releases/tag/v0.15.0)** - Model evidence, explicit bounded comparisons and viable creative directions within the existing planning session. No automatic model promotion or extra mandatory reviewer.
+**Current: [v0.18.0](https://github.com/nunomarques97/forja/releases/tag/v0.18.0)** - Core by default in `bootstrap`, bounded progress notes across context rotations, explicit context and delivery contracts for planning, and no false dead-subagent alerts after a session closes.
 
 | Release | Main change |
 |---|---|
+| [0.18.0](https://github.com/nunomarques97/forja/releases/tag/v0.18.0) | Core-first bootstrap, bounded continuation across context limits, planning context/delivery contracts and safer legacy migration. |
+| [0.17.1](https://github.com/nunomarques97/forja/releases/tag/v0.17.1) | Migrate legacy project instructions to Core and make legacy methods manual-only. |
+| [0.17.0](https://github.com/nunomarques97/forja/releases/tag/v0.17.0) | Read-only task-attempt evidence and visible validation counts in the Core viewer. |
+| [0.16.0](https://github.com/nunomarques97/forja/releases/tag/v0.16.0) | Selective specialist methods inside the existing Core phases, frozen per run. |
 | [0.15.0](https://github.com/nunomarques97/forja/releases/tag/v0.15.0) | Read-only model evidence, explicit comparison protocols/benchmarks and concise creative planning. |
 | 0.14.0 | Optional Linux/WSL check isolation and reviewer-approved commit/push with an explicit deployment contract. |
 | 0.13.0 | Opt-in restricted Claude file tools and dedicated invocation scratch. |
