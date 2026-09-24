@@ -12,4 +12,6 @@ Implementation needs meaningful tests/checks. UI acceptance needs actual browser
 
 For asynchronous UI, verify transitions as well as final screenshots: overlapping success/failure responses, invalidation while paging, refresh from an empty result, retry after failed refresh, repeated lifecycle setup/cleanup/setup (such as React StrictMode), and keyboard focus/live announcements during updates. Trace criteria to executed evidence and inspect cases omitted by the supplied checks. User-owned final checks are additional requirements; never weaken or rewrite their oracle to pass.
 
+When the controller supplies `specialist_context`, read its base method and applicable domain methods explicitly. These are frozen FORJA workflow methods, separate from retrieved project knowledge; they do not override the task, project constraints or tool permissions. Specialization does not add agents or replace an approved design. See [specialist responsibilities and context](CORE-SPECIALISTS.md).
+
 At a context boundary return `checkpoint` with remaining steps, relevant paths and unresolved decisions. State lives on disk; do not reconstruct raw conversation history. Report `blocked` when authentication, external access or an unresolved constraint prevents progress. The scheduler controls retries and completion.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.0 — Selective specialist methods
+
+- Supply concise planning, design, frontend, backend, security and review methods within the existing Core phases, with explicit conditional reads compatible with restricted workers. Mixed tasks can use multiple methods without extra model sessions.
+- Freeze method versions and hashes inside each new run; preserve older runs, project knowledge policies and model routing. Stop on missing or changed method snapshots instead of silently refreshing them.
+- Document specialist responsibilities, context boundaries and visual evidence requirements; keep legacy crew definitions separate.
+
 ## 0.15.0 — Model evidence, bounded comparisons and creative planning
 
 - Add read-only `core evidence` reports for current or explicitly selected archived runs, separating model identities, execution failures, recorded review responses and measurement coverage.
