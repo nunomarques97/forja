@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.1 — Fewer avoidable blocks
+
+- Skip task-local `git diff --exit-code`/`--quiet` checks in the final regression, where later accepted work necessarily changes the diff, instead of reopening the task and blocking the run; plans with such a check in a multi-task run get a `snapshot_check` warning (#14).
+- Refuse a check whose executable resolves nowhere before any task, on every platform: a bare name must be on `PATH` (on Windows also in the project root) and an explicit path must exist, unless a task's `files` scope covers it (#16).
+- When a repeated context stop also exhausted the task's rotations, the stop message and `recovery.guidance` name the minimum `--max-rotations` to raise in the same resume (#13).
+
 ## 0.19.0 — Clean stops and reliability fixes
 
 - Add `core stop` (next invocation boundary) and `core stop --after-task` (after the current task's checks, review and repairs). The run pauses with recovery reason `operator_stop`, spends no attempt, and `core resume` continues.
