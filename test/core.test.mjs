@@ -587,6 +587,64 @@ test('final regression skips a task-local git diff --exit-code check instead of 
   assert.equal(r.tasks[0].attempts, 1, 'no repair session for the analysis task');
   assert.deepEqual(r.tasks[0].finalValidation, [{ command: 'git', args: ['diff', '--exit-code', '--', 'value.mjs'], skipped: 'snapshot_bound', passed: true }]);
 });
+test('an oversize summary or findings list is shortened instead of discarding completed work', async () => {
+  const p = repo();
+  createRun(p, { goal: 'Return two', plan: plan() });
+  let schema;
+  const r = await drive(p, {
+    log: () => {},
+    providerCall: async (_, o) => {
+      if (o.readOnly) return { ...result('approve'), result: { status: 'approve', summary: 'ok', findings: Array.from({ length: 30 }, (_, i) => `${i}`.repeat(900)) } };
+      schema = JSON.parse(readFileSync(o.schemaPath, 'utf8'));
+      writeFileSync(join(p, 'value.mjs'), 'export const value = 2;\n');
+      return { ...result('ready_for_validation'), result: { status: 'ready_for_validation', summary: 'x'.repeat(5959), findings: [] } };
+    },
+  });
+  assert.equal(r.status, 'done', r.failure);
+  assert.equal(schema.properties.summary.maxLength, 4000);
+  assert.equal(schema.properties.findings.items.maxLength, 2000);
+  const develop = JSON.parse(readFileSync(join(p, '.forja', 'runs', r.run_id, 'call-1-result.json'), 'utf8'));
+  assert.equal(develop.summary.length, 4000);
+  assert.match(develop.summary, /… \[truncated; full text in call-1-stream\.json\]$/);
+  const review = JSON.parse(readFileSync(join(p, '.forja', 'runs', r.run_id, 'call-2-result.json'), 'utf8'));
+  assert.ok(JSON.stringify(review.findings).length <= 12000);
+  assert.match(review.findings.at(-1), /^\d+ more findings \[truncated; full text in call-2-stream\.json\]$/);
+  assert.throws(() => validateResult({ status: 'done', summary: 'x'.repeat(4001), findings: [] }), /summary has 4001 characters \(limit 4000\)/);
+});
+test('an approved task is reopened with --reopen and goes through development, checks and review again', async () => {
+  const p = repo();
+  createRun(p, { goal: 'Two changes', plan: { decisions: [], tasks: [task(), { ...task(), id: 'T2', title: 'Second', after: ['T1'], checks: [{ command: 'node', args: ['-e', 'process.exit(0)'] }] }] } });
+  const calls = [];
+  let blockT2 = true;
+  const providerCall = async (_, o) => {
+    const ctx = JSON.parse(o.text);
+    calls.push(`${ctx.phase}:${ctx.task?.id}`);
+    if (o.readOnly) return result('approve');
+    if (ctx.task.id === 'T2') return blockT2 ? result('blocked', 'Harness defect found on real hardware') : result();
+    if (ctx.feedback?.summary) assert.equal(ctx.feedback.summary, 'Reopened after approval: Silent buffers on real hardware');
+    writeFileSync(join(p, 'value.mjs'), 'export const value = 2;\n');
+    return result();
+  };
+  const blocked = await drive(p, { log: () => {}, providerCall });
+  assert.equal(blocked.status, 'blocked');
+  assert.equal(blocked.tasks[0].status, 'done');
+  assert.throws(() => recoverRun(p, { action: 'retry', taskId: 'T1', reason: 'x' }), /reopen an approved task with --reopen/);
+  assert.throws(() => recoverRun(p, { action: 'retry', taskId: 'T2', reason: 'x', reopen: true }), /Reopen applies only to an approved \(done\) task/);
+  assert.throws(() => recoverRun(p, { action: 'retry', taskId: 'T1', reason: 'x', reopen: true, validateOnly: true }), /--validate-only does not apply/);
+  const reopened = recoverRun(p, { action: 'retry', taskId: 'T1', reason: 'Silent buffers on real hardware', reopen: true });
+  assert.equal(reopened.tasks[0].status, 'todo');
+  assert.equal(reopened.tasks[0].reopened[0].reason, 'Silent buffers on real hardware');
+  assert.equal(reopened.tasks[0].reopened[0].review, 'approve');
+  const ledger = readFileSync(join(p, '.forja', 'runs', reopened.run_id, 'recovery.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.equal(ledger.at(-1).reopen, true);
+  recoverRun(p, { action: 'retry', taskId: 'T2', reason: 'Continue after the harness fix' });
+  blockT2 = false;
+  calls.length = 0;
+  const done = await drive(p, { log: () => {}, providerCall });
+  assert.equal(done.status, 'done', done.failure);
+  assert.deepEqual(calls.slice(0, 2), ['develop:T1', 'review:T1'], 'the reopened task is implemented and reviewed again first');
+  assert.equal(done.tasks[0].attempts, 2);
+});
 test('snapshot-bound checks are recognised by git subcommand and option', () => {
   const git = (...args) => ({ command: 'git', args });
   for (const c of [git('diff', '--exit-code'), git('-C', 'sub', 'diff', '--quiet', '--', 'a'), git('diff-index', '--quiet', 'HEAD'), { command: 'C:/Git/bin/git.exe', args: ['diff', '--exit-code'] }])
