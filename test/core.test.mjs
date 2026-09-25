@@ -36,7 +36,7 @@ import {
 import { invocation, parseOutput, execute } from '../lib/core/providers.mjs';
 import { initCore } from '../lib/core/init.mjs';
 import { summarizeUsage } from '../lib/core/metrics.mjs';
-import { checksFor } from '../lib/core/quality.mjs';
+import { checksFor, snapshotBoundCheck } from '../lib/core/quality.mjs';
 const dirs = [];
 after(() => {
   for (const p of dirs) rmSync(p, { recursive: true, force: true });
@@ -570,6 +570,29 @@ test('final regression reopens an earlier task when a later task invalidates it'
   assert.equal(r.status, 'done');
   assert.equal(r.tasks[0].attempts, 2);
   assert.equal(r.invocations, 6);
+});
+test('final regression skips a task-local git diff --exit-code check instead of reopening its task', async () => {
+  const p = repo();
+  const readOnly = { ...task(), title: 'Analyse only', checks: [{ command: 'git', args: ['diff', '--exit-code', '--', 'value.mjs'] }] };
+  createRun(p, { goal: 'Analyse then change', plan: { decisions: [], tasks: [readOnly, { ...task(), id: 'T2', after: ['T1'] }] } });
+  const r = await drive(p, {
+    log: () => {},
+    providerCall: async (_, o) => {
+      if (o.readOnly) return result('approve');
+      if (o.input.includes('"task":{"id":"T2"')) writeFileSync(join(p, 'value.mjs'), 'export const value = 2;\n');
+      return result();
+    },
+  });
+  assert.equal(r.status, 'done');
+  assert.equal(r.tasks[0].attempts, 1, 'no repair session for the analysis task');
+  assert.deepEqual(r.tasks[0].finalValidation, [{ command: 'git', args: ['diff', '--exit-code', '--', 'value.mjs'], skipped: 'snapshot_bound', passed: true }]);
+});
+test('snapshot-bound checks are recognised by git subcommand and option', () => {
+  const git = (...args) => ({ command: 'git', args });
+  for (const c of [git('diff', '--exit-code'), git('-C', 'sub', 'diff', '--quiet', '--', 'a'), git('diff-index', '--quiet', 'HEAD'), { command: 'C:/Git/bin/git.exe', args: ['diff', '--exit-code'] }])
+    assert.equal(snapshotBoundCheck(c), true, c.args.join(' '));
+  for (const c of [git('diff'), git('log', '--exit-code'), git('diff', '--', '--exit-code'), { command: 'node', args: ['diff', '--exit-code'] }])
+    assert.equal(snapshotBoundCheck(c), false, c.args.join(' '));
 });
 test('new files trigger security review by content even with an innocuous path', async () => {
   const p = repo();

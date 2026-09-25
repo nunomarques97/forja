@@ -78,6 +78,15 @@ test('a later task that needs committed HEAD is flagged with the delivery mode o
   assert.equal(planningContract({ limits: {}, config: {} }).commits_during_run, false);
 });
 
+test('a git diff --exit-code check in a multi-task plan is flagged as task-local', (t) => {
+  const root = repo(t);
+  const analysis = task({ id: 'analyse', checks: [{ command: 'git', args: ['diff', '--exit-code', '--', 'src'] }] });
+  const warnings = planWarnings({ limits: {}, config: {}, tasks: [analysis, task({ after: ['analyse'] })] }, root);
+  assert.deepEqual(warnings.map((w) => [w.code, w.task]), [['snapshot_check', 'analyse']]);
+  assert.match(warnings[0].message, /the final regression skips it/);
+  assert.deepEqual(planWarnings({ limits: {}, config: {}, tasks: [analysis] }, root), [], 'a single task has no later work');
+});
+
 test('the planner is told that no commit happens between tasks', async (t) => {
   const root = repo(t);
   createRun(root, { goal: 'Build then export HEAD', provider: 'custom' });
