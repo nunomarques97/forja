@@ -1171,6 +1171,24 @@ test('review preparation handles more changed paths than one Windows command lin
   assert.equal(list.new_files.length, 1500);
 });
 
+test('a check whose executable does not exist is refused at start and after planning, before any task', async () => {
+  const broken = { ...task(), checks: [{ command: '.venvScriptspython.exe', args: ['-m', 'pytest'] }] };
+  const p = repo();
+  assert.throws(() => createRun(p, { goal: 'Missing tool', provider: 'custom', plan: { decisions: [], tasks: [broken] } }), /Task T1 checks\[0\] command "\.venvScriptspython\.exe" was not found on PATH/);
+  assert.equal(existsSync(join(p, '.forja', 'current.json')), false);
+
+  createRun(p, { goal: 'Missing tool', provider: 'custom' });
+  const phases = [];
+  const r = await drive(p, { log: () => {}, providerCall: async (_, o) => {
+    const phase = JSON.parse(o.text).phase;
+    phases.push(phase);
+    return phase === 'plan' ? { code: 0, result: { decisions: [], tasks: [broken] }, usage: null } : result();
+  } });
+  assert.equal(r.status, 'blocked');
+  assert.match(r.failure, /^Plan refused before any task: Task T1 checks\[0\] command "\.venvScriptspython\.exe"/);
+  assert.deepEqual([phases, r.tasks.length], [['plan'], 0], 'no developer session is spent');
+});
+
 test('Windows: a check through a .cmd shim is refused at start and after planning, before any task', { skip: process.platform !== 'win32' && 'Windows command resolution' }, async () => {
   const shims = mkdtempSync(join(tmpdir(), 'forja-shims-'));
   dirs.push(shims);
