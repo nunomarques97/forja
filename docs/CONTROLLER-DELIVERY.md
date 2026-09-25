@@ -42,6 +42,26 @@ The built-in privacy scanner is the implementation used by FORJA's release guard
 
 `core status` reports code completion and delivery status separately. A delivery failure gives the CLI a nonzero exit even if code work is `done`. Receipts, manifests and logs stay under `.forja/runs/<run-id>/`; they are private evidence, not release files. A normal resume does not repeat a blocked delivery. After inspection, use `core deliver --retry`; it cannot invent reviewer approval or adopt changed source/history. Runs without `delivery` never commit or push.
 
+## One reviewed commit per task
+
+By default a run produces at most one commit, after every task is approved. To keep one explanatory commit per logical change, opt into task granularity:
+
+```json
+{
+  "delivery": { "mode": "commit", "granularity": "task" }
+}
+```
+
+`granularity` is `run` (the default) or `task`, with `mode` `commit` or `push`. With `task`, each task that changes source produces one local commit after its checks and independent review pass. The task's existing reviewer also approves its exact delivery snapshot and supplies a public-safe commit message in the same session; there is no extra reviewer, route or model session for Git.
+
+- The controller stages every run change on top of the last approved task commit in a separate index, so each commit holds exactly that task's delta, including later edits to shared files. The clean-start rule means no unrelated edit can be included. A task without source changes records `no_changes` and creates no empty commit.
+- The run base stays immutable. Only commits the controller recorded in `taskCommits` advance the expected HEAD; a manual commit, a branch switch or an occupied index blocks the run and is never adopted.
+- A snapshot that cannot be delivered (privacy scan, pipeline contract, moved HEAD) blocks before its review is paid for. A rejected or stale delivery approval blocks the task after review. Earlier commits and working files are preserved either way; after inspection, `core retry --task ID --validate-only --why "..."` runs fresh checks and a fresh review of the current snapshot.
+- Each task keeps its own receipt under `.forja/runs/<run-id>/delivery/`. The commit object is recorded before the branch moves; if installation is interrupted, `core resume` installs that same commit (or recognizes it as already installed) without another review and without a duplicate commit. Ambiguous HEAD or index state blocks for inspection.
+- `mode: "commit"` leaves the reviewed commits local. `mode: "push"` performs no push between tasks: after all tasks and final checks pass, the controller checks that local history is exactly the recorded chain on the run base, scans every outgoing commit's changes and message (a secret removed by a later commit still exists in history), and pushes the chain tip once to the authorized branch. Each task review sees the earlier commits in its manifest, so the last reviewer approves the whole outgoing chain. Remote, ancestry and production rules are the same as below.
+
+`core status` reports `delivery_granularity`, `task_commits`, any pending task delivery, and the delivery outcome of each task. The planner contract reports `commits_during_run: true`, so later tasks may rely on earlier approved work in HEAD.
+
 ## Push and deployment are separate permissions
 
 For automatic GitHub delivery, choose a working branch whose pipeline effects have been verified by the project administrator. Store the contract in a regular project-relative file, for example `forja.delivery.json`:

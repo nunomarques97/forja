@@ -99,6 +99,6 @@ test('the planner is told that no commit happens between tasks', async (t) => {
     return { code: 0, result: { status: 'blocked', summary: 'Stop here', findings: [] } };
   } });
   assert.match(input, /"planning_contract":\{[^}]*"delivery":"none","commits_during_run":false\}/);
-  assert.match(input, /Workers never commit and no commit happens between tasks/);
+  assert.match(input, /Workers never commit\. .*Without commits_during_run, HEAD stays at the starting commit for the whole run/);
   assert.match(input, /defer them to a later run and say so in decisions/);
 });
