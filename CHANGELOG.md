@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.20.0 — Commit per task, reopen approved tasks
+
+- Add opt-in `delivery.granularity: "task"`: each task that changes source gets one local commit, approved with its message by that task's existing reviewer in the same session. Tasks without changes create no empty commit. Manual commits and occupied indexes are never adopted, and an interrupted installation resumes with the same commit. Push mode publishes the approved chain once, after the whole run passes, and scans every outgoing commit (#12).
+- Add `core retry --task ID --reopen --why "..."` to reopen an approved task that later proves defective; it goes through implementation, checks and independent review again, and the reopening is recorded (#15).
+- Shorten an oversize worker summary or findings list instead of discarding completed work; the result schema declares the limits, and remaining validation errors name the field and length (#17).
+- Stop the watchdog from reporting a quiet conversation as a dead main session every 30 minutes while Core drives the project (#18).
+
 ## 0.19.1 — Fewer avoidable blocks
 
 - Skip task-local `git diff --exit-code`/`--quiet` checks in the final regression, where later accepted work necessarily changes the diff, instead of reopening the task and blocking the run; plans with such a check in a multi-task run get a `snapshot_check` warning (#14).
