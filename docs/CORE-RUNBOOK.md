@@ -46,7 +46,7 @@ A migração só arquiva definições reconhecidas da crew FORJA, não um agente
 
 ## Paragens repetidas por contexto
 
-As rotações de contexto têm também um limite rígido: três paragens forçadas por contexto seguidas bloqueiam com `repeated_context_limit`, mesmo que cada sessão altere uma linha de código ou reescreva as notas. Esses sinais ficam como evidência, não como prova de progresso útil. Uma entrega intencional do worker repõe esta contagem; os budgets normais de sessões e rotações continuam a aplicar-se. Inspeciona o trabalho e estreita a tarefa ou revê explicitamente o budget de contexto antes de retomar. A base de 35.000 tokens do planner é uma estimativa de referência do Claude, não uma medição nem uma garantia de contexto para outros providers.
+As rotações de contexto têm também um limite rígido: três paragens forçadas por contexto seguidas bloqueiam com `repeated_context_limit`, mesmo que cada sessão altere uma linha de código ou reescreva as notas. Esses sinais ficam como evidência, não como prova de progresso útil. Uma entrega intencional do worker repõe esta contagem; os budgets normais de sessões e rotações continuam a aplicar-se. Inspeciona o trabalho e estreita a tarefa ou revê explicitamente o budget de contexto antes de retomar. Se a tarefa também já esgotou as rotações, a paragem e o `recovery.guidance` dizem-no e indicam o valor mínimo de `--max-rotations`; sobe os dois limites no mesmo `core resume`, senão o run volta a bloquear com `rotations`. A base de 35.000 tokens do planner é uma estimativa de referência do Claude, não uma medição nem uma garantia de contexto para outros providers.
 
 ## Acesso completo dos executores
 

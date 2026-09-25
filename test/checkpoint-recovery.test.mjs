@@ -187,6 +187,10 @@ test('changing notes does not permit endless forced context rotations', async t 
   assert.equal(calls, 3);
   assert.equal(blocked.tasks[0].stalled_rotations, 0);
   assert.equal(blocked.tasks[0].progress_notes.text, 'step 1\nstep 2\nstep 3\n');
+  // The rotation budget is spent too: one resume must raise both limits.
+  const both = /T1 has also used 3 context rotations against a limit of 2, so raise --max-rotations to at least 4 in the same resume \(for example core resume --max-context-tokens <tokens> --max-rotations 4\)\./;
+  assert.match(blocked.failure, both);
+  assert.match(recoveryInfo(blocked).guidance, both);
 });
 
 test('one-line source changes cannot bypass the forced context stop bound', async t => {
@@ -202,4 +206,5 @@ test('one-line source changes cannot bypass the forced context stop bound', asyn
   assert.equal(blocked.tasks[0].context_limit_streak, 3);
   assert.equal(readFileSync(join(root, 'value.mjs'), 'utf8'), 'export const value = 3;\n');
   assert.equal(recoveryInfo(blocked).code, 'repeated_context_limit');
+  assert.doesNotMatch(recoveryInfo(blocked).guidance, /--max-rotations/, 'rotations remain within the limit');
 });
