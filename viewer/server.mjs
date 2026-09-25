@@ -69,16 +69,18 @@ export function watchdogPlan(snap, now = Date.now(), thresholds = THRESHOLDS, { 
     if (main.state === STATES.SPONSOR && !mainPermission) add(`${run.id}|sponsor|${main.since}`, `Forja precisa de ti (${run.project}): ${main.detail || 'a sessão principal parou'}`);
     // SEM_RESPOSTA (ainda pode recuperar sozinha) e ESPERA_QUOTA (retoma sozinho) não avisam o
     // telemóvel — nada espera pelo Sponsor ainda. MORTO continua a avisar: nada a relança sozinha.
-    if (main.state === STATES.MORTO) add(`${run.id}|main-dead|${main.since}`, `Forja: sessão principal em ${run.project} parece morta (${main.detail})`, 'urgent');
+    const legacyLive = ['running', 'blocked'].includes(run.forja && run.forja.status);
+    const coreDriven = !legacyLive && coreProjects.has(run.projectKey);
+    // In a Core run the conversation (or a finished worker session) goes quiet by design
+    // while the controller works; the guard watches the controller itself.
+    if (main.state === STATES.MORTO && !coreDriven) add(`${run.id}|main-dead|${main.since}`, `Forja: sessão principal em ${run.project} parece morta (${main.detail})`, 'urgent');
     // Under the runner a dead subagent is handled by the per-session watchdog (the session is
     // killed and the task redone): only the runner/main session dying is worth a notification.
     const underRunner = !!(run.forja && run.forja.runner && !run.forja.runner.exited && ['running', 'blocked'].includes(run.forja.status));
     // A subagent only counts as dead while whatever launched it can still act on it: not after its
     // session ended or its legacy run closed, not when the main session is already reported dead
     // (one alert per session), and not for old legacy sessions of a project that Core now drives.
-    const legacyLive = ['running', 'blocked'].includes(run.forja && run.forja.status);
     const parentGone = !!run.endedAt || ['finished', 'failed'].includes(run.forja && run.forja.status) || [STATES.MORTO, STATES.TERMINADO, STATES.FALHOU].includes(main.state);
-    const coreDriven = !legacyLive && coreProjects.has(run.projectKey);
     const deadMatters = !underRunner && !parentGone && !coreDriven;
     for (const c of run.roster.slice(1)) for (const i of c.instances || []) {
       if (i.state === STATES.MORTO && deadMatters) add(`${run.id}|dead|${i.key}`, `Forja: ${c.name} em ${run.project} morto — ${i.task || i.type} sem sinal há mais de 30 min`, 'urgent');

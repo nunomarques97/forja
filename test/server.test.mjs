@@ -324,6 +324,13 @@ describe('watchdog plan (pure)', () => {
     assert.deepEqual(wp2({ runs: [run({ projectKey: 'c:/p/demo', forja: { runner: null, status: 'running' } })] }, now, undefined, core).map(n => n.key), ['R-x|dead|k1'], 'a live legacy run still alerts');
     assert.deepEqual(wp2({ runs: [run({ projectKey: 'c:/p/other' })] }, now, undefined, core).map(n => n.key), ['R-x|dead|k1']);
   });
+  test('a quiet main session does not notify as dead while Core drives the project (#18)', () => {
+    const core = { coreProjects: new Set(['c:/p/demo']) };
+    const quiet = over => run({ projectKey: 'c:/p/demo', roster: [{ state: 'morto', since: now - 1, detail: 'sem qualquer evento há 30min' }, { name: 'Backend Dev', instances: [] }], ...over });
+    assert.deepEqual(wp2({ runs: [quiet()] }, now, undefined, core), [], 'the conversation waits while the controller works');
+    assert.deepEqual(wp2({ runs: [quiet({ forja: { runner: null, status: 'running' } })] }, now, undefined, core).map(n => n.key), ['R-x|main-dead|' + (now - 1)], 'a live legacy run still alerts');
+    assert.deepEqual(wp2({ runs: [quiet({ projectKey: 'c:/p/other' })] }, now, undefined, core).map(n => n.key), ['R-x|main-dead|' + (now - 1)], 'projects without a Core run still alert');
+  });
 });
 
 import { createState as createReducer, applyEvent as reduceEvent, snapshot as reducerSnapshot } from '../viewer/lib/state.mjs';
