@@ -69,12 +69,24 @@ test('kilo errors and missing JSON are provider failures', () => {
   assert.equal(parseOutput('kilo', failed, '').error, 'Model not found: org-gateway/missing.');
   const prose = [JSON.stringify({ type: 'text', part: { messageID: 'm', text: 'I am done.' } }), step('m', { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } })].join('\n');
   assert.equal(parseOutput('kilo', prose, '').error, 'Kilo returned no final JSON result');
+  const tokens = { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } };
+  const truncated = [JSON.stringify({ type: 'text', part: { messageID: 'm', text: '{"status":' } }), step('m', tokens, { reason: 'length' })].join('\n');
+  assert.equal(parseOutput('kilo', truncated, '').error, 'Kilo returned no final JSON result (last finish reason: length)');
+  const closing = [
+    JSON.stringify({ type: 'text', part: { messageID: 'a', text: '{"status":"done"}' } }), step('a', tokens, { reason: 'tool-calls' }),
+    JSON.stringify({ type: 'text', part: { messageID: 'b', text: 'Plan written above.' } }), step('b', tokens, { reason: 'stop' }),
+  ].join('\n');
+  assert.deepEqual(parseOutput('kilo', closing, '').result, { status: 'done' });
 });
 
 test('final JSON tolerates fences and surrounding prose only around one object', () => {
   assert.deepEqual(finalJson('```json\n{"status":"done"}\n```'), { status: 'done' });
   assert.deepEqual(finalJson('Result:\n{"status":"blocked"}'), { status: 'blocked' });
   assert.deepEqual(finalJson('{"status":"draft"}</think>{"status":"done","nested":{"a":1}}'), { status: 'done', nested: { a: 1 } });
+  assert.deepEqual(finalJson('Plan:\n{"file":"src\\app\\x.ts","ok":"C:\\\\Users"}'), { file: 'src\\app\\x.ts', ok: 'C:\\Users' });
+  const tasks = Array.from({ length: 150 }, (_, i) => ({ id: `t${i}`, meta: { a: { b: i } } }));
+  assert.equal(finalJson(`Here is the plan:\n${JSON.stringify({ tasks })}\nDone.`).tasks.length, 150);
+  assert.deepEqual(finalJson('{"note":"a } inside a string"}'), { note: 'a } inside a string' });
   assert.equal(finalJson('[1,2]'), null);
   assert.equal(finalJson(''), null);
 });
