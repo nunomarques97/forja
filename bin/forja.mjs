@@ -906,8 +906,8 @@ async function delegate(mod, fn, args) {
 }
 
 const usage = `FORJA core (docs/CORE-RUNBOOK.md)
-  start --goal "..." --provider claude|codex [--project <repo>] [--allow-dirty] [--config <json>] [--plan <json>]
-  core init | core doctor [--provider claude|codex] [--config file] | core resume | core status | core usage [--details]
+  start --goal "..." --provider claude|codex|kilo [--project <repo>] [--allow-dirty] [--config <json>] [--plan <json>]
+  core init | core doctor [--provider claude|codex|kilo] [--config file] | core resume | core status | core usage [--details]
   core deliver [--retry | --approve-production <reviewed-commit-sha>]
   core diagnose [--invocation ID] [--phase plan|develop|review]  (read-only execution metadata; no provider calls; ID 1..200; filters combine with AND)
   core evidence [--run ID]  (read-only model/effort evidence for the current or an archived run; no model ranking or automatic changes)

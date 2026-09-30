@@ -51,6 +51,28 @@ Every provider process receives a fresh scratch directory through `FORJA_SCRATCH
 
 This is a native tool boundary, not an OS sandbox, protection from another process running as the same user, or confinement of controller checks. Trusted native executables and administrative policy remain part of the trust boundary. Native Windows probes exercised allowed source/scratch writes, denials of new external files by absolute/traversal/junction paths, Git/scheduler/caller-file protection, and a read-only reviewer tool set. A hard-link write replaced the project link while the external sentinel remained unchanged; do not infer broader filesystem guarantees from this one probe. The [Claude sandbox documentation](https://code.claude.com/docs/en/sandboxing) separately describes OS sandbox support and its native Windows limitation. Codex retains its existing native sandbox/access settings; this option does not claim equivalent qualification for Codex.
 
+## Kilo CLI provider
+
+`--provider kilo` runs each phase through `kilo run --format json`. It exists for environments where models are only reachable through an organization gateway configured inside a Kilo Code build (for example a company-distributed VS Code extension), not through Claude Code or Codex. Kilo has no default models in FORJA; name the gateway's models explicitly:
+
+```json
+{
+  "providers": {
+    "kilo": {
+      "models": { "fast": "<gateway>/claude-sonnet-4-6", "normal": "<gateway>/claude-sonnet-4-6", "strong": "<gateway>/claude-opus-4-6", "critical": "<gateway>/claude-opus-4-6" }
+    }
+  }
+}
+```
+
+`kilo models <gateway>` lists the IDs. `efforts` map to Kilo's `--variant`. Without `provider.command`, FORJA uses the newest CLI bundled with an installed `*.kilo-code-<version>` extension (`.vscode`, `.vscode-insiders` or `.cursor`), then `kilo` on PATH. The bundled CLI matters: a public npm CLI does not know an organization's built-in gateway provider and fails with `Provider not found`.
+
+Each invocation gets an empty Kilo config home (`XDG_CONFIG_HOME` under the invocation's scratch owner) and `KILO_DISABLE_PROJECT_CONFIG=1`, so user and project permissions such as `"*": "allow"` do not apply. `KILO_CONFIG_CONTENT` then sets FORJA's policy with `"*": "deny"` and an allow list: planning/review get `read`, `glob`, `grep` and `list`; development adds `edit`, `todowrite` and `external_directory` (for progress notes in scratch) plus `bash` unless `writePolicy` is `restricted`; `fullAccess` allows everything. MCP servers are empty, sharing, autoupdate and session ingest are disabled. Authentication lives in Kilo's data directory and is not changed. Kilo has no per-path deny that FORJA relies on, so `.forja`, `.git` and protected files are guarded by the controller's own state, HEAD and protected-file checks, as for Codex.
+
+Kilo has no structured-output flag. FORJA appends the phase schema to the prompt and takes the last complete JSON object from the final message; a run without one is a provider failure. Usage is the sum of `step_finish` tokens (input excluding cache, cache reads/writes, output including reasoning) and cost. The context guard uses each `step_finish` input plus cache, like Claude. The project directory is passed with `--dir`, because Kilo otherwise resolves it from an inherited `PWD`.
+
+Validated on the public Kilo CLI 7.8.1 with free gateway models: read-only phases could not write, development wrote inside the project, and a FORJA run went through plan, develop, controller checks and review (the free reviewer answered with a develop status, which the controller blocked as it should). Isolation from a real user config with `"*": "allow"` and organization gateways must be confirmed on the target machine before relying on it.
+
 ## Acceptance checks owned by the caller
 
 Controller checks can separately opt into [bubblewrap isolation](CONTROLLER-DELIVERY.md#isolated-controller-checks). Reviewer-owned automatic delivery is also opt-in and reuses the existing final review route; there is no additional `delivery` model phase.

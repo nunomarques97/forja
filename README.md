@@ -87,7 +87,7 @@ These trade-offs shaped the runtime. Each one is backed by the documents above.
 
 ## Quick start
 
-You need **Node.js 24**, **Git**, and an installed, authenticated **Claude Code or Codex CLI**. FORJA is developed on Windows. Some supervision helpers are Windows-specific.
+You need **Node.js 24**, **Git**, and an installed, authenticated **Claude Code or Codex CLI** (or a **Kilo CLI** for organization gateways; see [Routing](docs/ROUTING.md#kilo-cli-provider)). FORJA is developed on Windows. Some supervision helpers are Windows-specific.
 
 ```powershell
 git clone https://github.com/nunomarques97/forja.git
