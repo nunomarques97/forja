@@ -18,5 +18,5 @@ Do not implement the request yourself. Prepare it for FORJA and launch it:
 5. Launch FORJA in a separate window so it keeps running after this conversation, by running exactly one of these, depending on your shell:
    - PowerShell: `Start-Process "$env:USERPROFILE\forja-kilo.cmd" -ArgumentList "<absolute project path>"`
    - cmd: `start "" "%USERPROFILE%\forja-kilo.cmd" "<absolute project path>"`
-   Do not wait for it and do not run FORJA inside this conversation.
+   Do not wait for it and do not run FORJA inside this conversation. The command returns within seconds. If it does not, a Windows security prompt is probably waiting for the downloaded launcher: tell the user to run `Unblock-File "$env:USERPROFILE\forja-kilo.cmd"` once, and never launch FORJA a second time for the same goal.
 6. Tell the user FORJA is running in its own window. It never commits or pushes; when it finishes, the changes are left uncommitted for the user to review with `git diff`.
