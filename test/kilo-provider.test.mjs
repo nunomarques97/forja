@@ -36,6 +36,7 @@ test('kilo invocation runs non-interactive JSON with explicit model and effort',
   const config = JSON.parse(spec.env.KILO_CONFIG_CONTENT);
   assert.equal(config.permission['*'], 'deny');
   assert.deepEqual(config.mcp, {});
+  assert.equal(config.snapshot, false);
   assert.throws(() => invocation('kilo', { schemaPath, config: { command: 'kilo-fixture' } }), /scratch directory/);
 });
 
