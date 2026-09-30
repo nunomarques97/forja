@@ -71,6 +71,8 @@ Each invocation gets an empty Kilo config home (`XDG_CONFIG_HOME` under the invo
 
 Kilo has no structured-output flag. FORJA appends the phase schema to the prompt and takes the last complete JSON object from the final message; a run without one is a provider failure. Usage is the sum of `step_finish` tokens (input excluding cache, cache reads/writes, output including reasoning) and cost. The context guard uses each `step_finish` input plus cache, like Claude. The project directory is passed with `--dir`, because Kilo otherwise resolves it from an inherited `PWD`.
 
+To start FORJA from the Kilo chat, copy [`examples/kilo/forja.md`](../examples/kilo/forja.md) to `%USERPROFILE%\.config\kilo\command\` and [`examples/kilo/forja-kilo.cmd`](../examples/kilo/forja-kilo.cmd) to `%USERPROFILE%`, and save the model profile as `%USERPROFILE%\forja-kilo.json`. `/forja <request>` then has the chat agent write `%USERPROFILE%\forja-goal.md`, confirm it with the user, check for a clean tree and open FORJA in its own window with `--goal-file`. Workers never see this global command, because each invocation uses its own config home. Without `delivery` in the profile, FORJA leaves changes uncommitted.
+
 Validated on the public Kilo CLI 7.8.1 with free gateway models: read-only phases could not write, development wrote inside the project, and a FORJA run went through plan, develop, controller checks and review (the free reviewer answered with a develop status, which the controller blocked as it should). Isolation from a real user config with `"*": "allow"` and organization gateways must be confirmed on the target machine before relying on it.
 
 ## Acceptance checks owned by the caller
