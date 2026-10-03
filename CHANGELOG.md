@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.3 — Goals from a file
+
+- Add `start --goal-file <path>`: the goal is read as UTF-8 from a file relative to the current folder, a leading BOM is stripped and the rest is stored byte-exact, so long goals with double quotes never go through shell quoting (Windows PowerShell 5.1 cuts them at the first inner quote). The 1–16,000-character bounds still apply. `--goal` with `--goal-file`, a missing, unreadable, empty or non-UTF-8 file are refused before any run state is written. A `--goal` with an unbalanced double quote prints a stderr warning recommending `--goal-file` and the run still starts, and the refusal of stray `start` arguments names `--goal-file`. Fixes #19.
+
 ## 0.20.2 — Help never resumes a run
 
 - `--help` and `-h` on `start` and on every `core` subcommand print the Core usage and exit 0 without taking the project lock, reading or writing `.forja` state or launching a provider; `core resume --help` no longer resumes a blocked run. `start`, `core resume`, `retry`, `abandon`, `stop`, `deliver`, `decide` and `init` refuse unknown flags and extra positional arguments before any effect, naming the flag or argument; the flags used by the guard and viewer launchers stay accepted. The CLI no longer drops positional arguments after `start` and `core <command>`. Fixes #27.
