@@ -148,6 +148,7 @@ Start with `node $forja core status`. A stopped run reports a fixed `recovery.co
 | `provider`, `provider_limit` | Fix authentication or quota in the provider CLI, then `core resume`. FORJA does not switch providers. |
 | `interrupted` | The controller ended or Ctrl+C stopped it. An interrupted check spends no attempt. Run `core resume`. |
 | `check_targets` | A check has a placeholder, a missing executable or a Windows `.cmd` shim. Start a new run with concrete commands, for example `node node_modules/typescript/bin/tsc`. |
+| `plan_packet`, `task_packet` | A task's packet exceeds its budget (planning) or the 48,000-character limit (execution); the guidance names the task and its size. For `plan_packet`, `core resume` plans again with those sizes. Otherwise `core abandon --why "..."` and start again with smaller tasks or a shorter goal. |
 | `operator_stop` | You ran `core stop`. `core resume` continues from the next step. |
 
 `core diagnose` summarizes what each session did without calling a model. Full procedures (in Portuguese) are in the [Core runbook](docs/CORE-RUNBOOK.md#retomar-e-resolver-bloqueios).

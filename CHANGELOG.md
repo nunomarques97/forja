@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.4 — Task packet budget checked at planning
+
+- The planner is told the per-task packet budget (`planning_contract.task_packet_budget_characters`: 40,000 of the 48,000-character limit, with 8,000 reserved for later feedback and review data). Before tasks are stored, the controller builds the develop packet of every planned task with the real packet builder; a plan with a task over the budget is planned again once, with feedback naming each task, its size and its own entry size. That re-plan is a normal counted session. A second violation blocks with the new `plan_packet` recovery code, stores no task and spends no attempt; the message and `recovery.guidance` name the tasks and sizes, and `core resume` plans again with them as feedback. A develop-time packet overflow now blocks with `task_packet`, naming the task, its size and the limit, and still spends no session or implementation attempt. Fixes #20.
+
 ## 0.20.3 — Goals from a file
 
 - Add `start --goal-file <path>`: the goal is read as UTF-8 from a file relative to the current folder, a leading BOM is stripped and the rest is stored byte-exact, so long goals with double quotes never go through shell quoting (Windows PowerShell 5.1 cuts them at the first inner quote). The 1–16,000-character bounds still apply. `--goal` with `--goal-file`, a missing, unreadable, empty or non-UTF-8 file are refused before any run state is written. A `--goal` with an unbalanced double quote prints a stderr warning recommending `--goal-file` and the run still starts, and the refusal of stray `start` arguments names `--goal-file`. Fixes #19.
