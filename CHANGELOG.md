@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.21.0 — Kilo CLI provider
+
+- New Core provider `kilo` (`start --provider kilo`, `core doctor --provider kilo`, `provider: "kilo"` in routes): each phase runs through `kilo run --format json` with explicit gateway models, an isolated Kilo configuration (empty config home, no project configuration, autoupdate, sharing and session ingest disabled, undo snapshots off) and a per-phase deny-by-default permission list. The final JSON result is recovered after prose, closing messages or Windows paths; step usage, cost and request context are recorded like Claude's, so the context guard applies. The CLI bundled with a Kilo Code VS Code extension is preferred over the npm shim. Kilo receives the same worker environment as the other providers (process-tree cleanup, `GIT_OPTIONAL_LOCKS=0`, scratch directory).
+- `examples/kilo/` holds a global Kilo instruction and a chat command that hands a plain "use FORJA" request to a Core run, plus a visible Windows launcher that reports the outcome, status and resume command. docs/ROUTING.md describes the setup.
+- Core adds `.forja/` to the project's local Git exclude when a run starts, so a project without a `.gitignore` entry does not see run state as untracked work.
+- The legacy runner reads a process command line without flashing a PowerShell window.
+- `start --goal-file` (0.20.3) is the single implementation; the Kilo branch's earlier variant was merged into it.
+
 ## 0.20.15 — Delivery privacy scan: rules up front, base pre-scan, .env templates, file and line
 
 - With `delivery` configured, `planning_contract.delivery_scan_rules` and the develop instructions state the delivery privacy scan rules (refused paths, home-path, private-key and credential content, the `.env` template allowance), so the planner and developer do not plan or create content that is deterministically refused.

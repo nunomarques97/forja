@@ -7,7 +7,7 @@
 <p align="center">A small controller that turns a goal into code changes, executed checks and an independent review.<br>Claude Code and Codex do the engineering. FORJA owns the state, the limits and the definition of done.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.20.15"><img src="https://img.shields.io/badge/version-0.20.15-ff9955" alt="Version 0.20.15"></a>
+  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.21.0"><img src="https://img.shields.io/badge/version-0.21.0-ff9955" alt="Version 0.21.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -87,7 +87,7 @@ These trade-offs shaped the runtime. Each one is backed by the documents above.
 
 ## Quick start
 
-You need **Node.js 24**, **Git**, and an installed, authenticated **Claude Code or Codex CLI**. FORJA is developed on Windows. Some supervision helpers are Windows-specific.
+You need **Node.js 24**, **Git**, and an installed, authenticated **Claude Code or Codex CLI** (or a **Kilo CLI** for organization gateways; see [Routing](docs/ROUTING.md#kilo-cli-provider)). FORJA is developed on Windows. Some supervision helpers are Windows-specific.
 
 ```powershell
 git clone https://github.com/nunomarques97/forja.git

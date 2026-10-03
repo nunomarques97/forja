@@ -60,7 +60,7 @@ test('release scanner ignores URL and route segments that resemble home paths (#
 test('release scanner keeps a user segment without a following separator unflagged', () => {
   assert.equal(homeFound("'" + ['', 'home', 'secret'].join('/') + "'"), false);
   assert.equal(homeFound('"' + ['C:', 'Users'].join('\\\\') + '"'), false);
-  for (const file of ['../lib/core/check-runner.py']) {
+  for (const file of ['../test/kilo-provider.test.mjs', '../lib/core/check-runner.py']) {
     assert.deepEqual(contentFindings(readFileSync(new URL(file, import.meta.url))), [], file);
   }
 });

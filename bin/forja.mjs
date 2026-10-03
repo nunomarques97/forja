@@ -906,9 +906,9 @@ async function delegate(mod, fn, args) {
 }
 
 const coreUsage = `FORJA core (docs/CORE-RUNBOOK.md)
-  start --goal "..." | --goal-file <path> --provider claude|codex [--project <repo>] [--allow-dirty] [--config <json>] [--plan <json>]
+  start --goal "..." | --goal-file <path> --provider claude|codex|kilo [--project <repo>] [--allow-dirty] [--config <json>] [--plan <json>]
     (--goal-file reads the goal as UTF-8 from a path relative to the current folder; use it for long goals or goals with double quotes, which Windows PowerShell 5.1 cuts)
-  core init | core doctor [--provider claude|codex] [--config file] | core resume | core status | core usage [--details]
+  core init | core doctor [--provider claude|codex|kilo] [--config file] | core resume | core status | core usage [--details]
   core deliver [--retry | --approve-production <reviewed-commit-sha>]
   core diagnose [--invocation ID] [--phase plan|develop|review]  (read-only execution metadata; no provider calls; ID 1..200; filters combine with AND)
   core evidence [--run ID]  (read-only model/effort evidence for the current or an archived run; no model ranking or automatic changes)

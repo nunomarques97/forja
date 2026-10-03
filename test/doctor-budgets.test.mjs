@@ -170,3 +170,16 @@ test('budgets accept only integers and digit strings, and a limit flag needs a v
   await assert.rejects(core({ pos: ['start'], opt: { ...opt, 'max-cloud-sessions': '0x5' } }), /Budget must be an integer in 0\.\.200/);
   assert.equal(existsSync(join(root, '.forja', 'current.json')), false);
 });
+
+test('start reads a long goal from --goal-file and refuses ambiguous or unreadable sources', async (t) => {
+  const root = fixture(t);
+  const base = { project: root, provider: 'custom' };
+  await assert.rejects(core({ pos: ['start'], opt: { ...base, goal: 'Inline', 'goal-file': join(root, 'goal.md') } }), /either --goal or --goal-file/);
+  await assert.rejects(core({ pos: ['start'], opt: { ...base, 'goal-file': join(root, 'missing-goal.md') } }), /Cannot read the goal file/);
+  // The file content reaches goal validation (oversize), before any provider.
+  const goalPath = join(tmpdir(), `forja-goal-${process.pid}.md`);
+  writeFileSync(goalPath, String.fromCharCode(0xfeff) + 'x'.repeat(16001));
+  t.after(() => rmSync(goalPath, { force: true }));
+  await assert.rejects(core({ pos: ['start'], opt: { ...base, 'goal-file': goalPath } }), /has 16001 characters; a goal has 1–16,000/);
+  assert.equal(existsSync(join(root, '.forja', 'current.json')), false);
+});
