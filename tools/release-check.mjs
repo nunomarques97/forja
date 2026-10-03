@@ -35,13 +35,23 @@ export function reviewedFixture(path, bytes, reason) {
     ? approved.note : null;
 }
 
+// Home directories only as filesystem paths. The Windows drive form is
+// case-insensitive and accepts JSON-escaped backslashes. The macOS and Linux
+// forms are case-sensitive and must start a path, so URL and route segments
+// (a host, version or other character before the slash) are not flagged.
+const WINDOWS_HOME = /(?<![A-Za-z0-9])[A-Z]:(?:\\{1,2}|\/)Users(?:\\{1,2}|\/)[^\s"'`<>\\/]/i;
+const UNIX_HOME = /(?<=^|[\s"'`=(:,;[{<>|]|file:\/\/)\/(?:Users|home)\/[A-Za-z0-9_][A-Za-z0-9._-]*\//;
+function homePath(text) {
+  return WINDOWS_HOME.test(text) || UNIX_HOME.test(text);
+}
+
 export function contentFindings(buffer) {
   if (buffer.includes(0)) return []; // Binary assets still need human review.
   const text = buffer.toString('utf8');
   const findings = [];
   if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(text)) findings.push('private key');
   if (/\b(?:sk-(?:proj-|ant-)?[A-Za-z0-9_-]{24,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[A-Z0-9]{16})\b/.test(text)) findings.push('credential-like value');
-  if (/(?:[A-Z]:[\\/]Users[\\/][^\s"'`<>]+|\/Users\/[^/\s]+\/|\/home\/[^/\s]+\/)/i.test(text)) findings.push('personal home path');
+  if (homePath(text)) findings.push('personal home path');
   if (/\.codex[\\/]attachments[\\/]|"(?:role|type)"\s*:\s*"(?:user|assistant)"\s*,\s*"(?:content|message)"/i.test(text)) findings.push('possible conversation export');
   return findings;
 }

@@ -18,6 +18,52 @@ test('release scanner detects home paths and raw conversation export shapes', ()
   assert.ok(contentFindings(Buffer.from(['C:', 'Users', 'someone', 'private'].join('\\'))).includes('personal home path'));
   assert.ok(contentFindings(Buffer.from(JSON.stringify({ role: 'user', content: 'private' }))).includes('possible conversation export'));
 });
+// Path-like strings are assembled so this file never contains a literal the scanner flags.
+const homeFound = text => contentFindings(Buffer.from(text)).includes('personal home path');
+test('release scanner detects home paths at every filesystem path boundary', () => {
+  const windows = ['C:', 'Users', 'someone', 'private'];
+  const paths = [
+    windows.join('\\'),
+    windows.join('/'),
+    ['c:', 'users', 'someone', 'private'].join('\\'),
+    windows.join('\\\\'),
+    JSON.stringify({ path: windows.join('\\') }),
+    ['', 'Users', 'someone', 'notes.md'].join('/'),
+    ['', 'home', 'someone', '.config'].join('/'),
+  ];
+  for (const path of paths) {
+    for (const prefix of ['', 'see ', '\n', '"', "'", '`', 'root=', 'open(', 'path:', '{"path":"', 'file://']) {
+      assert.ok(homeFound(prefix + path), prefix + path);
+    }
+  }
+  assert.ok(homeFound('file:///' + windows.join('/')));
+});
+test('release scanner ignores URL and route segments that resemble home paths (#26)', () => {
+  const calendar = ['', 'calendar', 'v3', 'users', 'me', 'calendarList', ''].join('/');
+  const texts = [
+    'if (u.pathname.startsWith("' + calendar + '")) {',
+    'url: "={{ \'https://www.googleapis.com' + calendar + '\' + encodeURIComponent($json.calendar_id) }}",',
+    '(`GET ' + calendar + '{id}`, one HTTP node ...)',
+    'https://graph.microsoft.com' + ['', 'v1.0', 'users', 'abc', 'calendar'].join('/'),
+    'https://api.github.com' + ['', 'users', 'octocat', 'repos'].join('/'),
+    "app.get('" + ['', 'home', ':id', ''].join('/') + "')",
+    '"https://example.com' + ['', 'home', 'dashboard', ''].join('/') + '"',
+    ' ' + ['', 'users', 'someone', ''].join('/'),
+    'https://example.com' + ['', 'Users', 'someone', ''].join('/'),
+    ['', 'v1', 'Users', 'someone', ''].join('/'),
+    ['', 'api', 'home', 'someone', ''].join('/'),
+    'x' + ['', 'home', 'someone', ''].join('/'),
+    '-' + ['', 'Users', 'someone', ''].join('/'),
+  ];
+  for (const text of texts) assert.equal(homeFound(text), false, text);
+});
+test('release scanner keeps a user segment without a following separator unflagged', () => {
+  assert.equal(homeFound("'" + ['', 'home', 'secret'].join('/') + "'"), false);
+  assert.equal(homeFound('"' + ['C:', 'Users'].join('\\\\') + '"'), false);
+  for (const file of ['../test/kilo-provider.test.mjs', '../lib/core/check-runner.py']) {
+    assert.deepEqual(contentFindings(readFileSync(new URL(file, import.meta.url))), [], file);
+  }
+});
 test('synthetic fixture review expires when bytes change and never waives credentials', () => {
   const path = 'test/fixtures/handover-t3-before.md';
   const bytes = readFileSync(new URL('./fixtures/handover-t3-before.md', import.meta.url));
