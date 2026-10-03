@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { createRun, drive, recoverRun, current } from '../lib/core/engine.mjs';
 import { validateDelivery } from '../lib/core/delivery-policy.mjs';
 import { planningContract } from '../lib/core/plan-warnings.mjs';
+import { snapshot, changedFiles } from '../lib/core/context.mjs';
 
 // Task granularity (#12): one reviewer-approved local commit per task that
 // changes source; a push, if configured, only after the whole run passes.
@@ -175,6 +176,54 @@ test('an interrupted task commit installation resumes with the same commit and n
     assert.equal(git(f.root, ['status', '--porcelain']), '');
     assert.deepEqual(done.taskCommits.map(c => c.commit), [pending.commit]);
   }
+});
+
+// #31: the next task commit is the last task commit updated with every
+// working-tree difference from it, not only paths changed since the run began.
+const startIgnore = '.forja/\nlocal-delivery.json\n';
+Object.assign(edits, {
+  R1: root => { writeFileSync(join(root, '.gitignore'), startIgnore + '!.env.example\n'); writeFileSync(join(root, 'value.mjs'), 'export const value = 2;\n'); },
+  R2: root => writeFileSync(join(root, '.gitignore'), startIgnore),
+  D1: root => { writeFileSync(join(root, 'notes.txt'), 'one\n'); unlinkSync(join(root, 'value.mjs')); },
+  D2: root => unlinkSync(join(root, 'notes.txt')),
+});
+async function chained(ids) {
+  const f = repo(), reviewed = {};
+  createRun(f.root, { goal: 'Two changes', provider: 'custom', plan: { decisions: [], tasks: [task(ids[0]), task(ids[1], [ids[0]])] }, config: f.config });
+  const r = await drive(f.root, { log: () => {}, providerCall: provider(f, { review: (id, packet) => { reviewed[id] = packet.changes.delivery.tree; return {}; } }) });
+  assert.equal(r.status, 'done', r.failure);
+  assert.equal(r.invocations, 4, 'installing a commit that records a deletion does not trigger another review');
+  assert.deepEqual(r.tasks.map(t => t.delivery.status), ['committed', 'committed']);
+  assert.deepEqual(git(f.root, ['log', '--format=%s', `${f.base}..HEAD`]).split('\n'), [`Apply ${ids[1]}`, `Apply ${ids[0]}`]);
+  // The reviewed tree is the committed tree and both equal the working tree.
+  assert.equal(reviewed[ids[1]], git(f.root, ['rev-parse', 'HEAD^{tree}']));
+  assert.equal(git(f.root, ['status', '--porcelain', '--untracked-files=all']), '');
+  return f;
+}
+
+test('a missing file is absent from the snapshot whether or not the index lists it', () => {
+  const f = repo();
+  unlinkSync(join(f.root, 'value.mjs'));
+  assert.equal('value.mjs' in snapshot(f.root), false);
+  git(f.root, ['rm', '-q', '--cached', '--', 'value.mjs']);
+  assert.equal('value.mjs' in snapshot(f.root), false);
+  // Snapshots stored by earlier versions record a missing file as null.
+  assert.deepEqual(changedFiles({ 'value.mjs': null }, {}), []);
+  assert.deepEqual(changedFiles({ 'value.mjs': 'a' }, {}), ['value.mjs']);
+});
+
+test('a later task that restores run-start content of an earlier task change commits the revert', async () => {
+  const f = await chained(['R1', 'R2']);
+  assert.equal(git(f.root, ['diff', '--name-only', 'HEAD~1', 'HEAD']), '.gitignore');
+  assert.equal(git(f.root, ['show', 'HEAD:.gitignore']), startIgnore.trim());
+  assert.equal(git(f.root, ['diff', '--name-only', f.base, 'HEAD']), 'value.mjs', 'only the kept change differs from the run base');
+});
+
+test('a later task that deletes a file an earlier task created commits the deletion', async () => {
+  const f = await chained(['D1', 'D2']);
+  assert.deepEqual(git(f.root, ['diff', '--name-only', f.base, 'HEAD~1']).split('\n'), ['notes.txt', 'value.mjs']);
+  assert.equal(git(f.root, ['diff', '--name-status', 'HEAD~1', 'HEAD']), 'D\tnotes.txt');
+  assert.equal(git(f.root, ['ls-tree', '-r', '--name-only', 'HEAD']), '.gitignore', 'the earlier deletion stays committed');
 });
 
 test('an existing run without granularity keeps a single commit after the run', async () => {
