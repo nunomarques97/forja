@@ -7,7 +7,7 @@
 <p align="center">A small controller that turns a goal into code changes, executed checks and an independent review.<br>Claude Code and Codex do the engineering. FORJA owns the state, the limits and the definition of done.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.20.0"><img src="https://img.shields.io/badge/version-0.20.0-ff9955" alt="Version 0.20.0"></a>
+  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.20.1"><img src="https://img.shields.io/badge/version-0.20.1-ff9955" alt="Version 0.20.1"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -64,7 +64,7 @@ Measurements taken on the current code (`v0.20.0`, 29 September 2026) unless sta
 | Test files | 66 | `test/*.test.mjs` |
 | Source / test code | 11,391 lines in `lib/` (5,638 in `lib/core/`) · 19,469 lines of tests | `wc -l` |
 | Runtime dependencies | 0 | [`package.json`](package.json) |
-| Tagged releases | 35 (`v0.1.0` → `v0.20.0`) | `git tag` |
+| Tagged releases | 36 (`v0.1.0` → `v0.20.1`) | `git tag` |
 
 The suite uses fixtures and simulated executors to cover real subprocess acceptance, repair budgets, timeouts, context-triggered termination, checkpoint rotation, stale validation on resume, locks, symlink/path refusal, state tampering and unexpected commits. Evaluations with real models are separate and recorded in [`docs/RESEARCH.md`](docs/RESEARCH.md) and [`docs/ADAPTIVE-ORCHESTRATION.md`](docs/ADAPTIVE-ORCHESTRATION.md). A few of their results:
 
@@ -158,7 +158,7 @@ Start with `node $forja core status`. A stopped run reports a fixed `recovery.co
 |---|---|
 | Sequential Core workflow, separate review, controller-run checks, protected acceptance, context rotation, crash recovery, explicit routing, isolated checks, reviewer-approved delivery, viewer and diagnostics. | Economy/Ollama presets are opt-in experiments. Dynamic specialist allocation, parallel writers in one project and adaptive replanning are **not implemented**. |
 
-**Current release: [v0.20.0](https://github.com/nunomarques97/forja/releases/tag/v0.20.0).** It adds an optional reviewed commit per task, lets you reopen an approved task with `core retry --reopen`, keeps oversized worker results instead of blocking the run, and stops false dead-session alerts. Earlier releases are listed in the [changelog](CHANGELOG.md) and the [tags](https://github.com/nunomarques97/forja/tags). The legacy `runner` remains available as a compatibility workflow.
+**Current release: [v0.20.1](https://github.com/nunomarques97/forja/releases/tag/v0.20.1).** The privacy scan no longer blocks Core delivery on REST API and route paths such as `users/me/` (#26). Builds on 0.20.0, which adds an optional reviewed commit per task, lets you reopen an approved task with `core retry --reopen`, keeps oversized worker results instead of blocking the run, and stops false dead-session alerts. Earlier releases are listed in the [changelog](CHANGELOG.md) and the [tags](https://github.com/nunomarques97/forja/tags). The legacy `runner` remains available as a compatibility workflow.
 
 For development, run `npm test`, `npm run check` and `npm run release:check`. The release guard scans Git's index for credential-shaped values and private run material before any commit. Read the [publication rules](docs/RELEASE.md) before you stage evidence.
 
