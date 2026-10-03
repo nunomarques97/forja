@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { privatePath, contentFindings, inspectIndex, reviewedFixture } from '../tools/release-check.mjs';
+import { privatePath, contentFindings, inspectIndex, reviewedFixture, fileFindings, envTemplateProblem, scanTree } from '../tools/release-check.mjs';
 
 test('release paths exclude raw execution and private research, allow curated knowledge', () => {
   for (const path of ['.forja/run.json', 'data/log.jsonl', 'docs/forja/RUN.json', 'docs/NEXT-RESUME.md', 'docs/CONTINUATION-REPORT.md', 'docs/benchmarks/raw.json', '.env.local', 'chat-history.json']) assert.equal(privatePath(path), true, path);
@@ -107,4 +107,73 @@ test('publication snapshot audit exposes private files already in history/index'
   git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'fixture');
   assert.deepEqual(inspectIndex(root).findings, []);
   assert.equal(inspectIndex(root, { tree: true }).findings.length, 1);
+});
+
+// #32: .env templates, line-level findings, base pre-scan.
+const PRIVATE = 'private execution/research/credential path';
+const reasons = (path, text) => fileFindings(path, Buffer.from(text)).map(f => f.reason);
+test('.env.example, .env.sample and .env.template pass only with empty or placeholder values (#32)', () => {
+  const allowed = [
+    'API_URL=\nAPI_KEY=\n',
+    '# Public settings\r\n\r\nAPI_KEY=""\r\nexport TOKEN=\r\n',
+    "KEY=<your-api-key>\nOTHER='changeme'\nNAME=your-project-name\nX=xxxx\nY=...\nZ= # filled in by the operator\n",
+  ];
+  for (const name of ['.env.example', 'web/.env.sample', '.env.template', '.ENV.EXAMPLE'])
+    for (const text of allowed) assert.deepEqual(reasons(name, text), [], `${name}: ${text}`);
+  const refused = [
+    ['API_URL=\nAPI_KEY=abc123\n', 2],
+    ['PORT=3000\n', 1],
+    ['KEY=#secret\n', 1],
+    ['KEY="real value"\n', 1],
+    ['KEY=<sk-proj-0123>\n', 1],
+    ['KEY=your_sk-proj-abcdefabcdefabcdefabcdef\n', 1],
+    ['just some prose\n', 1],
+    ['A=\n\nB=hunter2 # not a placeholder\n', 3],
+  ];
+  for (const [text, line] of refused) {
+    assert.equal(envTemplateProblem(Buffer.from(text)), line, text);
+    assert.deepEqual(fileFindings('.env.example', Buffer.from(text))[0], { reason: PRIVATE, line }, text);
+  }
+  assert.equal(envTemplateProblem(Buffer.from([65, 61, 0])), 1, 'binary content is never a template');
+  // Credential detection still runs on an otherwise acceptable template.
+  assert.ok(reasons('.env.example', 'KEY=\n# sk-' + 'a'.repeat(32) + '\n').includes('credential-like value'));
+});
+test('other .env names, keys and credential files stay refused whatever their content (#32)', () => {
+  for (const path of ['.env', '.env.local', '.env.production', '.env.example.local', 'config/.env.dev', 'credentials.json', 'id.key', 'cert.pem', 'app.keystore', 'release.jks'])
+    assert.deepEqual(reasons(path, 'KEY=\n'), [PRIVATE], path);
+});
+test('findings name the line of the first match and never the matched text (#32)', () => {
+  const home = ['C:', 'Users', 'someone', 'notes.txt'].join('\\');
+  const text = ['# Lesson', '', 'Escapes:', '```csharp', `var path = @"${home}";`, '```', 'key: sk-' + 'b'.repeat(32)].join('\n');
+  const found = fileFindings('docs/lesson.md', Buffer.from(text));
+  assert.deepEqual(found, [{ reason: 'credential-like value', line: 7 }, { reason: 'personal home path', line: 5 }],
+    'a home path inside a Markdown code fence is still reported');
+  assert.ok(!JSON.stringify(found).includes('someone'));
+  const unix = ['', 'home', 'someone', 'x'].join('/');
+  assert.deepEqual(fileFindings('a.txt', Buffer.from(`one\ntwo ${unix}\n${home}\n`)), [{ reason: 'personal home path', line: 2 }]);
+  assert.deepEqual(fileFindings('a.txt', Buffer.from(['-----BEGIN', 'PRIVATE', 'KEY-----\n'].join(' '))), [{ reason: 'private key', line: 1 }]);
+  assert.deepEqual(fileFindings('data/run.json', Buffer.from('{}')), [{ reason: PRIVATE, line: null }]);
+});
+test('release-check names file and line in its JSON and stderr output (#32)', t => {
+  const { root, git } = fixture(t);
+  writeFileSync(join(root, 'notes.md'), 'intro\n' + ['C:', 'Users', 'someone', 'x'].join('\\') + '\n'); git('add', 'notes.md');
+  writeFileSync(join(root, '.env.example'), 'API_KEY=\n'); git('add', '.env.example');
+  assert.deepEqual(inspectIndex(root).findings, [{ path: 'notes.md', reason: 'personal home path', line: 2 }]);
+  const cli = new URL('../tools/release-check.mjs', import.meta.url);
+  let failure;
+  try { execFileSync(process.execPath, [cli.pathname.replace(/^\/([A-Za-z]:)/, '$1')], { cwd: root, stdio: 'pipe' }); } catch (error) { failure = error; }
+  assert.equal(failure?.status, 1);
+  assert.equal(JSON.parse(failure.stdout).findings[0].line, 2);
+  assert.match(failure.stderr.toString(), /^notes\.md:2 personal home path$/m);
+});
+test('the base scan reports every tracked finding with file and line, and skips reviewed fixtures (#32)', t => {
+  const { root, git } = fixture(t);
+  writeFileSync(join(root, 'CLAUDE.md'), 'a\nb\n' + ['', 'Users', 'someone', 'repo'].join('/') + '\n');
+  writeFileSync(join(root, '.env.example'), 'TOKEN=\n');
+  writeFileSync(join(root, 'clean.txt'), 'nothing');
+  git('add', '.');
+  git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'base');
+  const report = scanTree(root, 'HEAD');
+  assert.equal(report.files, 3);
+  assert.deepEqual(report.findings, [{ path: 'CLAUDE.md', reason: 'personal home path', line: 3 }]);
 });
