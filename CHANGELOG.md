@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Stop the privacy scanner's personal home path rule from flagging URL and route segments, which blocked Core task delivery for REST paths such as the Google Calendar v3 `users/me/calendarList` pathname, Microsoft Graph and GitHub `users` endpoints, and `home` web routes. Home paths are now detected only as filesystem paths: the Windows drive form stays case-insensitive and also matches JSON-escaped backslashes; the macOS `Users` form (capital U) and the Linux `home` form must start a path (start of text, whitespace, a quote, backtick, `=`, `(`, `:` or `file://`) and have a username followed by a separator. Credential, private key and conversation export detection are unchanged (#26).
+
 ## 0.20.0 — Commit per task, reopen approved tasks
 
 - Add opt-in `delivery.granularity: "task"`: each task that changes source gets one local commit, approved with its message by that task's existing reviewer in the same session. Tasks without changes create no empty commit. Manual commits and occupied indexes are never adopted, and an interrupted installation resumes with the same commit. Push mode publishes the approved chain once, after the whole run passes, and scans every outgoing commit (#12).
