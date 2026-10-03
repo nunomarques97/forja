@@ -1,3 +1,5 @@
+import { statSync } from 'node:fs';
+import { join } from 'node:path';
 import { loadProjects, readProjects } from '../lib/projects.mjs';
 import { coreObservation } from '../lib/core/observe.mjs';
 import { decideTechnology, CORE_ROOT } from '../lib/core/engine.mjs';
@@ -27,17 +29,35 @@ export function coreSnapshot(dataDir) {
   };
 }
 
+// Registered projects with a readable Core run, as viewer project keys:
+// { status, active, ended_at }. `active` is running or blocked. A terminal run
+// (done or failed, which includes abandoned) carries its end time in ms:
+// finished_at, else updated_at, else the time the state file was last written.
+// The watchdog uses it to stay quiet about sessions that went silent before the
+// run ended. An unreadable registry or project only means no entry.
+export function coreProjectRuns(dataDir) {
+  const runs = new Map();
+  let projects = [];
+  try { projects = readProjects(dataDir); } catch { return runs; }
+  for (const p of projects) {
+    try {
+      const run = coreObservation(p.path)?.run;
+      if (!run) continue;
+      const active = run.status === 'running' || run.status === 'blocked';
+      let ended_at = null;
+      if (!active) {
+        ended_at = [run.finished_at, run.updated_at].map(t => Date.parse(t || '')).find(Number.isFinite) ?? null;
+        if (ended_at === null) ended_at = statSync(join(p.path, '.forja', 'current.json')).mtimeMs;
+      }
+      runs.set(projectKey(p.path), { status: run.status, active, ended_at });
+    } catch {}
+  }
+  return runs;
+}
+
 // Registered projects whose Core run is running or blocked, as viewer project keys.
-// The watchdog uses it to stop alerting on the legacy crew of a Core-driven project.
 export function coreDrivenProjects(dataDir) {
-  const keys = new Set();
-  try {
-    for (const p of readProjects(dataDir)) {
-      const status = coreObservation(p.path)?.run?.status;
-      if (status === 'running' || status === 'blocked') keys.add(projectKey(p.path));
-    }
-  } catch {} // An unreadable registry only means no suppression.
-  return keys;
+  return new Set([...coreProjectRuns(dataDir)].filter(([, r]) => r.active).map(([key]) => key));
 }
 
 // Called only after the server's authentication and Host checks.

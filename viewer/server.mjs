@@ -36,7 +36,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createState, applyLine, snapshot, STATES, THRESHOLDS } from './lib/state.mjs';
 import { createFeed, feedApply, feedSnapshot } from './lib/feed.mjs';
 import { handleRunsApi, crossSite } from './runs-api.mjs';
-import { coreDrivenProjects, coreSnapshot, handleCoreDecision } from './core-api.mjs';
+import { coreProjectRuns, coreSnapshot, handleCoreDecision } from './core-api.mjs';
 import { notify, sanitizeClick } from '../lib/notify.mjs';
 // A outra metade da supervisão mútua (docs/ARCHITECTURE.md §12): a guarda vigia
 // o viewer, e o viewer vigia a guarda. Regras, constantes e predicados de vida
@@ -54,10 +54,15 @@ const permissionTool = perm => (perm && typeof perm.tool === 'string' && /^[\w.:
 // Pure: the notifications a snapshot warrants right now (docs/ARCHITECTURE.md §10).
 // The timer in startServer fires each key once (data/watchdog.json remembers).
 // `coreProjects`: project keys (state.mjs projectKey) with a running or blocked Core run.
+// `coreRuns`: the same keys from core-api.mjs coreProjectRuns, { active, ended_at }, which
+// also lists terminal Core runs with their end time.
 // Their legacy crew is not driving the work, so a silent subagent from an old
 // interactive session there is not something the Sponsor can relaunch.
-export function watchdogPlan(snap, now = Date.now(), thresholds = THRESHOLDS, { coreProjects = new Set() } = {}) {
+// A dead main session is one alert per project: the notification carries every dead
+// session's key in `keys` and speaks of the most recent one (watchdogDue fires it once).
+export function watchdogPlan(snap, now = Date.now(), thresholds = THRESHOLDS, { coreProjects = new Set(), coreRuns = new Map() } = {}) {
   const out = [];
+  const mainDead = new Map();
   for (const run of snap.runs || []) {
     if (run.synthetic) continue;
     if (!(now - run.lastEventAt < thresholds.WATCHDOG_IGNORE_AFTER_MS)) continue; // runs silent for half a day are history
@@ -70,10 +75,29 @@ export function watchdogPlan(snap, now = Date.now(), thresholds = THRESHOLDS, { 
     // SEM_RESPOSTA (ainda pode recuperar sozinha) e ESPERA_QUOTA (retoma sozinho) não avisam o
     // telemóvel — nada espera pelo Sponsor ainda. MORTO continua a avisar: nada a relança sozinha.
     const legacyLive = ['running', 'blocked'].includes(run.forja && run.forja.status);
-    const coreDriven = !legacyLive && coreProjects.has(run.projectKey);
+    const core = run.projectKey ? coreRuns.get(run.projectKey) : undefined;
+    // A session whose last sign of life came before the project's Core run ended went
+    // quiet during that run (the conversation that launched it, a finished or stopped
+    // worker session): the end of the run, done or abandoned, does not make it dead.
+    // Activity after the end is a new episode and alerts as usual.
+    const lastSign = Math.max(Number(main.since) || 0, Number(run.lastEventAt) || 0);
+    const coreDriven = !legacyLive && (coreProjects.has(run.projectKey) || !!(core && core.active)
+      || !!(core && Number.isFinite(core.ended_at) && lastSign <= core.ended_at));
     // In a Core run the conversation (or a finished worker session) goes quiet by design
     // while the controller works; the guard watches the controller itself.
-    if (main.state === STATES.MORTO && !coreDriven) add(`${run.id}|main-dead|${main.since}`, `Forja: sessão principal em ${run.project} parece morta (${main.detail})`, 'urgent');
+    if (main.state === STATES.MORTO && !coreDriven) {
+      const key = `${run.id}|main-dead|${main.since}`;
+      const group = run.projectKey || `run:${run.id}`;
+      const seen = mainDead.get(group);
+      if (!seen) {
+        const n = { key, keys: [key], message: `Forja: sessão principal em ${run.project} parece morta (${main.detail})`, priority: 'urgent', lastSign };
+        mainDead.set(group, n);
+        out.push(n);
+      } else {
+        seen.keys.push(key);
+        if (lastSign > seen.lastSign) Object.assign(seen, { key, message: `Forja: sessão principal em ${run.project} parece morta (${main.detail})`, lastSign });
+      }
+    }
     // Under the runner a dead subagent is handled by the per-session watchdog (the session is
     // killed and the task redone): only the runner/main session dying is worth a notification.
     const underRunner = !!(run.forja && run.forja.runner && !run.forja.runner.exited && ['running', 'blocked'].includes(run.forja.status));
@@ -88,7 +112,23 @@ export function watchdogPlan(snap, now = Date.now(), thresholds = THRESHOLDS, { 
     }
     if (main.state === STATES.SPONSOR && mainPermission && now - mainPermission.since > thresholds.PERMISSION_NOTIFY_MS) add(`${run.id}|mainperm|${mainPermission.since}`, `Forja precisa de ti (${run.project}): permissão pendente${permissionTool(mainPermission)}`);
   }
+  for (const n of mainDead.values()) delete n.lastSign;
   return out;
+}
+
+// The notifications of a plan still to send, marking them in `notified` (the
+// data/watchdog.json map). A notification fires while one of its keys is new and
+// marks them all, so a project's quiet sessions alert once together and the
+// 30-second polls never resend it; a session that dies later is a new episode.
+export function watchdogDue(plan, notified, now = Date.now()) {
+  const due = [];
+  for (const n of plan) {
+    const keys = n.keys || [n.key];
+    if (keys.every(k => notified[k])) continue;
+    for (const k of keys) notified[k] ||= now;
+    due.push(n);
+  }
+  return due;
 }
 
 export function startServer(opts = {}) {
@@ -201,12 +241,14 @@ export function startServer(opts = {}) {
   const wdPath = join(dataDir, 'watchdog.json');
   let wd = { notified: {} };
   try { wd = JSON.parse(readFileSync(wdPath, 'utf8')); } catch {}
+  if (!wd || typeof wd.notified !== 'object' || !wd.notified) wd = { notified: {} };
   function saveWd() { try { writeFileSync(wdPath, JSON.stringify(wd)); } catch {} }
   async function watchdog() {
     const click = mobileUrl();
-    for (const n of watchdogPlan(currentSnapshot(true), Date.now(), THRESHOLDS, { coreProjects: coreDrivenProjects(dataDir) })) {
-      if (wd.notified[n.key]) continue;
-      wd.notified[n.key] = Date.now(); saveWd();
+    const now = Date.now();
+    const plan = watchdogPlan(currentSnapshot(true), now, THRESHOLDS, { coreRuns: coreProjectRuns(dataDir) });
+    for (const n of watchdogDue(plan, wd.notified, now)) {
+      saveWd();
       await notify(n.message, { click, priority: n.priority, tags: ['eyes'] });
     }
   }
