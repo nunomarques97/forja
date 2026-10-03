@@ -917,6 +917,8 @@ const coreUsage = `FORJA core (docs/CORE-RUNBOOK.md)
   core context --query "..."  (selected project knowledge with source references)
   core retry --task T1 --why "..." [--max-attempts 3] [--max-sessions 40]
   core retry --task T1 --reopen --why "..."   (reopen an approved task after a defect is found)
+  core retry --task T1 --checks-file <json> --why "..." [--validate-only]
+    (replace the checks of an unfinished task, for example one that writes project files, with read-only checks: a UTF-8 JSON array of {"command","args"}; validated like a new plan; final checks stay; old and new checks go to recovery.jsonl)
   core abandon --why "..."
   core stop [--after-task]  (asks the running controller to stop at the next invocation boundary, or after the current task; never kills a live worker; core resume continues)
   Budgets: --max-sessions 30 --max-cloud-sessions N --max-attempts 2 --max-minutes 30 --max-rotations 2 --max-context-tokens 120000
