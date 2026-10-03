@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.20.12 — A concurrent reader on Windows no longer stops the Core controller
+
+- Core state writes (`lib/core/engine.mjs` `write()`, used for `current.json` and each run's `state.json`), the repository index writer in `lib/core/context.mjs` (`.forja/index.json`) and the stop request writer in `lib/core/stop.mjs` renamed their tmp file over the target once; on Windows a concurrent reader (guard, `up`, viewer, forja-office) made `renameSync` fail with `EPERM`/`EBUSY` and killed the controller. They now use the bounded retry that the legacy state files already had: a rename failing with `EPERM`, `EBUSY` or `EACCES` is retried up to 20 times with 10 ms pauses, any other error is rethrown at once, the tmp file is removed when replacement finally fails and the previous complete file is kept, never truncated. Core keeps unique per-call tmp names created with flag `wx`.
+- The retry lives in the new shared module `lib/atomic-write.mjs`, used by Core and by `lib/state-files.mjs` (which keeps its per-process tmp name), so Core no longer carries its own rename and does not import legacy state code. docs/CORE-RUNBOOK.md describes the behaviour. New test/atomic-write.test.mjs covers transient `EPERM`/`EBUSY` renames, a permanent failure and a non-retryable code for the helper and each Core writer. Fixes #29.
+
 ## 0.20.11 — Bounded task scope; optional packet context is trimmed before a task stops
 
 - `task_scope.remaining_tasks` in develop and review packets no longer carries the full criteria of every unfinished task, which made a normal multi-task plan block on its first task with "Task packet exceeds 48,000 characters". Each remaining task always keeps `id`, `title`, `files` and `after`; its criteria are included only when it shares a file with the current task (equal paths, or a directory containing the other), capped at 1,200 characters per task and marked `criteria_truncated` when cut. `task_scope.plan.path` points at the run's state file (`.forja/runs/<run_id>/state.json`), which holds every task's full criteria.
