@@ -36,6 +36,7 @@ test('shared core budgets preserve startup defaults and numeric coercion', () =>
     attempts: 2,
     minutes: 30,
     rotations: 2,
+    providerRetries: 1,
     contextTokens: 120000,
   });
   assert.deepEqual(
@@ -45,12 +46,14 @@ test('shared core budgets preserve startup defaults and numeric coercion', () =>
       maxMinutes: '180',
       maxRotations: '0',
       maxContextTokens: '1000',
+      providerRetries: '0',
     }),
     {
       sessions: 200,
       attempts: 5,
       minutes: 180,
       rotations: 0,
+      providerRetries: 0,
       contextTokens: 1000,
     },
   );
@@ -64,6 +67,7 @@ test('doctor rejects each invalid execution budget before provider inspection', 
     maxMinutes: 1.5,
     maxRotations: -1,
     maxContextTokens: 1000001,
+    providerRetries: 2,
   };
 
   for (const [name, value] of Object.entries(invalid)) {
