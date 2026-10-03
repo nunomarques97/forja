@@ -905,7 +905,7 @@ async function delegate(mod, fn, args) {
   return m[fn](args);
 }
 
-const usage = `FORJA core (docs/CORE-RUNBOOK.md)
+const coreUsage = `FORJA core (docs/CORE-RUNBOOK.md)
   start --goal "..." --provider claude|codex [--project <repo>] [--allow-dirty] [--config <json>] [--plan <json>]
   core init | core doctor [--provider claude|codex] [--config file] | core resume | core status | core usage [--details]
   core deliver [--retry | --approve-production <reviewed-commit-sha>]
@@ -919,8 +919,11 @@ const usage = `FORJA core (docs/CORE-RUNBOOK.md)
   core abandon --why "..."
   core stop [--after-task]  (asks the running controller to stop at the next invocation boundary, or after the current task; never kills a live worker; core resume continues)
   Budgets: --max-sessions 30 --max-cloud-sessions N --max-attempts 2 --max-minutes 30 --max-rotations 2 --max-context-tokens 120000
+  --help or -h on start and any core command prints this text and changes nothing. start, resume, retry, abandon, stop, deliver, decide and init refuse unknown flags and extra arguments before any effect.
 
-Observability: serve, then /core; guard supports Core and legacy runs.
+Observability: serve, then /core; guard supports Core and legacy runs.`;
+
+const usage = `${coreUsage}
 
 Legacy (existing runs):
 forja — comandos (docs/ARCHITECTURE.md §7b)
@@ -977,8 +980,10 @@ async function main() {
       case 'status': return await status();
       case 'context': return context({ opt });
       case 'resume': return resume();
-      case 'start': return await delegate('core/engine.mjs', 'core', { pos: ['start'], opt });
-      case 'core': return await delegate('core/engine.mjs', 'core', { pos: [sub, ...rest], opt });
+      // Every positional goes through, so `--help`, `-h` and stray words
+      // (a goal split by shell quoting) reach the engine's checks.
+      case 'start': return await delegate('core/engine.mjs', 'core', { pos, opt, usage: coreUsage });
+      case 'core': return await delegate('core/engine.mjs', 'core', { pos: pos.slice(1), opt, usage: coreUsage });
       case 'runner': return await delegate('runner.mjs', 'runner', { opt });
       case 'serve': return await delegate('serve.mjs', 'serve', { opt });
       case 'up': return await delegate('up.mjs', 'up', { opt });

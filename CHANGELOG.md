@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.2 — Help never resumes a run
+
+- `--help` and `-h` on `start` and on every `core` subcommand print the Core usage and exit 0 without taking the project lock, reading or writing `.forja` state or launching a provider; `core resume --help` no longer resumes a blocked run. `start`, `core resume`, `retry`, `abandon`, `stop`, `deliver`, `decide` and `init` refuse unknown flags and extra positional arguments before any effect, naming the flag or argument; the flags used by the guard and viewer launchers stay accepted. The CLI no longer drops positional arguments after `start` and `core <command>`. Fixes #27.
+
 ## 0.20.1 — Privacy scan without URL false positives
 
 - Stop the privacy scanner's personal home path rule from flagging URL and route segments, which blocked Core task delivery for REST paths such as the Google Calendar v3 `users/me/calendarList` pathname, Microsoft Graph and GitHub `users` endpoints, and `home` web routes. Home paths are now detected only as filesystem paths: the Windows drive form stays case-insensitive and also matches JSON-escaped backslashes; the macOS `Users` form (capital U) and the Linux `home` form must start a path (start of text, whitespace, a quote, backtick, `=`, `(`, `:` or `file://`) and have a username followed by a separator. Credential, private key and conversation export detection are unchanged (#26).
