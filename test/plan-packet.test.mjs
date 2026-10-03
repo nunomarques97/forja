@@ -66,13 +66,12 @@ test('an oversized plan is planned again once with the task sizes and the compli
   const feedback = plans[1].ctx.feedback;
   assert.equal(feedback.status, 'plan_refused');
   assert.match(feedback.summary, /task_packet_budget_characters \(40000 characters\)/);
-  // Every unfinished task carries the others' criteria in task_scope, so both
-  // are named; the own-entry size points at the task that causes it.
-  assert.deepEqual(feedback.findings.map(f => f.split(':')[0]).sort(), ['T1', 'review0']);
+  // T1 shares a file with review0, but task_scope caps review0's criteria in
+  // T1's packet, so only the task that causes the size is named.
+  assert.deepEqual(feedback.findings.map(f => f.split(':')[0]), ['review0']);
   const finding = id => /^\w+: (\d+) characters, budget 40000; its own task entry has (\d+) characters/.exec(feedback.findings.find(f => f.startsWith(`${id}:`))).slice(1).map(Number);
-  const [reviewSize, reviewOwn] = finding('review0'), [t1Size, t1Own] = finding('T1');
-  assert.ok(reviewSize > TASK_PACKET_BUDGET && t1Size > TASK_PACKET_BUDGET);
-  assert.ok(reviewOwn > 42000 && t1Own < 1000);
+  const [reviewSize, reviewOwn] = finding('review0');
+  assert.ok(reviewSize > TASK_PACKET_BUDGET && reviewOwn > 42000);
   assert.ok(lines.some(line => /^FORJA plan refused: the develop packet of .*review0 \(\d{2},\d{3} characters; own entry 42,\d{3}\).* exceeds the planning budget of 40,000 characters/.test(line)));
   // The re-plan is a counted session; the compliant tasks are stored and run.
   assert.deepEqual(run.tasks.map(x => x.id), ['T1']);
@@ -96,7 +95,7 @@ test('the automatic re-plan counts against the session budget', async (t) => {
 test('two oversized plans block with plan_packet, store no task and resume plans again with the sizes', async (t) => {
   const root = repo(t);
   createRun(root, { goal: 'Review scenarios', provider: 'custom' });
-  const big = () => ({ decisions: [], tasks: [task({ id: 'small' }), oversized()] });
+  const big = () => ({ decisions: [], tasks: [task({ id: 'small' }), oversized(), { ...oversized(), id: 'review1' }] });
   const p = planner([big(), big(), big()]);
   const blocked = await drive(root, { log: () => {}, providerCall: p.providerCall });
   assert.equal(p.plans().length, 2, 'no third planner call');
@@ -105,13 +104,15 @@ test('two oversized plans block with plan_packet, store no task and resume plans
   assert.equal(blocked.stopCode, 'plan_packet');
   assert.deepEqual(blocked.tasks, []);
   assert.equal(blocked.invocations, 2);
-  assert.match(blocked.failure, /^Plan refused again: the develop packet of (small|review0) \(\d{2},\d{3} characters; own entry [\d,]+\), (small|review0) \(\d{2},\d{3} characters; own entry [\d,]+\) exceeds the planning budget of 40,000 characters \(limit 48,000\)/);
+  assert.match(blocked.failure, /^Plan refused again: the develop packet of (review0|review1) \(\d{2},\d{3} characters; own entry [\d,]+\), (review0|review1) \(\d{2},\d{3} characters; own entry [\d,]+\) exceeds the planning budget of 40,000 characters \(limit 48,000\)/);
   assert.match(blocked.failure, /review0 \(\d{2},\d{3} characters; own entry 42,\d{3}\)/);
   const info = recoveryInfo(blocked);
   assert.equal(info.code, 'plan_packet');
   assert.match(info.guidance, /core resume plans again/);
   assert.match(info.guidance, /Measured: .*task review0: \d{2},\d{3} characters \(own entry 42,\d{3}\)/);
-  assert.match(info.guidance, /task small: \d{2},\d{3} characters \(own entry \d{3}\)/);
+  assert.match(info.guidance, /task review1: \d{2},\d{3} characters \(own entry 42,\d{3}\)/);
+  // small shares a file with both, but their criteria are capped in its scope.
+  assert.doesNotMatch(info.guidance, /task small:/);
   assert.match(info.guidance, /; planning budget 40,000 characters, limit 48,000 characters\.$/);
   // Status reports the same named guidance.
   const status = spawnSync(process.execPath, [resolve('bin/forja.mjs'), 'core', 'status', '--project', root], { encoding: 'utf8', windowsHide: true, timeout: 20000 });
@@ -154,15 +155,15 @@ test('a stop requested during an oversized plan launches no re-plan and resume k
 
 test('a develop-time packet overflow names the task, its size and the limit and spends no attempt', async (t) => {
   const root = repo(t);
-  // T2's remaining criteria enter T1's task scope and overflow T1's develop packet.
+  // T1's own criteria are mandatory: trimming optional context cannot make them fit.
   const criteria = ['x', 'y', 'z', 'w', 'v', 'u', 't'].map(c => c.repeat(7000));
-  createRun(root, { goal: 'Oversized scope', provider: 'custom', plan: { decisions: [], tasks: [task(), task({ id: 'T2', after: ['T1'], criteria })] } });
+  createRun(root, { goal: 'Oversized task', provider: 'custom', plan: { decisions: [], tasks: [task({ criteria }), task({ id: 'T2', after: ['T1'] })] } });
   let calls = 0;
   const run = await drive(root, { log: () => {}, providerCall: async () => { calls++; return stopAtDevelop; } });
   assert.equal(calls, 0);
   assert.equal(run.status, 'blocked');
   assert.equal(run.stopCode, 'task_packet');
-  assert.match(run.failure, /^Task packet for T1 \(develop\) has \d{2},\d{3} characters, over the limit of 48,000 characters;/);
+  assert.match(run.failure, /^Task packet for T1 \(develop\) has \d{2},\d{3} characters, over the limit of 48,000 characters after trimming optional context \(task_scope\.remaining_tasks criteria, repository_map\); its mandatory parts alone exceed the limit/);
   assert.match(run.failure, /No session or implementation attempt was spent/);
   assert.deepEqual([run.tasks[0].status, run.tasks[0].attempts, run.invocations], ['todo', 0, 0]);
   const size = /has (\d{2},\d{3}) characters/.exec(run.failure)[1];

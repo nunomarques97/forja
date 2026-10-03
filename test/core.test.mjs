@@ -166,7 +166,11 @@ test('scope retains integration gates on repair and stays within the packet budg
   assert.deepEqual(planning.final_checks, r.config.finalChecks);
   b.status = 'todo';
   b.criteria = ['x'.repeat(48000)];
-  assert.throws(() => packet({ root: p, run: r, task: a, phase: 'develop' }), /48,000/);
+  // Another task's criteria are capped in task_scope; the task's own are mandatory.
+  const bounded = packet({ root: p, run: r, task: a, phase: 'develop' });
+  assert.ok(bounded.characters < 48000);
+  assert.ok(JSON.parse(bounded.text).task_scope.remaining_tasks[0].criteria_truncated);
+  assert.throws(() => packet({ root: p, run: r, task: b, phase: 'develop' }), /48,000/);
 });
 
 test('mixed routing keeps local development and independent native review in the ledger', async () => {
@@ -1148,9 +1152,9 @@ test('guard recovery checks run identity and running status under the project lo
 
 test('a refusal before launch spends no implementation attempt, however often it is resumed', async () => {
   const p = repo();
-  // T2's remaining criteria enter T1's task scope and overflow the develop packet.
+  // T1's own criteria are mandatory and overflow the develop packet.
   const big = ['x', 'y', 'z', 'w', 'v', 'u', 't'].map(c => c.repeat(7000));
-  createRun(p, { goal: 'Oversized scope', provider: 'custom', plan: { decisions: [], tasks: [task(), { ...task(), id: 'T2', after: ['T1'], criteria: big }] } });
+  createRun(p, { goal: 'Oversized task', provider: 'custom', plan: { decisions: [], tasks: [{ ...task(), criteria: big }, { ...task(), id: 'T2', after: ['T1'] }] } });
   let calls = 0;
   let r;
   for (let i = 0; i < 3; i++) {
