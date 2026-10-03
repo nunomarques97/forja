@@ -255,6 +255,12 @@ node $forja start --provider claude --goal-file objetivo.md --provider-retries 0
 node $forja core resume --max-minutes 60 --why "Suite longa; subir o timeout por chamada"
 ```
 
+### Processos deixados por uma sessão
+
+Quando um processo lançado pelo controlador termina (fim normal, timeout, paragem por contexto, limite de saída ou interrupção), o controlador termina o que ficou da árvore de processos que ele próprio lançou. Em Linux e macOS é o grupo de processos da sessão; um processo que saiu do grupo de propósito (`setsid`) não é seguido. Em Windows, enquanto o processo lançado vive, o timeout continua a usar `taskkill /T /F` do seu PID; durante a sessão, um `powershell.exe` regista os descendentes (PID, PID do pai e hora de criação, por CIM `Win32_Process`, a cada 3 segundos por omissão), e no fim são terminados também os órfãos cujo pai já saiu. Só é terminado um processo provado descendente do PID lançado, com PID e hora de criação coincidentes: um processo conta como filho apenas se foi criado antes do início da última leitura que ainda mostrava o pai vivo, por isso um PID reutilizado (mesmo por um processo que já saiu), um processo criado antes do pai ou um processo que o controlador não lançou nunca é tocado. Um descendente que nasce e cujo pai sai entre duas leituras pode não ser registado. Se o `powershell.exe` de leitura terminar antes da limpeza (por exemplo com o Ctrl+C do operador, que chega a todos os processos da consola), a limpeza lança um único substituto, que só acrescenta o que as suas próprias leituras provam.
+
+Os processos ainda vivos depois da terminação e de um curto período de espera (até duas rondas) são reportados com o PID: no ledger (`process_cleanup` com `method`, `terminated`, `survivors` e `error`), em `core status` (`process_cleanup`, com a invocação, fase e tarefa do último relatório com sobreviventes ou erro) e no motivo de paragem de uma falha do provider. Uma falha a ler ou a terminar processos nunca esconde o resultado da sessão; fica em `error`, com os últimos descendentes conhecidos em `survivors`. Termina esses PIDs à mão se já não forem precisos.
+
 ### Parar o controlador de forma limpa
 
 Para terminar a sessão sem matar o worker nem transformar a paragem numa falha do provider, pede a paragem noutro terminal, na raiz do projeto:
