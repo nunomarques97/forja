@@ -921,8 +921,9 @@ const coreUsage = `FORJA core (docs/CORE-RUNBOOK.md)
     (replace the checks of an unfinished task, for example one that writes project files, with read-only checks: a UTF-8 JSON array of {"command","args"}; validated like a new plan; final checks stay; old and new checks go to recovery.jsonl)
   core abandon --why "..."
   core stop [--after-task]  (asks the running controller to stop at the next invocation boundary, or after the current task; never kills a live worker; core resume continues)
-  Budgets: --max-sessions 30 --max-cloud-sessions N --max-attempts 2 --max-minutes 30 --max-rotations 2 --max-context-tokens 120000 --provider-retries 1
+  Budgets: --max-sessions 30 --max-cloud-sessions N --max-attempts 2 --max-minutes 30 --max-rotations 2 --max-context-tokens 120000 --provider-retries 1 --check-timeout-minutes N
     (--provider-retries 0|1: automatic fresh develop sessions per implementation attempt after a provider output-budget failure; 0 blocks at once)
+    (--check-timeout-minutes 1..180: per-check timeout; default the smaller of --max-minutes and 10; a check killed by it blocks with check_timeout, spends no attempt, and core resume --check-timeout-minutes N runs the checks again)
   --help or -h on start and any core command prints this text and changes nothing. start, resume, retry, abandon, stop, deliver, decide and init refuse unknown flags and extra arguments before any effect.
 
 Observability: serve, then /core; guard supports Core and legacy runs.`;
