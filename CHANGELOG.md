@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.20.1 — Privacy scan without URL false positives
 
 - Stop the privacy scanner's personal home path rule from flagging URL and route segments, which blocked Core task delivery for REST paths such as the Google Calendar v3 `users/me/calendarList` pathname, Microsoft Graph and GitHub `users` endpoints, and `home` web routes. Home paths are now detected only as filesystem paths: the Windows drive form stays case-insensitive and also matches JSON-escaped backslashes; the macOS `Users` form (capital U) and the Linux `home` form must start a path (start of text, whitespace, a quote, backtick, `=`, `(`, `:` or `file://`) and have a username followed by a separator. Credential, private key and conversation export detection are unchanged (#26).
 
