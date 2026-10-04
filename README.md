@@ -7,7 +7,7 @@
 <p align="center">A small controller that turns a goal into code changes, executed checks and an independent review.<br>Claude Code and Codex do the engineering. FORJA owns the state, the limits and the definition of done.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.21.0"><img src="https://img.shields.io/badge/version-0.21.0-ff9955" alt="Version 0.21.0"></a>
+  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.21.1"><img src="https://img.shields.io/badge/version-0.21.1-ff9955" alt="Version 0.21.1"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>

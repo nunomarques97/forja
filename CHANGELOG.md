@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.21.1 — Delivery: binary files no longer count toward the 4 MiB review limit
+
+- `prepareDelivery()` and `prepareTaskDelivery()` in `lib/core/delivery.mjs` built the review patch with `git diff --binary`, so screenshots and other binary assets were included as base85 literals and a small code change with UI evidence blocked with `Delivery diff exceeds the 4 MiB review limit.` The review patch is now built without `--binary` (and with `--no-renames`): each binary file is one `Binary files ... differ` line, and the 4 MiB limit applies to the text. Text over 4 MiB still blocks. Fixes #34.
+- The delivery manifest and receipt list every binary in the candidate under `binaries` with its path, change (added, modified or deleted), byte size and SHA-256, never its bytes. The approval stays bound to the exact tree, which includes the blob ids, so changing a binary after review voids it. The reviewer framing (run and task granularity) explains this representation.
+- New optional `delivery.maxBinaryBytes` (positive integer, 32 MiB by default) caps the total bytes of added and modified binaries per delivery candidate. Going over blocks before review with a message naming the limit and the largest files.
+- The privacy scan is unchanged and still runs on every file, binaries included. docs/CONTROLLER-DELIVERY.md and docs/CORE-RUNBOOK.md describe the text limit, the binary listing and the cap. New test/delivery-binary.test.mjs covers both granularities.
+
 ## 0.21.0 — Kilo CLI provider
 
 - New Core provider `kilo` (`start --provider kilo`, `core doctor --provider kilo`, `provider: "kilo"` in routes): each phase runs through `kilo run --format json` with explicit gateway models, an isolated Kilo configuration (empty config home, no project configuration, autoupdate, sharing and session ingest disabled, undo snapshots off) and a per-phase deny-by-default permission list. The final JSON result is recovered after prose, closing messages or Windows paths; step usage, cost and request context are recorded like Claude's, so the context guard applies. The CLI bundled with a Kilo Code VS Code extension is preferred over the npm shim. Kilo receives the same worker environment as the other providers (process-tree cleanup, `GIT_OPTIONAL_LOCKS=0`, scratch directory).
