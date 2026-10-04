@@ -96,6 +96,7 @@ for (const granularity of ['run', 'task']) {
       assert.equal(result.status === 'done' ? result.delivery.status : result.status, 'blocked');
       const reason = granularity === 'task' ? result.failure : result.delivery.reason;
       assert.match(reason, /Delivery inputs changed during review; approval cannot be applied/);
+      assert.match(reason, /Changed: index\./, 'the block names the changed input (#35)');
       assert.equal(git(f.root, ['rev-parse', 'HEAD']), f.base, 'no commit');
       assert.equal(readFileSync(join(f.root, 'value.mjs'), 'utf8'), 'export const value = 2;\n', 'work is preserved');
     });

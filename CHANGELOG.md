@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.21.2 — Delivery: Git configuration of sibling worktrees no longer voids approvals
+
+Fixes #35 (related #30).
+
+- `lib/core/delivery.mjs` bound delivery approvals to a hash of the whole `git config --list --show-origin`. Worktrees share `.git/config`, so a branch created with tracking in a sibling worktree (`git branch --track`, `git switch -c`/`-C` from a remote ref, `git push -u`, `git worktree add -b`) wrote `branch.<other>.*` entries and blocked the delivery with `Delivery inputs changed during review; approval cannot be applied.` The approval now binds only configuration that can change the created commit, its tree or the authorized push: `user.*`, `author.*`, `committer.*`, `commit.*`, `gpg.*`, `core.*`, `filter.*`, `i18n.*`, `url.*`, the delivery branch's own `branch.<target>.*` (case-sensitive subsection, dotted names supported), `remote.pushDefault`, and `remote.<name>.*` for the target branch's remote and any remote whose URL is the authorized destination. Changing, adding or removing a bound key still blocks in both granularities, during review, before a task or run commit is installed and before a push.
+- Receipts store one digest per bound key, never values. Block messages now name the changed inputs (`HEAD`, `branch`, `source`, `index`, `candidate tree`, `manifest`, `patch`, `Git config <key>`) after the existing wording, without configuration values; credentials in a `url.<base>` key name are masked. Receipts written before 0.21.2 keep the whole-configuration comparison.
+- docs/CONTROLLER-DELIVERY.md and docs/CORE-RUNBOOK.md list the bound keys, the named block message and a note to avoid Git configuration changes in sibling worktrees while a delivery review runs. New test/delivery-config.test.mjs covers sibling worktrees, bound-key changes and legacy receipts in both granularities.
+
 ## 0.21.1 — Delivery: binary files no longer count toward the 4 MiB review limit
 
 - `prepareDelivery()` and `prepareTaskDelivery()` in `lib/core/delivery.mjs` built the review patch with `git diff --binary`, so screenshots and other binary assets were included as base85 literals and a small code change with UI evidence blocked with `Delivery diff exceeds the 4 MiB review limit.` The review patch is now built without `--binary` (and with `--no-renames`): each binary file is one `Binary files ... differ` line, and the 4 MiB limit applies to the text. Text over 4 MiB still blocks. Fixes #34.
