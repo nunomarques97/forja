@@ -326,12 +326,13 @@ test('Core recovery launch uses argv and strips inherited runner/provider sessio
 });
 
 test('Core viewer uses existing authentication and refuses legacy launch on a Core project', async (t) => {
+  const spawned = [];
   const f = fixture(t),
     server = startServer({
       dataDir: f.data,
       port: 0,
       noWatchdog: true,
-      spawnRunner: () => ({ pid: 123 }),
+      spawnRunner: (...args) => (spawned.push(args), { pid: 123 }),
     });
   await once(server.server, 'listening');
   try {
@@ -364,16 +365,17 @@ test('Core viewer uses existing authentication and refuses legacy launch on a Co
       unknown: 0,
       tasks_without_records: 0,
     });
-    assert.equal(
-      (
-        await fetch(base + '/runs', {
-          method: 'POST',
-          headers: { ...headers, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ project: 'Project', resume: true }),
-        })
-      ).status,
-      409,
-    );
+    // The phone run launcher is gone: a resume request on a Core project, and
+    // later on one whose legacy RUN.json says running, gets 410 and starts nothing.
+    const relaunch = () =>
+      fetch(base + '/runs', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project: 'Project', resume: true }),
+      });
+    const refused = await relaunch();
+    assert.equal(refused.status, 410);
+    assert.match((await refused.json()).error, /forja core resume/);
     f.state.status = 'done';
     f.save();
     mkdirSync(join(f.project, 'docs/forja'), { recursive: true });
@@ -385,13 +387,10 @@ test('Core viewer uses existing authentication and refuses legacy launch on a Co
         driver: 'runner',
       }),
     );
-    const resumed = await fetch(base + '/runs', {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project: 'Project', resume: true }),
-    });
-    assert.equal(resumed.status, 200);
-    assert.equal((await resumed.json()).action, 'resume');
+    const again = await relaunch();
+    assert.equal(again.status, 410);
+    assert.equal((await again.json()).ok, false);
+    assert.equal(spawned.length, 0, 'no process is started');
   } finally {
     unwatchFile(join(f.data, 'events.jsonl'));
     await new Promise((resolve) => server.server.close(resolve));

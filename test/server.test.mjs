@@ -142,14 +142,14 @@ describe('página de entrada e POST /login', () => {
   // deixava à porta o Sponsor com o token certo. O token é a própria prova: uma
   // submissão forjada de outro sítio não ganha nada, porque quem consegue enviar
   // o token já o tem.
-  test('POST /login como o browser real o envia (Origin: null, sem Referer) → 302 + cookie; /runs continua a recusar Origin: null', async () => {
+  test('POST /login como o browser real o envia (Origin: null, sem Referer) → 302 + cookie; /api/core/decision continua a recusar Origin: null', async () => {
     const r = await form({ k: token, next: '/m' }, { Origin: 'null' });
     assert.equal(r.status, 302, 'o formulário da própria página tem de deixar entrar');
     assert.equal(r.headers.location, '/m');
     const cookie = r.headers['set-cookie'][0].split(';')[0];
     assert.equal((await http('/state', { headers: { Cookie: cookie } })).status, 200, 'o cookie que ele devolve serve mesmo');
-    const runs = await http('/runs', { method: 'POST', headers: { Origin: 'null', 'Content-Type': 'application/json', Cookie: cookie }, body: '{}' });
-    assert.equal(runs.status, 403, 'a rota que lança processos mantém o 403 a Origin: null');
+    const decision = await http('/api/core/decision', { method: 'POST', headers: { Origin: 'null', 'Content-Type': 'application/json', Cookie: cookie }, body: '{}' });
+    assert.equal(decision.status, 403, 'a rota que pode retomar um run Core mantém o 403 a Origin: null');
   });
 });
 
@@ -273,7 +273,7 @@ describe('state and records', () => {
 });
 
 describe('a body split across chunks', () => {
-  // Same hazard as POST /runs: over the tunnel the body arrives in several TCP
+  // Same hazard as POST /api/core/decision: over the tunnel the body arrives in several TCP
   // segments and a boundary can fall inside a multibyte character. Decoding each
   // chunk on its own would store two U+FFFD instead of the character.
   test('POST /answers keeps an accented answer intact when the cut is inside a «ç»', async () => {

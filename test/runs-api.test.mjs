@@ -1,19 +1,19 @@
-// viewer/runs-api.mjs + lib/projects.mjs against a temp data dir: the registry,
-// GET /projects (shape, liveness from a real lock with a live/dead owner) and
-// POST /runs (validation, the three 409s, the 30 s throttle, the exact argv and
-// cwd of the launch). The server runs in-process with a fake spawnRunner, so no
-// real runner is ever started; the data dir is a tmpdir (never data/).
+// viewer/runs-api.mjs + lib/projects.mjs against a temp data dir: the registry
+// (liveness from a real lock with a live/dead owner), the 410 of the retired
+// phone launcher (GET /projects, POST /runs) and the request helpers Core still
+// uses (readBody, crossSite). The server runs in-process with a fake spawnRunner
+// that must never be called; the data dir is a tmpdir (never data/).
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { once } from 'node:events';
+import { EventEmitter, once } from 'node:events';
 import { request } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unwatchFile, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer } from '../viewer/server.mjs';
-import { MAX_BODY } from '../viewer/runs-api.mjs';
+import { MAX_BODY, crossSite, readBody } from '../viewer/runs-api.mjs';
 import { acquireLock, lockPath, ownerAlive, releaseLock } from '../lib/runner.mjs';
 import { ALIVE_TTL_MS, listProjectsWithStatus, loadProjects, missingProjects, ownerAliveAsync, ownerAliveCached, projectsPath, pruneProjects, readProjects, removeProject, resetAliveCache, safeName, upsertProject } from '../lib/projects.mjs';
 
@@ -140,7 +140,7 @@ describe('an unreadable projects.json is left alone', () => {
   let original;
   before(() => { original = readFileSync(file, 'utf8'); });
   after(() => writeFileSync(file, original));
-  test('readers report it, writers refuse, the file stays byte for byte the same, both endpoints answer 500', async () => {
+  test('readers report it, writers refuse, the file stays byte for byte the same, the retired endpoints do not read it', async () => {
     writeFileSync(file, garbage);
     const reg = loadProjects(dataDir);
     assert.equal(reg.corrupt, true);
@@ -150,12 +150,9 @@ describe('an unreadable projects.json is left alone', () => {
     assert.throws(() => upsertProject({ path: alpha }, dataDir), /ilegível/, 'bootstrap does not rewrite it');
     assert.throws(() => removeProject('alpha', dataDir), /ilegível/);
     assert.equal(readFileSync(file, 'utf8'), garbage, 'the file was not touched');
-    const list = await http('/projects');
-    assert.equal(list.status, 500);
-    assert.match(list.json.error, /ilegível/);
-    assert.ok(!list.body.includes(root), 'the error carries no path');
-    const run = await post({ project: 'alpha', goal: 'arrancar com o registo partido' });
-    assert.equal(run.status, 500, 'a corrupt registry is not "projeto desconhecido"');
+    assert.equal((await http('/projects')).status, 410);
+    assert.equal((await post({ project: 'alpha', goal: 'arrancar com o registo partido' })).status, 410);
+    assert.equal(readFileSync(file, 'utf8'), garbage, 'the 410s did not touch it either');
     assert.equal(spawned.length, 0, 'nothing was launched');
   });
   test('no registry at all is not corruption: it is an empty list', () => {
@@ -164,316 +161,99 @@ describe('an unreadable projects.json is left alone', () => {
   });
 });
 
-describe('GET /projects', () => {
-  test('401 without the token, and nothing about the projects leaks', async () => {
-    const r = await http('/projects', { auth: false });
-    assert.equal(r.status, 401);
-    assert.ok(!/alpha|beta/.test(r.body), 'the 401 page says nothing about the registry');
-  });
-  test('every project with its run summary and liveness; no-store; unknown method → 405', async () => {
-    const r = await http('/projects');
-    assert.equal(r.status, 200);
+// The phone run launcher is retired (docs/LEGACY-REMOVAL.md): both routes answer
+// 410 Gone with a pointer to the terminal, whatever the method, body or project,
+// and never read the registry, read the body or start a process.
+describe('the retired phone run launcher', () => {
+  const spawnLog = join(dataDir, 'runner', 'spawn.log');
+  const assertGone = (r, label) => {
+    assert.equal(r.status, 410, `${label}: ${r.body}`);
     assert.equal(r.headers['content-type'], 'application/json; charset=utf-8');
     assert.equal(r.headers['cache-control'], 'no-store');
-    assert.equal(r.json.ok, true);
-    assert.deepEqual(r.json.projects.map(p => p.name), ['alpha', 'beta', 'delta', 'gama']);
-    const byName = Object.fromEntries(r.json.projects.map(p => [p.name, p]));
-    assert.equal(byName.alpha.run, null, 'a project that never ran has no run');
-    assert.equal(byName.alpha.runnerAlive, false);
-    // `visible` entrou no resumo com a guarda dos runners (lib/guard.mjs, §12):
-    // um run relançado tem de ser relançado no modo em que arrancou.
-    // `driver` (§3c): beta's RUN.json predates the field and its lock names no
-    // run_id — a live lock of a run we cannot name is not evidence, so the
-    // driver is shown as unknown, never guessed.
-    assert.deepEqual(byName.beta.run, {
-      run_id: 'R-20260916-aaaa', status: 'running', goal: 'continuar o que ficou a meio', started_at: '2026-09-16T10:00:00.000Z', visible: false,
-      driver: 'unknown', driver_source: 'sem evidência (run anterior ao campo: nenhum registo do runner com este run_id)', driver_request: null,
-    });
-    assert.equal(byName.beta.runnerAlive, true);
-    assert.equal(byName.gama.run.status, 'finished');
-    assert.equal(byName.gama.runnerAlive, false);
-    assert.match(byName.alpha.bootstrappedAt, /^\d{4}-\d{2}-\d{2}T/);
-    assert.deepEqual(Object.keys(byName.alpha).sort(), ['bootstrappedAt', 'name', 'run', 'runnerAlive'], 'sem `path`: o telemóvel identifica um projeto pelo nome e mais nada');
-    assert.ok(!r.body.includes(root.replace(/\\/g, '\\\\')) && !r.body.includes(root), 'nenhum caminho do PC atravessa o túnel');
-    assert.equal((await http('/projects', { method: 'POST', body: '{}' })).status, 405);
-  });
-  test('cached project status remains available while liveness refreshes are unresolved', async () => {
-    resetAliveCache();
-    const staleAt = Date.now() - ALIVE_TTL_MS - 1;
-    ownerAliveCached(decoy.pid, staleAt, () => true);
-    ownerAliveCached(deadPid, staleAt, () => false);
-    const completions = [];
-    const refresh = pid => new Promise(resolve => completions.push(() => resolve(pid === decoy.pid)));
-    try {
-      const projects = listProjectsWithStatus(dataDir, Date.now(), () => assert.fail('cached status must not repeat a blocking check'), refresh);
-      assert.equal(projects.find(p => p.name === 'beta').runnerAlive, true);
-      await Promise.resolve();
-      assert.equal(completions.length, 2, 'both background refreshes started and neither has resolved');
-      const r = await http('/projects');
-      assert.equal(r.status, 200);
-      assert.equal(r.json.projects.find(p => p.name === 'beta').runnerAlive, true);
-      assert.equal(r.json.projects.find(p => p.name === 'gama').runnerAlive, false);
-    } finally {
-      for (const complete of completions) complete();
-      await Promise.resolve();
-    }
-  });
-});
-
-describe('POST /runs — refusals', () => {
-  test('401 without the token', async () => {
+    assert.equal(r.json.ok, false);
+    assert.match(r.json.error, /forja start/);
+    assert.match(r.json.error, /forja core resume/);
+    assert.equal(r.json.start, 'forja start --goal "..."');
+    assert.equal(r.json.resume, 'forja core resume');
+    assert.equal(r.json.monitor, '/core');
+    assert.ok(!/alpha|beta|gama|delta/.test(r.body), `${label}: no project leaks`);
+    assert.ok(!r.body.includes(root) && !r.body.includes(root.replace(/\\/g, '\\\\')), `${label}: no path leaks`);
+  };
+  test('401 without the token, before the 410', async () => {
+    assert.equal((await http('/projects', { auth: false })).status, 401);
     assert.equal((await post({ project: 'alpha', goal: 'arrancar o run de teste' }, { auth: false })).status, 401);
   });
-  test('400: bad json, not an object, no project, short goal, long goal, control characters, body over 4 KB', async () => {
-    assert.equal((await post('{nope')).status, 400);
-    assert.equal((await post('null')).status, 400);
-    assert.equal((await post([1, 2])).status, 400);
-    assert.equal((await post({ goal: 'sem projeto nenhum' })).status, 400);
-    const short = await post({ project: 'alpha', goal: '  curto  ' });
-    assert.equal(short.status, 400);
-    assert.match(short.json.error, /10 caracteres/);
-    const long = await post({ project: 'alpha', goal: 'a'.repeat(601) });
-    assert.equal(long.status, 400);
-    assert.match(long.json.error, /600/);
-    const ctrl = await post({ project: 'alpha', goal: 'arrancar o run com sino' });
-    assert.equal(ctrl.status, 400);
-    assert.match(ctrl.json.error, /controlo/);
-    // Invisible formatting: a goal that reads clean in the queue but carries a
-    // zero-width or bidi mark would put something else in argv and in RUN.json.
-    for (const cp of [0x00ad, 0x061c, 0x180e, 0x200b, 0x200e, 0x202e, 0x2065, 0x2066, 0xfeff, 0xe0001, 0xe0041, 0xe007f]) {
-      const hidden = await post({ project: 'alpha', goal: `limpar a${String.fromCodePoint(cp)}configuração antiga` });
-      assert.equal(hidden.status, 400, `U+${cp.toString(16).toUpperCase().padStart(4, '0')} devia ser recusado`);
-      assert.match(hidden.json.error, /controlo ou invisíveis/);
-    }
-    // `--max-sessions 999` as a goal must not reach argv as a flag: one argv
-    // element either way, but the CLI would read it as a flag and lose the goal.
-    const dash = await post({ project: 'alpha', goal: '--max-sessions 999 e mais texto' });
-    assert.equal(dash.status, 400);
-    assert.match(dash.json.error, /começar por/);
-    assert.equal((await post({ project: 'alpha', goal: 'x'.repeat(8000) })).status, 400, 'body over 4 KB');
-    assert.equal(spawned.length, 0, 'nothing was launched by a bad request');
-    assert.equal((await http('/health')).status, 200, 'server still up after hostile input');
+  test('GET /projects answers 410 and lists nothing', async () => {
+    assertGone(await http('/projects'), 'GET /projects');
+    assertGone(await http('/projects?x=1'), 'GET /projects with a query');
+    assertGone(await http('/projects', { method: 'POST', body: '{}' }), 'POST /projects');
   });
-  test('404 for a project that is not in the registry (and a path is never accepted)', async () => {
-    const r = await post({ project: 'desconhecido', goal: 'arrancar um run qualquer' });
-    assert.equal(r.status, 404);
-    assert.deepEqual(r.json, { error: 'projeto desconhecido' });
-    const byPath = await post({ project: alpha, path: alpha, goal: 'arrancar pelo caminho absoluto' });
-    assert.equal(byPath.status, 404, 'a path in the body is not a project');
-    assert.ok(!byPath.body.includes(root), 'the error never echoes a path');
-    assert.equal(spawned.length, 0);
+  test('POST /runs answers 410 for a start, a resume and a malformed body, and launches nothing', async () => {
+    assertGone(await post({ project: 'alpha', goal: 'arrancar o run de teste' }), 'start');
+    assertGone(await post({ project: 'delta', resume: true }), 'resume of a runner-driven run');
+    assertGone(await post('{nope'), 'bad JSON');
+    assertGone(await post({ project: 'alpha', goal: 'x'.repeat(MAX_BODY * 2) }), 'body over the cap');
+    assertGone(await post({ project: 'alpha', goal: 'arrancar de outra origem' }, { headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' } }), 'cross-site');
+    assertGone(await http('/runs'), 'GET /runs');
+    assertGone(await http('/runs', { method: 'PUT', body: '{}' }), 'PUT /runs');
+    assert.equal(spawned.length, 0, 'no process was started');
+    assert.ok(!existsSync(spawnLog), 'no launch was logged');
   });
-  test('409: a live runner, a run already in progress, and resume with no run to resume', async () => {
-    const live = await post({ project: 'beta', goal: 'arrancar por cima de um runner vivo' });
-    assert.equal(live.status, 409);
-    assert.deepEqual(live.json, { error: 'já há um runner vivo neste projeto' });
-    assert.equal((await post({ project: 'beta', resume: true })).status, 409, 'resume is refused too while the runner is alive');
-    const running = await post({ project: 'delta', goal: 'arrancar um segundo run no mesmo projeto' });
-    assert.equal(running.status, 409);
-    assert.deepEqual(running.json, { error: 'há um run em curso — relança-o em vez de arrancar outro' });
-    const noRun = await post({ project: 'alpha', resume: true });
-    assert.equal(noRun.status, 409);
-    assert.deepEqual(noRun.json, { error: 'não há run em curso para relançar' });
-    assert.equal(spawned.length, 0);
-  });
-  test('403 for a cross-site POST (the token cookie alone must not be enough to launch a process)', async () => {
-    const r = await post({ project: 'alpha', goal: 'arrancar a partir de outro site' }, { headers: { Origin: 'https://evil.example', 'Content-Type': 'application/json' } });
-    assert.equal(r.status, 403);
-    // `Origin: null` is what a sandboxed iframe or a redirected cross-origin post
-    // sends; no page of this viewer ever produces it. Absent Origin still passes
-    // (curl and the tests above have none).
-    const nul = await post({ project: 'alpha', goal: 'arrancar a partir de uma iframe' }, { headers: { Origin: 'null', 'Content-Type': 'application/json' } });
-    assert.equal(nul.status, 403);
-    assert.deepEqual(nul.json, { error: 'pedido de outra origem' });
-    assert.equal(spawned.length, 0);
+  test('the server keeps answering after a 410 that never read the body', async () => {
+    assertGone(await post({ project: 'beta', goal: 'a'.repeat(3000) }), 'large body');
+    assert.equal((await http('/api/core')).status, 200, 'the next request is answered');
   });
 });
 
-describe('POST /runs — launches', () => {
-  test('start: 200 with the pid, the runner argv carries the goal as one argument, cwd is the project folder', async () => {
-    const goal = 'acrescentar a página de definições ao viewer';
-    const r = await post({ project: 'alpha', goal }, { headers: { Origin: `http://127.0.0.1:${port}`, 'Content-Type': 'application/json' } });
-    assert.equal(r.status, 200);
-    assert.equal(r.headers['cache-control'], 'no-store');
-    assert.deepEqual(r.json, { ok: true, action: 'start', project: 'alpha', pid: 4243 });
-    assert.equal(spawned.length, 1);
-    const call = spawned[0];
-    assert.equal(call.command, process.execPath);
-    assert.deepEqual(call.args, [join(forja, 'bin', 'forja.mjs'), 'runner', '--goal', goal]);
-    assert.equal(call.options.cwd, alpha);
-    assert.equal(call.options.env.FORJA_DATA_DIR, dataDir);
-    assert.equal(call.options.env.CLAUDE_CODE_SESSION_ID, undefined, 'the viewer session never leaks into the run');
-    assert.equal(call.options.env.FORJA_PROJECT_ROOT, undefined);
-    assert.match(call.options.logPath, /runner[\\/]spawn-alpha-/);
+// readBody is still the body reader of POST /api/core/decision (viewer/core-api.mjs):
+// a body split across chunks is decoded once, and the cap counts bytes.
+describe('readBody', () => {
+  const fakeReq = () => {
+    const req = new EventEmitter();
+    req.destroy = () => { req.destroyed = true; };
+    return req;
+  };
+  const fakeRes = () => {
+    const res = { status: null, body: null };
+    res.writeHead = status => { res.status = status; };
+    res.end = body => { res.body = body; };
+    return res;
+  };
+  test('a character cut in half between two chunks arrives whole', () => {
+    const text = JSON.stringify({ choice: 'começar a limpeza da configuração' });
+    const buf = Buffer.from(text, 'utf8');
+    const cut = buf.indexOf(Buffer.from('ç', 'utf8')) + 1;
+    const req = fakeReq(); const res = fakeRes(); let got = null;
+    readBody(req, res, body => { got = body; });
+    req.emit('data', buf.subarray(0, cut)); req.emit('data', buf.subarray(cut)); req.emit('end');
+    assert.equal(got, text);
+    assert.ok(!got.includes('�'), 'no broken character');
+    assert.equal(res.status, null, 'the reader answered nothing');
   });
-  test('the launch is logged as status only — project, action, pid, goal length, never the goal text', () => {
-    const log = readFileSync(join(dataDir, 'runner', 'spawn.log'), 'utf8');
-    assert.match(log, /project=alpha action=start pid=4243 goal_chars=44 via=viewer/);
-    assert.ok(!/página de definições/.test(log), 'the goal text is never written to the log');
-  });
-  test('a second start for the same project inside 30 s → 409, no second process', async () => {
-    const again = await post({ project: 'alpha', goal: 'arrancar outra vez a correr' });
-    assert.equal(again.status, 409);
-    assert.match(again.json.error, /^espera \d+ s$/);
-    assert.equal(spawned.length, 1, 'no second launch');
-  });
-  test('resume: 200 for a run in progress with no live runner, and the runner gets no --goal', async () => {
-    const r = await post({ project: 'delta', resume: true });
-    assert.equal(r.status, 200);
-    assert.deepEqual(r.json, { ok: true, action: 'resume', project: 'delta', pid: 4244 });
-    const call = spawned[1];
-    assert.deepEqual(call.args, [join(forja, 'bin', 'forja.mjs'), 'runner']);
-    assert.equal(call.options.cwd, delta);
-    assert.match(readFileSync(join(dataDir, 'runner', 'spawn.log'), 'utf8'), /project=delta action=resume pid=4244 goal_chars=0/);
-  });
-  test('a project whose run already finished may start a new one', async () => {
-    const r = await post({ project: 'gama', goal: 'arrancar um run novo no gama' });
-    assert.equal(r.status, 200, 'gama finished its run: a new one may start');
-    assert.equal(spawned.length, 3);
-    assert.deepEqual(spawned[2].args.slice(1), ['runner', '--goal', 'arrancar um run novo no gama']);
+  test('the cap is counted in bytes: MAX_BODY passes, one byte more is a 400 and onDone never runs', () => {
+    const atCap = fakeReq(); let got = null;
+    readBody(atCap, fakeRes(), body => { got = body; });
+    atCap.emit('data', Buffer.from('á'.repeat(MAX_BODY / 2), 'utf8')); atCap.emit('end');
+    assert.equal(Buffer.byteLength(got), MAX_BODY);
+    const over = fakeReq(); const res = fakeRes(); let called = false;
+    readBody(over, res, () => { called = true; });
+    over.emit('data', Buffer.alloc(MAX_BODY, 97)); over.emit('data', Buffer.from('b')); over.emit('end');
+    assert.equal(res.status, 400);
+    assert.match(JSON.parse(res.body).error, /too large/);
+    assert.equal(called, false);
   });
 });
 
-// §3c: the phone never relaunches a run that is not the runner's. A run a
-// conversation conducts, and a run whose driver cannot be proven, are refused
-// before any process exists — even with no live runner and the run "running".
-describe('POST /runs — only a runner-driven run is relaunched (§3c)', () => {
-  before(() => {
-    makeProject('drv-conversa', { ...RUNNING, run_id: 'R-20260916-dddd', driver: 'interactive', driver_since: '2026-09-16T10:00:00.000Z' });
-    makeProject('drv-sem-campo', { ...RUNNING, run_id: 'R-20260916-eeee' });
-    makeProject('drv-invalido', { ...RUNNING, run_id: 'R-20260916-ffff', driver: 'robot' });
-  });
-  test('interactive, unknown (no field, no evidence) and an invalid value → 409, nothing launched', async () => {
-    const before = spawned.length;
-    const eta = await post({ project: 'drv-conversa', resume: true });
-    assert.equal(eta.status, 409);
-    assert.match(eta.json.error, /conversa/);
-    for (const name of ['drv-sem-campo', 'drv-invalido']) {
-      const r = await post({ project: name, resume: true });
-      assert.equal(r.status, 409, name);
-      assert.match(r.json.error, /não sei quem conduz/, name);
-    }
-    assert.equal(spawned.length, before, 'no runner was started');
-  });
-  test('GET /projects shows each driver as it is — never a guess', async () => {
-    const r = await http('/projects');
-    const by = Object.fromEntries(r.json.projects.map(p => [p.name, p]));
-    assert.equal(by['drv-conversa'].run.driver, 'interactive');
-    assert.equal(by['drv-sem-campo'].run.driver, 'unknown');
-    assert.equal(by['drv-invalido'].run.driver, 'unknown');
-    assert.equal(by['drv-invalido'].run.driver_source, 'valor inválido no RUN.json');
-    assert.equal(by.delta.run.driver, 'runner');
-  });
-});
-
-// A registry hand-edited (or written by an older Forja) can hold a name that
-// safeName would have refused; spawn.log must not let it forge a line.
-describe('POST /runs — the log line never trusts the registry name', () => {
-  const nasty = 'omega\nproject=alpha action=start pid=1 goal_chars=0 via=teclado';
-  let original;
-  before(() => {
-    const dir = join(root, 'projects', 'omega');
-    mkdirSync(join(dir, 'docs', 'forja'), { recursive: true });
-    original = readFileSync(projectsPath(dataDir), 'utf8');
-    const reg = JSON.parse(original);
-    reg.projects.push({ name: nasty, path: dir, bootstrappedAt: new Date().toISOString() });
-    writeFileSync(projectsPath(dataDir), JSON.stringify(reg, null, 2));
-  });
-  after(() => writeFileSync(projectsPath(dataDir), original));
-  test('the name in spawn.log goes through safeName: one line, no forged record', async () => {
-    const before = readFileSync(join(dataDir, 'runner', 'spawn.log'), 'utf8').trim().split('\n').length;
-    const r = await post({ project: nasty, goal: 'arrancar com um nome tramado' });
-    assert.equal(r.status, 200, r.body);
-    const lines = readFileSync(join(dataDir, 'runner', 'spawn.log'), 'utf8').trim().split('\n');
-    assert.equal(lines.length, before + 1, 'um arranque, uma linha — o \\n do nome não abriu um registo novo');
-    assert.ok(lines.at(-1).includes('project=omega-project-alpha action-start pid-1 goal_chars-0 via-teclado action=start pid=4'),
-      `linha inesperada: ${lines.at(-1)}`);
-  });
-});
-
-// U+00A0 arrives by accident (phone keyboard, a paste from a document) and
-// reads exactly like a space: refusing the goal over it is a dead end the
-// Sponsor cannot diagnose. It is normalised to a plain space before validation
-// and never reaches argv as U+00A0; every other invisible stays refused.
-describe('POST /runs — o espaço inquebrável é normalizado, não recusado', () => {
-  const teta = join(root, 'projects', 'teta');
-  before(() => {
-    mkdirSync(join(teta, 'docs', 'forja'), { recursive: true });
-    upsertProject({ path: teta }, dataDir);
-  });
-  test('um objetivo com NBSP (e espaços estreito/figura/fino) é aceite e chega ao argv com espaços normais; os outros invisíveis continuam recusados', async () => {
-    const n = spawned.length;
-    const goal = 'arrumar a\u00A0configuração\u202Fantiga\u2009do\u2007viewer';
-    const r = await post({ project: 'teta', goal });
-    assert.equal(r.status, 200, r.body);
-    assert.equal(spawned.length, n + 1, 'o arranque aconteceu mesmo');
-    assert.equal(spawned.at(-1).args.at(-1), 'arrumar a configuração antiga do viewer');
-    assert.ok(!/[\u00A0\u2007\u2009\u202F]/.test(spawned.at(-1).args.at(-1)), 'nenhum espaço invisível chega ao runner');
-    const zw = await post({ project: 'teta', goal: 'arrumar a\u200Bconfiguração antiga do viewer' });
-    assert.equal(zw.status, 400, 'o zero-width continua a ser recusado');
-    assert.match(zw.json.error, /controlo ou invisíveis/);
-  });
-});
-
-// The phone posts over the tunnel: a body past ~1,4 KB arrives in several TCP
-// segments, and a segment boundary can fall inside a multibyte character.
-describe('POST /runs — a body split across chunks', () => {
-  const epsilon = join(root, 'projects', 'epsilon');
-  const zeta = join(root, 'projects', 'zeta');
-  before(() => {
-    for (const p of [epsilon, zeta]) mkdirSync(join(p, 'docs', 'forja'), { recursive: true });
-    upsertProject({ path: epsilon }, dataDir);
-    upsertProject({ path: zeta }, dataDir);
-  });
-  // Two writes with a pause between them, so the server really sees two 'data'
-  // events with the boundary where we put it.
-  const postSplit = (payload, cut) => new Promise((resolve, reject) => {
-    const buf = Buffer.from(typeof payload === 'string' ? payload : JSON.stringify(payload), 'utf8');
-    const at = typeof cut === 'function' ? cut(buf) : cut;
-    const headers = { Host: `127.0.0.1:${port}`, Cookie: `forja_k=${token}`, 'Content-Type': 'application/json', 'Content-Length': buf.length };
-    const req = request({ host: '127.0.0.1', port, path: '/runs', method: 'POST', headers }, resp => {
-      let data = ''; resp.setEncoding('utf8'); resp.on('data', d => { data += d; });
-      resp.on('end', () => resolve({ status: resp.statusCode, body: data, json: (() => { try { return JSON.parse(data); } catch { return null; } })() }));
-    });
-    req.on('error', reject);
-    req.write(buf.subarray(0, at));
-    setTimeout(() => req.end(buf.subarray(at)), 25);
-  });
-  // A cut one byte into a two-byte character: the worst case for a per-chunk decode.
-  const midChar = (buf, ch) => { const i = buf.indexOf(Buffer.from(ch, 'utf8')); assert.ok(i > 0, `${ch} no corpo`); return i + 1; };
-
-  test('a goal cut in half inside a «ç» reaches argv exactly as it was sent', async () => {
-    const goal = 'começar a limpeza da configuração antiga e da documentação';
-    const r = await postSplit({ project: 'epsilon', goal }, buf => midChar(buf, 'ç'));
-    assert.equal(r.status, 200, r.body);
-    const sent = spawned.at(-1).args.at(-1);
-    assert.equal(sent, goal, 'o objetivo chega inteiro ao argv do runner');
-    assert.ok(!sent.includes('�'), 'nenhum caractere partido a meio');
-    assert.equal(spawned.at(-1).options.cwd, epsilon);
-  });
-  test('601 accented characters are refused for length; 600 are accepted, split or not', async () => {
-    const tooLong = await postSplit({ project: 'zeta', goal: 'á'.repeat(601) }, 40);
-    assert.equal(tooLong.status, 400);
-    assert.match(tooLong.json.error, /600/);
-    const before = spawned.length;
-    const goal = 'á'.repeat(600); // 600 caracteres, 1200 bytes: dentro do teto de 4 KB
-    const ok = await postSplit({ project: 'zeta', goal }, buf => midChar(buf, 'á'));
-    assert.equal(ok.status, 200, ok.body);
-    assert.equal(spawned.length, before + 1);
-    assert.equal(spawned.at(-1).args.at(-1), goal, 'os 600 caracteres acentuados chegam inteiros');
-  });
-  test('the 4 KB cap is counted in bytes, not in decoded chunks', async () => {
-    const body = total => { // um corpo JSON de exatamente `total` bytes
-      const empty = JSON.stringify({ project: 'zeta', goal: '' });
-      return JSON.stringify({ project: 'zeta', goal: 'a'.repeat(total - Buffer.byteLength(empty)) });
-    };
-    const atCap = await postSplit(body(MAX_BODY), 100);
-    assert.equal(Buffer.byteLength(body(MAX_BODY)), MAX_BODY);
-    assert.equal(atCap.status, 400);
-    assert.match(atCap.json.error, /600/, 'no limite o corpo é lido: recusado pelo comprimento do objetivo, não pelo tamanho');
-    const over = await postSplit(body(MAX_BODY + 1), 100);
-    assert.equal(over.status, 400);
-    assert.match(over.json.error, /too large/);
+// crossSite stays the Origin check of /login and /api/core/decision.
+describe('crossSite', () => {
+  const req = (origin, host = '127.0.0.1:8787') => ({ headers: { host, ...(origin === undefined ? {} : { origin }) } });
+  test('same origin and no Origin pass; another site, garbage and null are refused; null passes only with allowNull', () => {
+    assert.equal(crossSite(req(undefined)), false);
+    assert.equal(crossSite(req('http://127.0.0.1:8787')), false);
+    assert.equal(crossSite(req('https://evil.example')), true);
+    assert.equal(crossSite(req('not a url')), true);
+    assert.equal(crossSite(req('null')), true);
+    assert.equal(crossSite(req('null'), { allowNull: true }), false);
   });
 });
 
@@ -525,15 +305,10 @@ describe('registo: entradas cuja pasta já não existe', () => {
   before(() => {
     for (const g of [ghost, ghost2]) { mkdirSync(join(g, 'docs', 'forja'), { recursive: true }); upsertProject({ path: g }, dataDir); rmSync(g, { recursive: true, force: true }); }
   });
-  test('readProjects e GET /projects escondem-na, o ficheiro mantém-na, e POST /runs recusa arrancar lá', async () => {
+  test('readProjects esconde-a e o ficheiro mantém-na', () => {
     assert.ok(!readProjects(dataDir).some(p => p.name === 'fantasma'), 'fora dos leitores');
     assert.ok(loadProjects(dataDir).projects.some(p => p.name === 'fantasma'), 'mas continua no ficheiro');
     assert.ok(missingProjects(dataDir).map(p => p.name).includes('fantasma'));
-    const list = JSON.parse((await http('/projects')).body).projects.map(p => p.name);
-    assert.ok(!list.includes('fantasma') && !list.includes('fantasma2'), `a lista do telemóvel não as mostra: ${list.join(',')}`);
-    const r = await post({ project: 'fantasma', goal: 'arrancar numa pasta que já não existe' });
-    assert.equal(r.status, 404);
-    assert.match(r.json.error, /desconhecido/);
   });
   test('pruneProjects tira-as do ficheiro, diz quantas, e é idempotente', () => {
     const { removed, kept } = pruneProjects(dataDir);

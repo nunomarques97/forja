@@ -1,10 +1,10 @@
-// viewer/runs-api.mjs `defaultSpawnRunner` — the seam the "Novo run" button uses
-// to launch `forja runner` from the viewer. Every other test replaces it with a
-// fake, so the real one (detached child, its own log file, `unref`, a command
-// that does not exist) was never exercised. It is here, against a real child
-// process; nothing in the viewer is imported for its side effects and no server
-// is started. This file only imports runs-api.mjs, never edits it.
-// Since T-RUN-2 it also proves the property the whole run depends on: the runner
+// lib/spawn-runner.mjs `defaultSpawnRunner` — the seam the viewer's Core decision
+// resume and the guard use to launch a detached process. Every other test replaces
+// it with a fake, so the real one (detached child, its own log file, `unref`, a
+// command that does not exist) was never exercised. It is here, against a real
+// child process; nothing in the viewer is imported for its side effects and no
+// server is started. This file only imports lib/spawn-runner.mjs, never edits it.
+// Since T-RUN-2 it also proves the property the whole run depends on: the child
 // does not belong to the tree of whoever launched it (Windows).
 import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +12,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { defaultSpawnRunner } from '../viewer/runs-api.mjs';
+import { defaultSpawnRunner } from '../lib/spawn-runner.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'forja-spawn-'));
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -54,7 +54,7 @@ describe('defaultSpawnRunner', () => {
     const parent = join(root, 'parent.mjs');
     const child = `const fs=require('fs');fs.mkdirSync(${JSON.stringify(dir)},{recursive:true});fs.writeFileSync(${JSON.stringify(pidFile)},String(process.pid));setTimeout(()=>{},60000);`;
     writeFileSync(parent, [
-      `import { defaultSpawnRunner } from ${JSON.stringify(new URL('../viewer/runs-api.mjs', import.meta.url).href)};`,
+      `import { defaultSpawnRunner } from ${JSON.stringify(new URL('../lib/spawn-runner.mjs', import.meta.url).href)};`,
       `const { pid } = defaultSpawnRunner(process.execPath, ['-e', ${JSON.stringify(child)}], { logPath: ${JSON.stringify(join(dir, 'spawn.log'))}, env: process.env });`,
       `console.log('pid=' + pid);`,
     ].join('\n'));
@@ -113,7 +113,7 @@ describe('the runner leaves the caller\'s process tree (T-RUN-2)', () => {
     // A stand-in for the viewer: launches the runner through the real seam and
     // stays alive, like a server would.
     writeFileSync(caller, [
-      `import { defaultSpawnRunner } from ${JSON.stringify(new URL('../viewer/runs-api.mjs', import.meta.url).href)};`,
+      `import { defaultSpawnRunner } from ${JSON.stringify(new URL('../lib/spawn-runner.mjs', import.meta.url).href)};`,
       `defaultSpawnRunner(process.execPath, ['-e', ${JSON.stringify(runner)}], { logPath: ${JSON.stringify(join(dir, 'spawn.log'))}, env: process.env });`,
       `setTimeout(function(){}, 60000);`,
     ].join('\n'));

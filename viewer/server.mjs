@@ -494,7 +494,7 @@ export function startServer(opts = {}) {
     // page sends exactly that (Fetch spec) — refusing it would lock out the
     // Sponsor holding the right token. A forged cross-site login wins nothing:
     // whoever can post the token already has the token. Another site's Origin
-    // is still refused, and `/runs` still refuses `null`.
+    // is still refused, and `/api/core/decision` still refuses `null`.
     if (crossSite(req, { allowNull: true })) { res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('pedido de outra origem'); return; }
     const chunks = []; let bytes = 0; let tooBig = false;
     req.on('data', d => {
@@ -517,8 +517,8 @@ export function startServer(opts = {}) {
     });
   }
 
-  // ---------- run API ----------
-  const runsCtx = { dataDir, forjaRoot: repoRoot, spawnRunner: opts.spawnRunner };
+  // ---------- Core decision API ----------
+  const coreCtx = { dataDir, forjaRoot: repoRoot, spawnRunner: opts.spawnRunner };
 
   // ---------- server ----------
   const server = createServer((req, res) => {
@@ -553,9 +553,10 @@ export function startServer(opts = {}) {
       denied(res); return;
     }
 
-    // Run API (viewer/runs-api.mjs): /projects and /runs, authenticated above.
-    if (handleRunsApi(req, res, runsCtx)) return;
-    if (handleCoreDecision(req, res, runsCtx)) return;
+    // The retired phone run launcher (viewer/runs-api.mjs): /projects and /runs
+    // answer 410 with a pointer to the terminal, authenticated above.
+    if (handleRunsApi(req, res)) return;
+    if (handleCoreDecision(req, res, coreCtx)) return;
 
     if (req.method === 'GET' && url.pathname === '/api/core') {
       const snapshot = coreSnapshot(dataDir);

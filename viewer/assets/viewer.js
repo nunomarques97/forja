@@ -737,184 +737,6 @@ export function answerSubmission(form) {
   return { project, id, answer, key: answerKey(project, id) };
 }
 
-// ---------- novo run (bilhete claro: o Sponsor arranca ou relança um run) ----------
-// Contrato do servidor (`viewer/runs-api.mjs`): GET /projects → { ok, projects:
-// [{ name, path, bootstrappedAt, run: { run_id, status, goal, started_at } | null,
-// runnerAlive }] }; POST /runs { project, goal } → 200 { ok, action, project, pid },
-// { project, resume: true } idem; 400/403/404/409/500 → { error }.
-// `path` nunca aparece na página — só `name`.
-//
-// `runnerAlive` é de topo e INDEPENDENTE de `run`: o runner escreve o lock ao
-// arrancar e o RUN.json só existe segundos a minutos depois (é a sessão do Lead
-// que o escreve). Entre os dois há uma janela real de `run: null, runnerAlive:
-// true` — o estado "a arrancar" — em que um arranque novo levaria 409.
-export const NEWRUN_GOAL_MIN = 10;
-export const NEWRUN_GOAL_MAX = 600;
-// Sem escapes unicode no ficheiro: os mesmos caracteres que o servidor recusa
-// (controlo, DEL e os separadores de linha/parágrafo).
-const hasControl = s => {
-  for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); if (c < 32 || c === 127 || c === 8232 || c === 8233) return true; }
-  return false;
-};
-const NEWRUN_WORD = { running: 'run a correr', finished: 'terminado', failed: 'falhou', blocked: 'bloqueado' };
-
-// `busy: true` = um arranque agora levaria 409 do servidor; o botão fica desativado.
-export function projectRunState(p) {
-  const r = p && p.run && typeof p.run === 'object' ? p.run : null;
-  const alive = !!(p && p.runnerAlive);
-  const word = r ? NEWRUN_WORD[r.status] || String(r.status || 'run') : null;
-  // Palavras de estado exatas do DESIGN §Novo run, com vírgula a separar as duas metades.
-  if (alive && !r) return { kind: 'starting', label: 'a arrancar', busy: true };
-  if (alive) return { kind: 'live', label: `${word}, runner vivo`, busy: true };
-  if (!r) return { kind: 'none', label: 'sem run', busy: false };
-  if (r.status === 'running') return { kind: 'stale', label: 'run em curso, runner parado', busy: false };
-  const kind = ['finished', 'failed', 'blocked'].includes(r.status) ? r.status : 'none';
-  return { kind, label: word, busy: false };
-}
-
-export const newRunInit = () => ({ project: null, goal: '', confirmArmed: false, phase: 'idle', error: '', loaded: false, startedProject: null, startedRunId: null, startedGoal: '', startedResume: false, startedAt: null });
-// O selo "run a arrancar" expira ao fim disto sem prova (/projects) de que o
-// runner arrancou ou de um run novo (DESIGN §Novo run + B5): volta ao formulário.
-export const NEWRUN_EXPIRE_MS = 90000;
-export const NEWRUN_EXPIRED_TEXT = 'o runner não arrancou — vê o computador (o motivo fica no registo do runner)';
-
-// Tudo o que a secção precisa de decidir, sem DOM e sem rede.
-export function newRunView(projects, state = {}) {
-  const list = Array.isArray(projects) ? projects : [];
-  const phase = state.phase === 'submitting' || state.phase === 'started' ? state.phase : 'idle';
-  const wanted = phase === 'started' ? state.startedProject || state.project : state.project;
-  const sel = list.find(p => p.name === wanted) || list[0] || null;
-  const info = sel ? projectRunState(sel) : null;
-  const isResume = !!(info && info.kind === 'stale');
-  const busy = !!(info && info.busy);
-  const goal = typeof state.goal === 'string' ? state.goal : '';
-  const trimmed = goal.trim(); // o servidor apara antes de validar: o contador conta o mesmo
-  const len = trimmed.length;
-  const badDash = trimmed.startsWith('-'); // `--goal <texto>`: um "-" à cabeça seria lido como flag
-  const ctl = hasControl(trimmed); // uma textarea aceita Enter e o servidor recusa-o: é preciso dizê-lo
-  const validGoal = len >= NEWRUN_GOAL_MIN && len <= NEWRUN_GOAL_MAX && !badDash && !ctl;
-  const locked = phase !== 'idle';
-  const canSubmit = !!sel && !busy && !locked && (isResume || validGoal);
-  return { list, sel, info, phase, isResume, busy, goal, trimmed, len, badDash, ctl, validGoal, locked, canSubmit, armed: !!state.confirmArmed && canSubmit, loaded: !!state.loaded };
-}
-export const NEWRUN_HINT = 'toca outra vez para arrancar';
-export const NEWRUN_SENT = 'a arrancar · pedido enviado';
-// Runner vivo: não há ação nenhuma a oferecer — diz-se porquê, em palavras.
-const NEWRUN_NOTHING = {
-  starting: 'nada a fazer: o run aparece nesta página assim que o Lead escrever o primeiro evento.',
-  live: 'nada a fazer: já há um run a correr neste projeto.',
-};
-// Um erro do servidor a seco ("espera 24 s") não diz o que falhou: leva sempre o prefixo.
-export const newRunErrText = m => {
-  const t = String(m || '').trim();
-  return !t ? 'não foi possível arrancar — tenta outra vez' : /^não foi possível arrancar/.test(t) ? t : `não foi possível arrancar — ${t}`;
-};
-export const newRunButtonLabel = v => v.phase === 'submitting' ? 'a arrancar…' : v.armed ? 'Confirmar' : v.isResume ? 'Relançar o runner' : 'Arrancar';
-export const newRunCountText = v =>
-  `${v.len}/${NEWRUN_GOAL_MAX}` + (v.badDash ? ' · não pode começar por «-»' : v.ctl ? ' · tudo numa linha, sem quebras' : v.len < NEWRUN_GOAL_MIN ? ` · mínimo ${NEWRUN_GOAL_MIN}` : v.len > NEWRUN_GOAL_MAX ? ' · demasiado longo' : '');
-
-// Máquina de estados do bilhete: idle → submitting → started, e só um /projects
-// posterior que confirme o runner (ou um run novo) a traz de volta a idle.
-export function newRunReducer(state, event) {
-  const s = { ...newRunInit(), ...state };
-  const type = event && event.type;
-  if (type === 'select') return { ...s, project: event.project || null, confirmArmed: false, error: '' };
-  if (type === 'goal') return { ...s, goal: typeof event.goal === 'string' ? event.goal : '', confirmArmed: false, error: '' };
-  if (type === 'tap') {
-    const v = newRunView(event.projects, s);
-    if (!v.canSubmit) return s;
-    if (!s.confirmArmed) return { ...s, confirmArmed: true, error: '' }; // o segundo toque é que arranca
-    return { ...s, confirmArmed: false, phase: 'submitting', error: '' };
-  }
-  if (type === 'sent') return { ...s, phase: 'started', project: event.project || s.project, startedProject: event.project || s.project, startedRunId: event.runId || null, startedGoal: event.resume ? '' : (s.goal || '').trim(), startedResume: !!event.resume, goal: '', confirmArmed: false, error: '', startedAt: typeof event.now === 'number' ? event.now : Date.now() };
-  if (type === 'failed') return { ...s, phase: 'idle', confirmArmed: false, error: newRunErrText(event.error) };
-  // O relógio (chamado de 1 em 1 s no browser): se o bilhete está "started" e
-  // já passou o prazo sem prova, volta a idle com o objetivo mantido no campo.
-  if (type === 'tick') {
-    if (s.phase !== 'started' || s.startedAt == null) return state;
-    const t = typeof event.now === 'number' ? event.now : Date.now();
-    if (t - s.startedAt < NEWRUN_EXPIRE_MS) return state;
-    return { ...s, phase: 'idle', error: NEWRUN_EXPIRED_TEXT, goal: s.startedGoal || '', confirmArmed: false,
-      startedProject: null, startedRunId: null, startedGoal: '', startedResume: false, startedAt: null };
-  }
-  if (type === 'projects') {
-    const next = { ...s, loaded: true };
-    if (s.phase !== 'started') return next;
-    const p = (Array.isArray(event.projects) ? event.projects : []).find(x => x && x.name === s.startedProject);
-    if (!p) return next;
-    // Confirmação = o runner deu sinal de vida (lock) ou já existe um run novo.
-    const newRun = !!(p.run && p.run.run_id && p.run.run_id !== s.startedRunId);
-    if (!p.runnerAlive && !newRun) return next;
-    return { ...next, phase: 'idle', startedProject: null, startedRunId: null, startedGoal: '', startedResume: false, startedAt: null };
-  }
-  return s;
-}
-
-export function renderNewRun(projects, state = {}) {
-  const v = newRunView(projects, state);
-  const { sel, info, list } = v;
-  if (!v.loaded && !list.length) return `<article class="ticket newrun"><div class="k"><span>novo run</span></div><div class="q">Arrancar ou relançar um run</div><div class="only">a carregar os projetos preparados…</div></article>`;
-  // Enquanto o selo está no ecrã, o estado do projeto seria o de ANTES do
-  // arranque ("sem run") e contradiria o selo: diz-se o que já se sabe.
-  const started = p => v.locked && p === (state.startedProject || (sel && sel.name));
-  const options = list.length
-    ? list.map(p => {
-        const label = started(p.name) ? NEWRUN_SENT : projectRunState(p).label;
-        return `<option value="${esc(p.name)}"${sel && sel.name === p.name ? ' selected' : ''}>${esc(p.name)} · ${esc(label)}</option>`;
-      }).join('')
-    : `<option value="">nenhum projeto preparado</option>`;
-  // A palavra de estado vai no seletor E por baixo dele (DESIGN §Novo run): a
-  // caixa do seletor corta o texto, e a palavra não pode depender da largura.
-  const note = !info ? `<div class="only">nenhum projeto foi preparado com <span class="mono">forja bootstrap</span> — só o Sponsor o pode fazer, no terminal.</div>`
-    : `<div class="d state"><b>${esc(started(sel.name) ? NEWRUN_SENT : info.label)}</b>${NEWRUN_NOTHING[info.kind] && !v.locked ? ` — ${NEWRUN_NOTHING[info.kind]}` : ''}</div>`;
-  // Projeto ocupado (runner vivo): nada a fazer é um estado legítimo, não um
-  // botão desativado a meio (DESIGN §Novo run) — fica só o seletor e a linha do estado.
-  const field = v.phase === 'started'
-    ? `<div class="d"><b>${state.startedResume ? 'Relançado:' : 'Objetivo enviado:'}</b> ${esc(state.startedResume ? 'o run em curso, do ponto onde ficou' : state.startedGoal || '')}</div>`
-    : v.busy ? ''
-    : v.isResume
-      ? `<div class="d clamp"><b>Objetivo do run em curso:</b> ${esc((sel.run && sel.run.goal) || 'sem objetivo registado')}</div>`
-      : sel
-        ? `<label for="newrun-goal">Objetivo</label><textarea id="newrun-goal" placeholder="o que queres que fique feito, em uma a três frases"${v.locked ? ' disabled' : ''}>${esc(v.goal)}</textarea><div class="count mono${v.validGoal ? '' : ' bad'}" id="newrun-count">${esc(newRunCountText(v))}</div>`
-        : '';
-  const action = v.phase === 'started'
-    ? `<div class="seal">run a arrancar — a notificação chega em menos de um minuto</div>
-       <div class="only">o bilhete volta ao normal quando o runner der sinal de vida.</div>
-       <div class="row"><button class="btn" type="button" data-action="newrun-recheck">Verificar de novo</button></div>`
-    : v.busy ? ''
-    : `<div class="row"><button class="btn" type="button" id="newrun-submit" data-action="newrun-submit"${v.canSubmit ? '' : ' disabled'}>${esc(newRunButtonLabel(v))}</button><span class="only" id="newrun-hint">${v.armed ? NEWRUN_HINT : ''}</span></div>`;
-  return `<article class="ticket newrun${v.locked ? ' pending' : ''}">
-    <div class="k"><span>novo run</span></div>
-    <div class="q">Arrancar ou relançar um run</div>
-    <div><label for="newrun-project">Projeto</label><select id="newrun-project" data-action="newrun-project"${!list.length || v.locked ? ' disabled' : ''}>${options}</select></div>
-    ${note}
-    ${field}
-    <div class="err" id="newrun-err">${esc(state.error || '')}</div>
-    ${action}
-  </article>`;
-}
-
-// Chamadas de rede sem DOM (testáveis com um `fetch` simulado); só `boot()` liga isto ao browser real.
-export async function fetchProjects(fetchImpl) {
-  try {
-    const r = await fetchImpl('/projects', { cache: 'no-store', credentials: 'same-origin' });
-    if (!r.ok) throw new Error(String(r.status));
-    const body = await r.json();
-    return Array.isArray(body.projects) ? body.projects : [];
-  } catch { return null; }
-}
-// goal === null → relançar o run em curso; senão arrancar com o objetivo aparado.
-export async function postRun(project, goal, fetchImpl) {
-  const name = project && project.name;
-  const body = goal === null ? { project: name, resume: true } : { project: name, goal: String(goal).trim() };
-  try {
-    const r = await fetchImpl('/runs', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    let data = {}; try { data = await r.json(); } catch {}
-    if (!r.ok) return { ok: false, error: newRunErrText((data && data.error) || `HTTP ${r.status}`) };
-    return { ok: true, action: data.action || (goal === null ? 'resume' : 'start'), project: data.project || name, pid: data.pid };
-  } catch { return { ok: false, error: newRunErrText('sem ligação ao viewer') }; }
-}
-
 export function renderDecisions(run, limit = 0) {
   let ds = run.decisions || [];
   if (limit) ds = ds.slice(-limit).reverse();
@@ -1156,7 +978,6 @@ export function boot(mode = 'desktop') {
   const S = { snap: null, runId: null, offset: 0, lastStateAt: 0, lastSignal: Date.now(), gotState: false, sseError: false, mode: 'connecting', pollOk: false, bannerHtml: '',
     expanded: new Set(), demandOpen: false, html: new Map(), sent: new Map(), sending: new Set(), errors: new Map(),
     queueNodes: new Map(), queueForm: new Map(), queueEmptyShown: false, queueRun: null,
-    projects: [], newrun: newRunInit(), newrunPending: false, newrunExpiryChecking: false,
     // T-UI-9: a dobra das sessões soltas, a pausa das atualizações (à mão e por
     // foco num campo) e o instantâneo que ficou à espera da retoma.
     looseOpen: false, paused: false, pausedAt: null, focusPaused: false, focusPausedAt: null, pending: null };
@@ -1200,41 +1021,6 @@ export function boot(mode = 'desktop') {
     if (next) applySnapshot(next); else paintSelector();
   }
 
-  // "Novo run". A secção NÃO depende do instantâneo: só se re-escreve quando
-  // muda o projeto, a fase do bilhete ou a lista de projetos. Escrever nunca
-  // re-escreve o HTML (recriar a textarea parte a composição de acentos no
-  // Android): aí só se atualizam o contador, o botão e a linha de erro.
-  function renderNewRunSection() {
-    const a = document.activeElement;
-    // Com o campo de objetivo em foco (a pessoa está a escrever) nunca se
-    // re-escreve o HTML: adia-se para o blur e entretanto só se corrigem os
-    // controlos, que é o que pode ter mudado de estado (ex.: o projeto ficou ocupado).
-    if (a && a.id === 'newrun-goal' && S.newrun.phase === 'idle') { S.newrunPending = true; patchNewRun(); return; }
-    S.newrunPending = false;
-    const id = a && a.id, selStart = a && 'selectionStart' in a ? a.selectionStart : null;
-    if (setSection('newrun', renderNewRun(S.projects, S.newrun)) && (id === 'newrun-goal' || id === 'newrun-project')) {
-      const el = $(id);
-      if (el) { el.focus(); if (selStart != null && el.setSelectionRange) el.setSelectionRange(selStart, selStart); }
-    }
-  }
-  function patchNewRun() {
-    const v = newRunView(S.projects, S.newrun);
-    const c = $('newrun-count'); if (c) { c.textContent = newRunCountText(v); c.classList.toggle('bad', !v.validGoal); }
-    const b = $('newrun-submit'); if (b) { b.disabled = !v.canSubmit; b.textContent = newRunButtonLabel(v); }
-    const h = $('newrun-hint'); if (h) h.textContent = v.armed ? NEWRUN_HINT : '';
-    const e = $('newrun-err'); if (e) e.textContent = S.newrun.error || '';
-    S.html.delete('newrun'); // o DOM já não é a última string: força o próximo render completo
-  }
-  async function loadProjects() {
-    const list = await fetchProjects(fetch);
-    if (list) S.projects = list;
-    S.newrun = newRunReducer(S.newrun, { type: 'projects', projects: list || S.projects });
-    renderNewRunSection();
-  }
-  // Depois de um arranque o runner leva alguns segundos a escrever o lock: dois
-  // pedidos pontuais, nunca um poll (o selo fica até um deles confirmar).
-  const NEWRUN_RECHECKS_MS = [3000, 15000];
-
   function render() {
     const snap = S.snap || { runs: [], generatedAt: Date.now(), lines: 0, current: null };
     const run = currentRun();
@@ -1273,28 +1059,8 @@ export function boot(mode = 'desktop') {
     tick();
   }
 
-  // O selo só expira depois de uma prova FRESCA (um /projects pedido agora),
-  // nunca por inferência sobre a última lista conhecida (que pode ter dezenas
-  // de segundos, já que os recheques pontuais param aos 15 s e o poll seguinte
-  // só vem aos 60 s): ao bater o prazo, primeiro confirma-se com o servidor e
-  // só depois se decide — `loadProjects` já despacha `projects`, que resolve o
-  // bilhete sozinho se entretanto houver prova; só resta o `tick` para o caso
-  // sem prova nenhuma.
-  function checkNewRunExpiry() {
-    if (S.newrun.phase !== 'started' || S.newrunExpiryChecking) return;
-    const startedAt = S.newrun.startedAt;
-    if (startedAt == null || Date.now() - startedAt < NEWRUN_EXPIRE_MS) return;
-    S.newrunExpiryChecking = true;
-    loadProjects().finally(() => {
-      S.newrunExpiryChecking = false;
-      if (S.newrun.phase !== 'started') return; // a prova fresca já resolveu o bilhete
-      const next = newRunReducer(S.newrun, { type: 'tick', now: Date.now() });
-      if (next !== S.newrun) { S.newrun = next; renderNewRunSection(); }
-    });
-  }
   function tick() {
     const t = now();
-    checkNewRunExpiry();
     for (const el of document.querySelectorAll('[data-ago]')) el.textContent = ago(t, Number(el.dataset.ago));
     for (const el of document.querySelectorAll('[data-dur]')) el.textContent = dur(t - Number(el.dataset.dur), true);
     const conn = $('conn');
@@ -1355,8 +1121,6 @@ export function boot(mode = 'desktop') {
     catch { S.pollOk = false; tick(); }
   }
   connect();
-  renderNewRunSection(); // placeholder "a carregar" até o primeiro /projects
-  loadProjects();
   setInterval(() => {
     const silent = Date.now() - S.lastSignal > (S.gotState ? 40000 : 8000);
     if (S.sseError || silent) { S.mode = 'poll'; poll(); }
@@ -1386,33 +1150,11 @@ export function boot(mode = 'desktop') {
       S.looseOpen = !S.looseOpen; paintSelector();
     } else if (b.dataset.action === 'pick-run') { S.runId = b.dataset.run; render(); }
     else if (b.dataset.action === 'pause') setPaused(!S.paused);
-    else if (b.dataset.action === 'newrun-recheck') loadProjects();
     else if (b.dataset.action === 'conn-retry') location.reload();
-    else if (b.dataset.action === 'newrun-submit') {
-      const before = S.newrun;
-      const v = newRunView(S.projects, before);
-      const next = newRunReducer(before, { type: 'tap', projects: S.projects });
-      S.newrun = next;
-      if (next.phase !== 'submitting') { if (next !== before) patchNewRun(); return; } // 1.º toque: só o rótulo do botão
-      renderNewRunSection();
-      postRun(v.sel, v.isResume ? null : v.trimmed, fetch).then(res => {
-        S.newrun = newRunReducer(S.newrun, res.ok
-          ? { type: 'sent', project: v.sel.name, runId: v.sel.run && v.sel.run.run_id, resume: v.isResume, now: Date.now() }
-          : { type: 'failed', error: res.error });
-        renderNewRunSection();
-        if (res.ok) for (const ms of NEWRUN_RECHECKS_MS) setTimeout(loadProjects, ms);
-      });
-    }
   });
   document.addEventListener('change', e => {
     if (e.target.matches('select[data-action="run"]')) { S.runId = e.target.value; render(); paintSelector(true); }
-    else if (e.target.matches('select[data-action="newrun-project"]')) { S.newrun = newRunReducer(S.newrun, { type: 'select', project: e.target.value }); renderNewRunSection(); }
   });
-  document.addEventListener('input', e => {
-    if (e.target.id === 'newrun-goal') { S.newrun = newRunReducer(S.newrun, { type: 'goal', goal: e.target.value }); patchNewRun(); }
-  });
-  // Re-escrita adiada enquanto se escrevia: faz-se ao sair do campo.
-  document.addEventListener('focusout', e => { if (e.target && e.target.id === 'newrun-goal' && S.newrunPending) setTimeout(renderNewRunSection, 0); });
   // Pausa automática: com o foco num seletor, campo ou caixa de texto, um
   // instantâneo novo espera pela saída do campo (adenda T-UI-9).
   document.addEventListener('focusin', e => { if (isFormField(e.target) && !S.focusPaused) { S.focusPaused = true; S.focusPausedAt = Date.now(); paintSelector(); } });

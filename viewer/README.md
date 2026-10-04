@@ -19,6 +19,7 @@ Every route except `/health` needs the token. A visitor without the cookie gets 
 | `GET /events` | SSE: `event: state` with the snapshot on connect and on every change (debounced 250 ms); `event: ping` every 15 s |
 | `GET /feed` | the key-events feed (`viewer/lib/feed.mjs` → `feedSnapshot()`): `{ generatedAt, janelaHoras, agora: [ { projeto, estado: 'parou'\|'precisa'\|'pausa'\|'ativo'\|'terminou'\|'sem-run', ultimo, terminou, pendentes[] } ], itens: [ volta \| marco ] }`, newest first. Projects = `data/projects.json`; "next in the plan" reads each live project's `docs/forja/TASKS.json`. There is no raw-record route: the raw log is `data/events.jsonl` |
 | `POST /answers` `{ project, id: "Q3", answer }` | stores the Sponsor's answer for the lead (`forja answers`) and emits `answer.pending`; `{ ok: true }` · 400 bad input · 404 no such open question in a known run · 413 body over 64 KB |
+| `GET /projects` · `POST /runs` (any method) | 410 Gone: the phone run launcher was removed. `{ ok: false, error, start: 'forja start --goal "..."', resume: 'forja core resume', monitor: '/core' }`; reads no body or registry and starts no process. Start or resume a Core run in the terminal |
 | `GET /health` | `{ ok: true }` (no auth; nothing else) |
 
 ## Snapshot (`viewer/lib/state.mjs` → `snapshot()`)
