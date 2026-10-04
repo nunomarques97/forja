@@ -1,5 +1,5 @@
 # Sample project
 
-Small Node application and synthetic tests for exercising FORJA. Run `npm test` in this directory. The mirrored agent and skill definitions are compatibility assets checked by the root `npm run check`.
+Small Node application and synthetic tests for exercising FORJA. Run `npm test` in this directory. The six Core methods in `.claude/skills/forja-core-*` mirror the root copies, and the root `npm run check` verifies they are byte-identical.
 
-To configure local legacy hooks, run `node bin/forja.mjs bootstrap examples/sample-project` from the FORJA root. Generated execution state stays local.
+Generated execution state stays local.

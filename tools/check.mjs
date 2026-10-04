@@ -1,29 +1,18 @@
 #!/usr/bin/env node
 // `npm run check` — the repo invariants a unit test cannot see.
 //
-// Six checks, all cheap, all deterministic, no network, no install:
-//   1. the sample project's crew files are byte-identical to this repo's
-//      (`.claude/{agents,skills}/**` vs `examples/sample-project/.claude/…`),
-//      because a Sponsor who bootstraps a repo gets the sample's copy;
+// Three checks, all cheap, all deterministic, no network, no install:
+//   1. the sample project's copy of the six Core methods is byte-identical to
+//      this repo's (`.claude/skills/forja-core-*/**` vs
+//      `examples/sample-project/.claude/skills/…`), and the sample carries no
+//      other skill;
 //   2. no control or invisible character (form feed, zero-width, bidi
 //      overrides, word joiner, BOM, soft hyphen) in any versioned text file —
 //      the same class of character the viewer refuses in a goal, which can
 //      hide text from a reviewer while a model still reads it;
 //   3. `data/events.jsonl` still replays through the viewer's reducer with
 //      zero bad lines (skipped when the file is not there — `data/` is
-//      git-ignored evidence, not every clone has it);
-//   4. the model policy is written in words in exactly one place
-//      (`lib/models.mjs`, printed by `policyText`) plus the table of
-//      `docs/ARCHITECTURE.md` §6; no second copy in `CLAUDE.md`, in the rest
-//      of the architecture, in the runner's prompts or in the crew's skills;
-//   5. the autonomy rule of a run (lib/autonomy.mjs, docs/ARCHITECTURE.md
-//      §6b) still reaches every file that has to carry it: the CLI, the
-//      runner's prompts, the four skills, CLAUDE.md, the architecture and the
-//      runbook.
-//   6. no runner prompt, skill or agent (this repo's or the sample project's
-//      copy) commands opening `docs/forja/TASKS.json` directly (D30-b, S7):
-//      `forja task show` / `forja status` / `forja context --task` give the
-//      same whole information without it.
+//      git-ignored evidence, not every clone has it).
 //
 // Prints one line per failure and exits 1; otherwise prints `check ok`.
 // Everything is exported and pure enough to test (test/check.test.mjs); the
@@ -46,28 +35,31 @@ export function walk(dir, base = dir, out = []) {
   return out;
 }
 
-// ---------- 1. the sample project is a byte-identical copy of the crew ----------
-export const CREW_DIRS = ['agents', 'skills'];
-const BOOTSTRAP_HINT = 'corre `node bin/forja.mjs bootstrap examples/sample-project --legacy`';
+// ---------- 1. the sample project is a byte-identical copy of the Core methods ----------
+export const CORE_SKILL_PREFIX = 'forja-core-';
+export const isCoreSkillFile = f => String(f).startsWith(CORE_SKILL_PREFIX);
+const COPY_HINT = 'copia .claude/skills/forja-core-*/ deste repo para examples/sample-project/.claude/skills/';
 
 // Returns one line per divergence, in reading order. `[]` = the copy is exact.
-export function sampleDivergences(srcDir, dstDir, kind = 'skills') {
+// Only the Core methods of `srcDir` are copied; every other file in `dstDir`
+// is an extra the sample must not carry.
+export function sampleDivergences(srcDir, dstDir) {
   const lines = [];
-  const ours = walk(srcDir);
+  const ours = walk(srcDir).filter(isCoreSkillFile);
   const theirs = walk(dstDir);
   for (const f of ours) {
     const b = join(dstDir, f);
-    if (!existsSync(b)) { lines.push(`sample: falta .claude/${kind}/${f} em examples/sample-project — ${BOOTSTRAP_HINT}`); continue; }
-    if (!readFileSync(join(srcDir, f)).equals(readFileSync(b))) lines.push(`sample: .claude/${kind}/${f} difere da cópia em examples/sample-project — ${BOOTSTRAP_HINT}`);
+    if (!existsSync(b)) { lines.push(`sample: falta .claude/skills/${f} em examples/sample-project — ${COPY_HINT}`); continue; }
+    if (!readFileSync(join(srcDir, f)).equals(readFileSync(b))) lines.push(`sample: .claude/skills/${f} difere da cópia em examples/sample-project — ${COPY_HINT}`);
   }
-  for (const f of theirs) if (!ours.includes(f)) lines.push(`sample: examples/sample-project/.claude/${kind}/${f} não existe em .claude/${kind}/ — apaga-o ou traz a fonte para cá`);
+  for (const f of theirs) if (!ours.includes(f)) lines.push(`sample: examples/sample-project/.claude/skills/${f} não é um método Core deste repo — apaga-o`);
   return lines;
 }
 
 export function checkSample(root) {
   const sample = join(root, 'examples', 'sample-project');
   if (!existsSync(sample)) return []; // a bootstrapped repo has no sample
-  return CREW_DIRS.flatMap(kind => sampleDivergences(join(root, '.claude', kind), join(sample, '.claude', kind), kind));
+  return sampleDivergences(join(root, '.claude', 'skills'), join(sample, '.claude', 'skills'));
 }
 
 // ---------- 2. no control or invisible characters in versioned text ----------
@@ -151,139 +143,6 @@ export async function checkReplay(root, dataDir = process.env.FORJA_DATA_DIR ? r
   return { skipped: false, lines: state.lines, badLines: state.badLines, failures };
 }
 
-// ---------- 4. the model policy has exactly one source ----------
-// `lib/models.mjs` builds the sentence (`policyText`); §6 of the architecture
-// keeps the table for a human reader. Anywhere else these words mean a second
-// copy, which is exactly what drifts.
-export const POLICY_MARKERS = [/sonnet em tasks/i, /devs em sonnet/i];
-export const policyMarkersIn = text => POLICY_MARKERS.map(re => String(text).match(re)).filter(Boolean);
-export const policyScanList = root => [
-  'CLAUDE.md',
-  'docs/ARCHITECTURE.md',
-  'bin/forja.mjs',
-  ...walk(join(root, 'lib')).filter(f => f.endsWith('.mjs') && f !== 'models.mjs').map(f => `lib/${f}`),
-  ...walk(join(root, '.claude', 'skills')).map(f => `.claude/skills/${f}`),
-  ...walk(join(root, '.claude', 'agents')).map(f => `.claude/agents/${f}`),
-];
-// §6 is the one section allowed to restate the table in prose.
-export function stripPolicySection(text) {
-  const start = text.indexOf('\n## 6. forjalvl e effort');
-  if (start === -1) return text;
-  const after = text.indexOf('\n## ', start + 1);
-  return text.slice(0, start) + (after === -1 ? '' : text.slice(after));
-}
-
-export function checkPolicySource(root, files = policyScanList(root)) {
-  const out = [];
-  for (const f of files) {
-    const path = join(root, f);
-    if (!existsSync(path)) continue;
-    let text = readFileSync(path, 'utf8');
-    if (f.endsWith('ARCHITECTURE.md')) text = stripPolicySection(text);
-    for (const m of policyMarkersIn(text)) {
-      const line = text.slice(0, m.index).split('\n').length;
-      out.push(`política de modelos: ${f}:${line} escreve a tabela ("${m[0]}") — a fonte é lib/models.mjs (policyText); aponta para docs/ARCHITECTURE.md §6`);
-    }
-  }
-  return out;
-}
-
-// ---------- 5. the autonomy rule reaches the crew ----------
-// The opposite problem of check 4. The model policy must exist in ONE place
-// because it is a table; the autonomy rule (`lib/autonomy.mjs`, docs/ARCHITECTURE.md
-// §6b) must exist in SEVERAL, because each of these files is what an agent or the
-// Sponsor actually reads at the moment it matters — and the failure mode seen on
-// 17 set 2026 was precisely a rule that lived only in the Sponsor's head while
-// the crew kept queueing free dependencies. This check does not compare wording
-// (the skills explain the rule to their own role): it refuses a file that stopped
-// mentioning autonomy at all.
-export const AUTONOMY_MARKER = /autonom(y|ia)/i;
-export const AUTONOMY_FILES = [
-  "CLAUDE.md",
-  "docs/ARCHITECTURE.md",
-  "docs/RUNBOOK-UNATTENDED.md",
-  "lib/runner.mjs",
-  "bin/forja.mjs",
-  ".claude/skills/forja-crew/SKILL.md",
-  ".claude/skills/forja-lead/SKILL.md",
-  ".claude/skills/forja-product/SKILL.md",
-  ".claude/skills/forja-scout/SKILL.md",
-];
-export function checkAutonomyRule(root, files = AUTONOMY_FILES) {
-  // Only this repo: the rule lives in lib/autonomy.mjs, and a repo without it
-  // (a bootstrapped project, a fixture) has no crew of ours to keep honest.
-  if (!existsSync(join(root, "lib", "autonomy.mjs"))) return [];
-  const out = [];
-  for (const f of files) {
-    const path = join(root, f);
-    if (!existsSync(path)) continue; // a bootstrapped repo has no docs/ of ours
-    if (!AUTONOMY_MARKER.test(readFileSync(path, "utf8"))) {
-      out.push(`autonomia: ${f} não diz nada sobre a autonomia do run — a regra vive em lib/autonomy.mjs e tem de chegar a este ficheiro (docs/ARCHITECTURE.md §6b)`);
-    }
-  }
-  return out;
-}
-
-// ---------- 6. nothing commands opening docs/forja/TASKS.json directly ----------
-// D30-b / S7: a Dev, the QA and the Lead get the SAME whole information through
-// `forja task show T<n>` / `forja status` / `forja context --task T<n>` (D30-a:
-// take away the reason before the instruction) — so no prompt or skill needs to
-// name `TASKS.json` as a thing to open. Naming the file as a FORMAT or a WRITE
-// target stays legitimate (the Architect writes the plan there through the CLI,
-// `lib/state-files.mjs` defines the path, `docs/ARCHITECTURE.md` describes the
-// format): this only fires when a read/open verb sits on the SAME LINE, before
-// the mention, and that line does not already say, in the same breath, that the
-// file is never opened directly (the pattern this repo already uses in
-// `lib/runner.mjs` and in forja-lead's own §"You know nothing but the disk").
-export const TASKS_JSON_OPEN_VERBS = /\b(read|reading|lendo|lê|ler|leia|abrir|abre|abrindo|open|opens|opening|carregar|carrega)\b/i;
-export const TASKS_JSON_NEGATION = /\b(instead of|em vez de|never|nunca|not\b|não\b|does not|doesn't|don't)\b/i;
-
-// [{ line, excerpt }] for every line of `text` that commands opening TASKS.json.
-export function findTasksJsonOpenCommands(text) {
-  const hits = [];
-  const lines = String(text).split('\n');
-  lines.forEach((line, i) => {
-    let idx = line.indexOf('TASKS.json');
-    while (idx !== -1) {
-      const before = line.slice(0, idx);
-      if (TASKS_JSON_OPEN_VERBS.test(before) && !TASKS_JSON_NEGATION.test(line)) {
-        hits.push({ line: i + 1, excerpt: line.trim().slice(0, 160) });
-        break; // one hit per line is enough to name it
-      }
-      idx = line.indexOf('TASKS.json', idx + 1);
-    }
-  });
-  return hits;
-}
-
-// The prompts and crew files a specialist or the Lead actually reads: the
-// runner's prompts, every skill and every agent (this repo's and the sample
-// project's byte-identical copy), and the resume prompt in bin/forja.mjs.
-export function tasksJsonScanList(root) {
-  const files = ['lib/runner.mjs', 'bin/forja.mjs'];
-  const dirs = [
-    ['.claude/skills', f => f.endsWith('SKILL.md')],
-    ['.claude/agents', f => f.endsWith('.md')],
-    ['examples/sample-project/.claude/skills', f => f.endsWith('SKILL.md')],
-    ['examples/sample-project/.claude/agents', f => f.endsWith('.md')],
-  ];
-  for (const [dir, keep] of dirs) {
-    for (const f of walk(join(root, ...dir.split('/')))) if (keep(f)) files.push(`${dir}/${f}`);
-  }
-  return files;
-}
-
-export function checkNoTasksJsonRead(root, files = tasksJsonScanList(root)) {
-  const out = [];
-  for (const f of files) {
-    const path = join(root, f);
-    if (!existsSync(path)) continue;
-    for (const hit of findTasksJsonOpenCommands(readFileSync(path, 'utf8'))) {
-      out.push(`TASKS.json: ${f}:${hit.line} manda abrir/ler docs/forja/TASKS.json diretamente — usa \`forja task show T<n>\` ou \`forja context --task T<n>\` ("${hit.excerpt}")`);
-    }
-  }
-  return out;
-}
 // ---------- everything, in order ----------
 export async function runChecks({ root = REPO_ROOT, files = null } = {}) {
   const failures = [];
@@ -294,9 +153,6 @@ export async function runChecks({ root = REPO_ROOT, files = null } = {}) {
   }
   failures.push(...checkSample(root));
   failures.push(...checkInvisible(root, list));
-  failures.push(...checkPolicySource(root));
-  failures.push(...checkAutonomyRule(root));
-  failures.push(...checkNoTasksJsonRead(root));
   const replay = await checkReplay(root);
   failures.push(...replay.failures);
   return { failures, files: list, replay };
@@ -310,5 +166,5 @@ if (isMain) {
     for (const f of failures) console.error(`- ${f}`);
     process.exit(1);
   }
-  console.log(`check ok — ${files.length} ficheiros versionados, elenco do sample idêntico, política de modelos numa fonte só, regra de autonomia em todos os ficheiros que a carregam, nenhum ficheiro manda abrir TASKS.json diretamente, ${replay.skipped ? 'sem data/events.jsonl para reproduzir' : `${replay.lines} eventos reproduzidos sem linhas más`}`);
+  console.log(`check ok — ${files.length} ficheiros versionados, métodos Core do sample idênticos, ${replay.skipped ? 'sem data/events.jsonl para reproduzir' : `${replay.lines} eventos reproduzidos sem linhas más`}`);
 }

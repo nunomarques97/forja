@@ -1,16 +1,16 @@
 // tools/check.mjs — the repo invariants `npm run check` enforces. The units are
 // tested against fixtures in a temp dir (so the test never depends on the state
 // of this working tree), plus one run of the real script on this repo to prove
-// the invisible-character and model-policy checks are actually clean here.
+// it is actually clean here.
 import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findInvisible, sampleDivergences, policyMarkersIn, checkPolicySource, stripPolicySection, checkInvisible, checkAutonomyRule, AUTONOMY_FILES, findTasksJsonOpenCommands, checkNoTasksJsonRead, tasksJsonScanList, runChecks, TEXT_EXT, isTextFile, INVISIBLE_RANGES } from '../tools/check.mjs';
-import { policyText, LEVELS } from '../lib/models.mjs';
+import * as check from '../tools/check.mjs';
+import { findInvisible, sampleDivergences, checkSample, checkInvisible, runChecks, TEXT_EXT, isTextFile, INVISIBLE_RANGES } from '../tools/check.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..');
@@ -18,6 +18,7 @@ const root = mkdtempSync(join(tmpdir(), 'forja-check-'));
 after(() => rmSync(root, { recursive: true, force: true }));
 const ch = code => String.fromCharCode(code);
 const write = (path, text) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text, 'utf8'); };
+const CORE_METHODS = ['backend', 'design', 'frontend', 'planner', 'reviewer', 'security'].map(id => `forja-core-${id}`);
 
 describe('invisible characters', () => {
   test('every forbidden code point is found, with line and column and a name', () => {
@@ -30,7 +31,7 @@ describe('invisible characters', () => {
     }
   });
   test('tab, CR, LF, accents and emoji are legitimate; the scan is not stateful between calls', () => {
-    const clean = 'a\tb\r\nção — «citação» 🙂  fim';
+    const clean = 'a\tb\r\nção — «citação» 🙂  fim';
     assert.deepEqual(findInvisible(clean), []);
     assert.deepEqual(findInvisible(clean), [], 'the global regex is reset every call');
     assert.equal(findInvisible(`x${ch(0x200B)}y${ch(0x200B)}z`).length, 2, 'every occurrence, not just the first');
@@ -56,67 +57,75 @@ describe('invisible characters', () => {
     // file was written): the moment it was committed, `npm run check` would have
     // failed on its own source for ever. They are code points now, and this test
     // is the guard.
-    for (const f of ['tools/check.mjs', 'test/check.test.mjs', 'test/spawn-runner.test.mjs', 'lib/models.mjs', 'lib/runner.mjs', 'bin/forja.mjs']) {
+    for (const f of ['tools/check.mjs', 'test/check.test.mjs', 'bin/forja.mjs']) {
       const hits = findInvisible(readFileSync(join(repo, f), 'utf8'));
       assert.deepEqual(hits, [], `${f}: ${hits.map(h => `${h.line}:${h.column} ${h.name}`).join(', ')}`);
     }
-    assert.deepEqual(checkInvisible(repo, ['tools/check.mjs', 'test/check.test.mjs', 'test/spawn-runner.test.mjs']), []);
+    assert.deepEqual(checkInvisible(repo, ['tools/check.mjs', 'test/check.test.mjs']), []);
     // And the ranges really are the ones the task named, declared as numbers.
     assert.deepEqual(INVISIBLE_RANGES.map(([a, b]) => [a, b]), [[0x000C, 0x000C], [0x00AD, 0x00AD], [0x200B, 0x200F], [0x202A, 0x202E], [0x2060, 0x2064], [0x2066, 0x2069], [0xFEFF, 0xFEFF]]);
   });
 });
 
-describe('the sample project is a byte-identical copy of the crew', () => {
+describe('the sample project is a byte-identical copy of the Core methods', () => {
   const src = join(root, 'src'); const dst = join(root, 'dst');
-  test('identical trees pass; a changed, a missing and an extra file are each named', () => {
-    write(join(src, 'forja-lead', 'SKILL.md'), 'igual\n');
-    write(join(src, 'forja-crew', 'SKILL.md'), 'fonte\n');
-    write(join(dst, 'forja-lead', 'SKILL.md'), 'igual\n');
-    write(join(dst, 'forja-crew', 'SKILL.md'), 'fonte\n');
+  test('identical Core methods pass; a changed, a missing and an extra file are each named', () => {
+    write(join(src, 'forja-core-planner', 'SKILL.md'), 'igual\n');
+    write(join(src, 'forja-core-reviewer', 'SKILL.md'), 'fonte\n');
+    write(join(dst, 'forja-core-planner', 'SKILL.md'), 'igual\n');
+    write(join(dst, 'forja-core-reviewer', 'SKILL.md'), 'fonte\n');
     assert.deepEqual(sampleDivergences(src, dst), []);
 
-    write(join(dst, 'forja-crew', 'SKILL.md'), 'fonte alterada\n');
-    write(join(src, 'forja-qa', 'SKILL.md'), 'novo\n');
-    write(join(dst, 'forja-velho', 'SKILL.md'), 'legado\n');
-    const lines = sampleDivergences(src, dst, 'skills');
+    write(join(dst, 'forja-core-reviewer', 'SKILL.md'), 'fonte alterada\n');
+    write(join(src, 'forja-core-security', 'SKILL.md'), 'novo\n');
+    write(join(dst, 'forja-velho', 'SKILL.md'), 'antigo\n');
+    const lines = sampleDivergences(src, dst);
     assert.equal(lines.length, 3);
-    assert.match(lines[0], /^sample: \.claude\/skills\/forja-crew\/SKILL\.md difere da cópia em examples\/sample-project — corre `node bin\/forja\.mjs bootstrap examples\/sample-project --legacy`$/);
-    assert.match(lines[1], /^sample: falta \.claude\/skills\/forja-qa\/SKILL\.md em examples\/sample-project/);
-    assert.match(lines[2], /^sample: examples\/sample-project\/\.claude\/skills\/forja-velho\/SKILL\.md não existe em \.claude\/skills\//);
+    assert.match(lines[0], /^sample: \.claude\/skills\/forja-core-reviewer\/SKILL\.md difere da cópia em examples\/sample-project — copia \.claude\/skills\/forja-core-\*\/ deste repo para examples\/sample-project\/\.claude\/skills\/$/);
+    assert.match(lines[1], /^sample: falta \.claude\/skills\/forja-core-security\/SKILL\.md em examples\/sample-project/);
+    assert.match(lines[2], /^sample: examples\/sample-project\/\.claude\/skills\/forja-velho\/SKILL\.md não é um método Core deste repo/);
+    assert.doesNotMatch(lines.join('\n'), /bootstrap/, 'no hint to the removed crew install');
+  });
+  test('only forja-core-* is compared: another skill in the source is not expected in the sample', () => {
+    const a = join(root, 'only-core-src'); const b = join(root, 'only-core-dst');
+    write(join(a, 'forja-core-design', 'SKILL.md'), 'x\n');
+    write(join(a, 'forja-other', 'SKILL.md'), 'not a Core method\n');
+    write(join(b, 'forja-core-design', 'SKILL.md'), 'x\n');
+    assert.deepEqual(sampleDivergences(a, b), []);
   });
   test('a one-byte difference is enough (a trailing newline is not "the same file")', () => {
     const a = join(root, 'a'); const b = join(root, 'b');
-    write(join(a, 'x.md'), 'texto');
-    write(join(b, 'x.md'), 'texto\n');
+    write(join(a, 'forja-core-x', 'x.md'), 'texto');
+    write(join(b, 'forja-core-x', 'x.md'), 'texto\n');
     assert.equal(sampleDivergences(a, b).length, 1);
+  });
+  test('checkSample compares the skills folders of a repo and its sample; a repo without a sample is skipped', () => {
+    const r = join(root, 'sample-repo');
+    write(join(r, '.claude', 'skills', 'forja-core-backend', 'SKILL.md'), 'm\n');
+    write(join(r, 'examples', 'sample-project', '.claude', 'skills', 'forja-core-backend', 'SKILL.md'), 'm\n');
+    assert.deepEqual(checkSample(r), []);
+    write(join(r, 'examples', 'sample-project', '.claude', 'skills', 'forja-core-backend', 'SKILL.md'), 'changed\n');
+    assert.equal(checkSample(r).length, 1);
+    assert.deepEqual(checkSample(join(root, 'no-sample')), []);
   });
 });
 
-describe('the model policy has exactly one source', () => {
-  test('the markers catch the sentence policyText really prints, at every level', () => {
-    for (const lv of LEVELS) assert.equal(policyMarkersIn(policyText(lv)).length > 0, true, `${lv}: a pasted copy of the policy is caught`);
-    assert.deepEqual(policyMarkersIn('ver §6 — gerado de `lib/models.mjs`'), [], 'a pointer to §6 is not a copy');
-    assert.deepEqual(policyMarkersIn('the Devs run on the model given in the delegation step'), []);
+describe('the crew-only checks are gone', () => {
+  test('tools/check.mjs no longer exports the model-policy, autonomy-rule or TASKS.json checks', () => {
+    for (const name of ['checkPolicySource', 'policyMarkersIn', 'stripPolicySection', 'POLICY_MARKERS', 'checkAutonomyRule', 'AUTONOMY_FILES', 'findTasksJsonOpenCommands', 'checkNoTasksJsonRead', 'tasksJsonScanList', 'CREW_DIRS']) {
+      assert.equal(Object.hasOwn(check, name), false, name);
+    }
   });
-  test('a copy in a scanned file is reported with its line; §6 of the architecture is exempt', () => {
-    const r = join(root, 'policy');
-    write(join(r, 'CLAUDE.md'), `linha um\nDevs em Sonnet, Opus em tasks hard\n`);
-    assert.deepEqual(checkPolicySource(r, ['CLAUDE.md']).map(l => l.replace(/\(".*"\)/, '(marcador)')), [
-      'política de modelos: CLAUDE.md:2 escreve a tabela (marcador) — a fonte é lib/models.mjs (policyText); aponta para docs/ARCHITECTURE.md §6',
-    ]);
-    const arch = `## 5. Antes\ntexto\n\n## 6. forjalvl e effort\nDevs em Sonnet, o resto aqui\n\n## 7. Depois\nnada\n`;
-    write(join(r, 'docs', 'ARCHITECTURE.md'), arch);
-    assert.deepEqual(checkPolicySource(r, ['docs/ARCHITECTURE.md']), [], '§6 may keep the table');
-    assert.equal(stripPolicySection(`\n${arch}`).includes('o resto aqui'), false);
-    assert.equal(stripPolicySection(`\n${arch}`).includes('## 7. Depois'), true, 'only §6 is removed');
-    write(join(r, 'docs', 'ARCHITECTURE.md'), `${arch}\n## 8. Outra\nsonnet em tasks fáceis\n`);
-    assert.equal(checkPolicySource(r, ['docs/ARCHITECTURE.md']).length, 1, 'a copy outside §6 is still caught');
-    assert.deepEqual(checkPolicySource(r, ['nao-existe.md']), []);
+  test('this repo and its sample carry no crew agents and only the six Core methods', () => {
+    for (const base of [repo, join(repo, 'examples', 'sample-project')]) {
+      assert.equal(existsSync(join(base, '.claude', 'agents')), false, base);
+      assert.deepEqual(readdirSync(join(base, '.claude', 'skills')).sort(), CORE_METHODS);
+    }
   });
 });
 
 describe('the whole check', () => {
-  test('a clean fixture repo has no failures; a planted invisible character and a planted copy are both reported', async () => {
+  test('a clean fixture repo has no failures; a planted invisible character and a planted sample divergence are both reported', async () => {
     const clean = join(root, 'clean');
     write(join(clean, 'CLAUDE.md'), 'projeto limpo\n');
     const ok = await runChecks({ root: clean, files: ['CLAUDE.md'] });
@@ -125,97 +134,18 @@ describe('the whole check', () => {
 
     const dirty = join(root, 'dirty');
     write(join(dirty, 'CLAUDE.md'), `Devs em Sonnet, Opus em tasks hard\num${ch(0x200B)}dois\n`);
+    write(join(dirty, '.claude', 'skills', 'forja-core-planner', 'SKILL.md'), 'method\n');
+    write(join(dirty, 'examples', 'sample-project', '.claude', 'skills', 'forja-old', 'SKILL.md'), 'old\n');
     const bad = await runChecks({ root: dirty, files: ['CLAUDE.md'] });
-    assert.equal(bad.failures.length, 2);
-    assert.match(bad.failures[0], /^invisíveis: CLAUDE\.md:2:3 — U\+200B$/);
-    assert.match(bad.failures[1], /^política de modelos: CLAUDE\.md:1 /);
+    assert.equal(bad.failures.length, 3, 'a missing and an extra sample file plus one invisible character; model-policy words are no longer checked');
+    assert.match(bad.failures[0], /^sample: falta \.claude\/skills\/forja-core-planner\/SKILL\.md/);
+    assert.match(bad.failures[1], /^sample: examples\/sample-project\/\.claude\/skills\/forja-old\/SKILL\.md não é um método Core/);
+    assert.match(bad.failures[2], /^invisíveis: CLAUDE\.md:2:3 — U\+200B$/);
   });
-  test('on this repo the script runs, and the invisible-character and policy checks are clean', () => {
+  test('on this repo the script runs and passes', () => {
     const r = spawnSync(process.execPath, [join(repo, 'tools', 'check.mjs')], { cwd: repo, encoding: 'utf8' });
     const out = `${r.stdout}${r.stderr}`;
-    assert.ok([0, 1].includes(r.status), `exit ${r.status}: ${out}`);
-    assert.equal(/^- invisíveis:/m.test(out), false, `no invisible characters in versioned files:\n${out}`);
-    assert.equal(/^- política de modelos:/m.test(out), false, `the policy is written in one place only:\n${out}`);
-    assert.equal(/^- replay:/m.test(out), false, `the event stream still replays:\n${out}`);
-    assert.equal(/^- TASKS\.json:/m.test(out), false, `nothing commands opening TASKS.json directly:\n${out}`);
-    if (r.status === 0) assert.match(out, /check ok/);
-    else assert.match(out, /^- sample:/m, 'the only failure a clean tree may have here is the sample copy waiting for a bootstrap');
-  });
-});
-
-describe('the autonomy rule reaches every file that carries it', () => {
-  test('a file of the list that stopped mentioning it is reported; a repo without lib/autonomy.mjs is not ours to check', () => {
-    const r = join(root, 'aut');
-    write(join(r, 'lib', 'autonomy.mjs'), 'export const AUTONOMIES = [];\n');
-    write(join(r, 'CLAUDE.md'), 'regras do projeto, sem uma palavra sobre o assunto\n');
-    assert.deepEqual(checkAutonomyRule(r, ['CLAUDE.md']), [
-      'autonomia: CLAUDE.md não diz nada sobre a autonomia do run — a regra vive em lib/autonomy.mjs e tem de chegar a este ficheiro (docs/ARCHITECTURE.md §6b)',
-    ]);
-    write(join(r, 'CLAUDE.md'), 'em `autonomy: total` o run decide sozinho\n');
-    assert.deepEqual(checkAutonomyRule(r, ['CLAUDE.md']), [], 'the English word counts');
-    write(join(r, 'CLAUDE.md'), 'a autonomia do run está em RUN.json\n');
-    assert.deepEqual(checkAutonomyRule(r, ['CLAUDE.md']), [], 'and so does the Portuguese one');
-    assert.deepEqual(checkAutonomyRule(r, ['nao-existe.md']), [], 'a file that is not there is not a failure');
-    // A bootstrapped project or a fixture has its own CLAUDE.md and none of our code.
-    const other = join(root, 'nao-forja');
-    write(join(other, 'CLAUDE.md'), 'outro projeto qualquer\n');
-    assert.deepEqual(checkAutonomyRule(other, ['CLAUDE.md']), [], 'without lib/autonomy.mjs there is nothing to keep honest');
-  });
-  test('the list names the files an agent or the Sponsor actually reads, and this repo passes', () => {
-    for (const f of ['CLAUDE.md', 'lib/runner.mjs', 'bin/forja.mjs', '.claude/skills/forja-lead/SKILL.md', '.claude/skills/forja-product/SKILL.md', '.claude/skills/forja-scout/SKILL.md', '.claude/skills/forja-crew/SKILL.md', 'docs/ARCHITECTURE.md', 'docs/RUNBOOK-UNATTENDED.md']) {
-      assert.ok(AUTONOMY_FILES.includes(f), `${f} tem de estar na lista`);
-    }
-    assert.deepEqual(checkAutonomyRule(repo), [], 'this repo carries the rule everywhere it must');
-  });
-});
-
-describe('nothing commands opening docs/forja/TASKS.json directly (D30-b, S7)', () => {
-  test('a read/open verb on the same line as TASKS.json is caught, with the line and an excerpt', () => {
-    const hits = findTasksJsonOpenCommands('linha um\nRead CLAUDE.md, then docs/forja/TASKS.json, then go on\nmore text');
-    assert.equal(hits.length, 1);
-    assert.equal(hits[0].line, 2);
-    assert.match(hits[0].excerpt, /^Read CLAUDE\.md, then docs\/forja\/TASKS\.json, then go on$/);
-  });
-  test('the Portuguese verbs are caught too (ler, abrir, abre)', () => {
-    for (const line of ['Contexto: ler CLAUDE.md, docs/forja/TASKS.json (T1).', 'manda abrir o docs/forja/TASKS.json inteiro', 'a sessão abre docs/forja/TASKS.json para ver o estado']) {
-      assert.equal(findTasksJsonOpenCommands(line).length, 1, line);
-    }
-  });
-  test('naming the file as a format or a write target is legitimate and is not caught', () => {
-    for (const line of [
-      'the plan lives in `docs/forja/TASKS.json` (3–10 small tasks, `forja task add`)',
-      'Decomposes a project or phase ONCE into the plan file docs/forja/TASKS.json',
-      'every task in `docs/forja/TASKS.json` must be small enough for one dev session',
-      'the owner comes from TASKS.json, so "constructor" needs Object.hasOwn',
-    ]) {
-      assert.deepEqual(findTasksJsonOpenCommands(line), [], line);
-    }
-  });
-  test('a line that says, in the same breath, that the file is never opened directly passes (the pattern already used in this repo)', () => {
-    for (const line of [
-      'task T<n> in full (id, state, criteria, verdicts — read it instead of opening TASKS.json)',
-      '// never has to read (and re-read into its context) the whole TASKS.json:',
-      'task state comes from `status` below, never from opening TASKS.json directly.',
-    ]) {
-      assert.deepEqual(findTasksJsonOpenCommands(line), [], line);
-    }
-  });
-  test('checkNoTasksJsonRead scans a file list and reports path:line; a clean file is silent', () => {
-    const r = join(root, 'tasksjson');
-    write(join(r, '.claude', 'skills', 'forja-bad', 'SKILL.md'), 'a\nb\n1. Read CLAUDE.md and docs/forja/TASKS.json for your task.\n');
-    write(join(r, '.claude', 'skills', 'forja-good', 'SKILL.md'), 'run `forja task show T<n>` for your task — never open TASKS.json directly.\n');
-    write(join(r, 'lib', 'runner.mjs'), 'export const x = 1; // TASKS.json is the plan file, written through the CLI\n');
-    const out = checkNoTasksJsonRead(r, ['.claude/skills/forja-bad/SKILL.md', '.claude/skills/forja-good/SKILL.md', 'lib/runner.mjs', 'nao-existe.md']);
-    assert.equal(out.length, 1);
-    assert.match(out[0], /^TASKS\.json: \.claude\/skills\/forja-bad\/SKILL\.md:3 manda abrir\/ler docs\/forja\/TASKS\.json diretamente/);
-  });
-  test('the scan list reaches the runner, every skill, every agent and the sample project\'s copies', () => {
-    const list = tasksJsonScanList(repo);
-    for (const f of ['lib/runner.mjs', 'bin/forja.mjs', '.claude/skills/forja-lead/SKILL.md', '.claude/agents/architect.md', 'examples/sample-project/.claude/skills/forja-lead/SKILL.md', 'examples/sample-project/.claude/agents/architect.md']) {
-      assert.ok(list.includes(f), `${f} tem de estar na lista`);
-    }
-  });
-  test('this repo has zero files that command opening TASKS.json directly', () => {
-    assert.deepEqual(checkNoTasksJsonRead(repo), [], 'D30-b: de N para 0');
+    assert.equal(r.status, 0, out);
+    assert.match(out, /^check ok — \d+ ficheiros versionados, métodos Core do sample idênticos, /);
   });
 });

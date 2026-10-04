@@ -94,13 +94,19 @@ test('init repairs a project migrated before frontmatter validation', (t) => {
 
 test('every bundled skill and agent header is valid YAML in the supported subset', () => {
   const here = join(import.meta.dirname, '..');
+  let checked = 0;
   for (const base of ['', 'examples/sample-project/'])
-    for (const kind of ['skills', 'agents'])
+    for (const kind of ['skills', 'agents']) {
+      // 0.22.0 removed the bundled crew agents; a folder that is gone has no headers.
+      if (!existsSync(join(here, base, '.claude', kind))) continue;
       for (const entry of readdirSync(join(here, base, '.claude', kind))) {
         const file = join(here, base, '.claude', kind, entry, ...(kind === 'skills' ? ['SKILL.md'] : []));
         const header = readFileSync(file, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/)[1];
         assert.deepEqual(frontmatterProblems(header), [], file);
+        checked++;
       }
+    }
+  assert.ok(checked >= 12, 'the six Core methods in this repo and in the sample are checked');
 });
 
 test('invalid YAML escapes, tab indentation and typed collections refuse repair', () => {
