@@ -309,7 +309,7 @@ function setTask(run, id, patch, t) {
 // um alias do `forjalvl`.
 // `keepWhenMissing`: um evento que não traz nenhum dos dois não apaga o que já
 // se sabia (só o `run.start` decide o valor por omissão, `high` — regra do
-// Sponsor, 18 set 2026; lib/models.mjs é a fonte, isto só espelha o mesmo default).
+// Sponsor, 18 set 2026; o mesmo default do fluxo legado, removido em 0.22.0).
 function setForjalvl(run, f, { keepWhenMissing = false } = {}) {
   const v = str(f.forjalvl) || str(f.model_level);
   if (!v && keepWhenMissing) return;

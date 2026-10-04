@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { privatePath, contentFindings, inspectIndex, reviewedFixture, fileFindings, envTemplateProblem, scanTree } from '../tools/release-check.mjs';
 
 test('release paths exclude raw execution and private research, allow curated knowledge', () => {
@@ -65,13 +66,16 @@ test('release scanner keeps a user segment without a following separator unflagg
   }
 });
 test('synthetic fixture review expires when bytes change and never waives credentials', () => {
-  const path = 'test/fixtures/handover-t3-before.md';
-  const bytes = readFileSync(new URL('./fixtures/handover-t3-before.md', import.meta.url));
+  assert.equal(reviewedFixture('test/runner.test.mjs', Buffer.from('x'), 'possible conversation export'), null, 'no asset is reviewed since 0.22.0');
+  const path = 'test/fixtures/synthetic-state.md';
+  const bytes = Buffer.from('synthetic state');
   const reason = 'private execution/research/credential path';
-  assert.ok(reviewedFixture(path, bytes, reason));
-  assert.equal(reviewedFixture(path, Buffer.concat([bytes, Buffer.from('changed')]), reason), null);
-  assert.equal(reviewedFixture('docs/HANDOVER.md', bytes, reason), null);
-  assert.equal(reviewedFixture(path, bytes, 'credential-like value'), null);
+  const table = { [path]: { sha256: createHash('sha256').update(bytes).digest('hex'), reason, note: 'Synthetic state.' } };
+  assert.equal(reviewedFixture(path, bytes, reason, table), 'Synthetic state.');
+  assert.equal(reviewedFixture(path, Buffer.concat([bytes, Buffer.from('changed')]), reason, table), null);
+  assert.equal(reviewedFixture('docs/HANDOVER.md', bytes, reason, table), null);
+  assert.equal(reviewedFixture(path, bytes, 'credential-like value', table), null);
+  assert.equal(reviewedFixture('toString', bytes, reason, table), null, 'prototype names are not entries');
   assert.equal(privatePath('test/handover.test.mjs'), false);
   assert.equal(privatePath('test/handover.json'), true);
 });

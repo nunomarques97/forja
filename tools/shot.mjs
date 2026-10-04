@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Forja screenshot helper: drives the local Chrome headless over the DevTools
 // protocol and writes a PNG of a URL. Node core only (uses the global
-// WebSocket of Node 22+). Used by forja-visual-check (Frontend Dev, Backend Dev,
-// Reviewer, Product Designer, QA) so "verified visually" always means a real rendered page.
+// WebSocket of Node 22+). Used for the desktop and mobile screenshots that UI
+// acceptance needs, so "verified visually" always means a real rendered page.
 //
 //   node tools/shot.mjs <url> <out.png> [--width 1440] [--height 1000] [--mobile]
 //        [--wait 1200] [--full] [--eval "<js>"] [--no-reduced-motion] [--chrome <path>]

@@ -929,7 +929,7 @@ test('usage aggregation keeps cache semantics, unknown coverage and crash duplic
   assert.equal(report.totals.input_covered_invocations, 2);
   assert.equal(report.by_phase.develop.measured_input_share_percent, null);
 });
-test('core refuses overlapping legacy start through the real CLI', () => {
+test('the removed legacy start is refused through the real CLI next to a Core run', () => {
   const p = repo();
   createRun(p, { goal: 'Return two', plan: plan() });
   const launched = spawnSync(
@@ -946,8 +946,8 @@ test('core refuses overlapping legacy start through the real CLI', () => {
       },
     },
   );
-  assert.notEqual(launched.status, 0);
-  assert.match(launched.stderr, /unfinished FORJA core run/);
+  assert.equal(launched.status, 2);
+  assert.match(launched.stderr, /`run` was removed in 0\.22\.0/);
   assert.equal(existsSync(join(p, 'docs/forja/RUN.json')), false);
 });
 
