@@ -50,3 +50,22 @@ test('the version check reports every place that names another version', () => {
   assert.deepEqual(versionMismatches('1.2.3', readme, '# Changelog\n\n## 1.2.2 — Older\n\n## 1.2.3 — Title\n'), ['top CHANGELOG heading is not 1.2.3: ## 1.2.2 — Older']);
   assert.deepEqual(versionMismatches('1.2.3', 'no badge here', changelog), ['README has no version badge', 'README current release link does not say v1.2.3']);
 });
+
+test('the forja-office section follows the badges block and links the demo video', () => {
+  const readme = read('README.md');
+  const lines = readme.split(/\r?\n/);
+  const badge = lines.findIndex(line => line.includes('img.shields.io/badge/version-'));
+  const badgesEnd = lines.findIndex((line, index) => index > badge && line.trim() === '</p>');
+  const next = lines.slice(badgesEnd + 1).find(line => line.trim() !== '');
+  assert.equal(next, '<h2 align="center">See it live: forja-office</h2>');
+
+  const start = readme.indexOf('<h2 align="center">See it live: forja-office</h2>');
+  const section = readme.slice(start, readme.indexOf('\n## ', start));
+  assert.ok(readme.indexOf('img.shields.io/badge/version-') < start);
+  assert.match(section, /<a href="https:\/\/github\.com\/nunomarques97\/forja-office">forja-office<\/a> is a separate, read-only 3D view of FORJA Core runs/);
+  for (const room of ['whiteboard', 'desks', 'server rack', 'independent review', "Sponsor's door", 'break room']) assert.ok(section.includes(room), room);
+  assert.match(section, /reads FORJA's registry and run state files and never writes them/);
+  assert.match(section, /<a href="https:\/\/youtu\.be\/EXVfoSOA7j8"><img src="https:\/\/img\.youtube\.com\/vi\/EXVfoSOA7j8\/hqdefault\.jpg"[^>]*alt="[^"]+"><\/a>/);
+  assert.match(section, /<a href="https:\/\/youtu\.be\/EXVfoSOA7j8">[^<]+<\/a> \(demo mode with fictional projects\)/);
+  for (const line of section.split(/\r?\n/).filter(Boolean)) assert.match(line, /^(<h2 align="center">|<p align="center">|  <a |<\/p>)/);
+});

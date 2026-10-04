@@ -11,6 +11,7 @@ Sponsor decision 2026-10-03, recorded in [docs/LEGACY-REMOVAL.md](docs/LEGACY-RE
 - Unchanged: `lib/core/` is byte-identical to 0.21.2, so the controller, workers, the six `forja-core-*` methods, checks, review, delivery and the `.forja/` state formats are the same. `core init` still recognises and archives legacy files of older projects (detection only). The registry `data/projects.json` keeps its byte format (new test/registry-format.test.mjs). `hooks/log-event.mjs` and the `.claude/settings.json` hooks stay.
 - `tools/check.mjs` drops the crew byte-copy, model-policy, autonomy-rule and TASKS.json checks. New test/legacy-references.test.mjs fails on any remaining reference to a removed command, flag, agent, skill, module or doc outside the allowlist in docs/LEGACY-REMOVAL.md, and on broken relative Markdown links. New test/readme.test.mjs checks that the package version, the README badge and release links and the top CHANGELOG heading agree.
 - README, CLAUDE.md, AGENTS.md, docs/CORE-RUNBOOK.md, docs/ARCHITECTURE.md (now only the viewer, guard, notifications and registry), docs/forja/CORE-CONVENTIONS.md and viewer/README.md describe Core as the only workflow. docs/CORE.md, the worker contract the controller sends to every session, already described Core only and is unchanged, so worker prompts are the same as in 0.21.2.
+- README: new "See it live: forja-office" section after the badges, introducing the separate read-only 3D view of Core runs with a link to its demo video (demo mode, fictional projects).
 
 ### Migration from the legacy workflow
 

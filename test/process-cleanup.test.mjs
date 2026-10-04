@@ -48,13 +48,16 @@ test('a grandchild left behind by an exited process is terminated, and an unrela
 
 test('after a timeout the orphan of an exited intermediate process is terminated too', async t => {
   // root -> middle (starts the grandchild, lives long enough to be observed, exits) ; root keeps sleeping.
-  const root = `const m = require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(launcher(2500))}], { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }); m.stdout.pipe(process.stdout); setTimeout(() => {}, 120000);`;
-  const out = await execute(process.execPath, ['-e', root], { timeoutMs: 6000, processTree: tree });
+  // Only a middle seen alive by a snapshot is tracked, and the first snapshot
+  // waits for powershell.exe and WMI: with many concurrent watchers (full suite
+  // on Windows) that takes several seconds, so the middle stays 7 s.
+  const root = `const m = require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(launcher(7000))}], { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }); m.stdout.pipe(process.stdout); setTimeout(() => {}, 120000);`;
+  const out = await execute(process.execPath, ['-e', root], { timeoutMs: 12000, processTree: tree });
   const pid = grandchildOf(out.stdout);
   assert.ok(Number.isSafeInteger(pid), out.stdout + out.stderr);
   reap(t, pid);
   assert.equal(out.timedOut, true);
-  assert.ok(await gone(pid), `grandchild ${pid} still running after the timeout`);
+  assert.ok(await gone(pid), `grandchild ${pid} still running after the timeout: ${JSON.stringify(out.processCleanup)}`);
   assert.deepEqual(out.processCleanup.survivors, []);
 });
 

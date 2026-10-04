@@ -13,6 +13,16 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
 </p>
 
+<h2 align="center">See it live: forja-office</h2>
+
+<p align="center"><a href="https://github.com/nunomarques97/forja-office">forja-office</a> is a separate, read-only 3D view of FORJA Core runs: planning at the whiteboard, development at the desks, controller checks at the server rack, independent review, the Sponsor's door when a decision is needed, and the break room when a run finishes.<br>It reads FORJA's registry and run state files and never writes them.</p>
+
+<p align="center">
+  <a href="https://youtu.be/EXVfoSOA7j8"><img src="https://img.youtube.com/vi/EXVfoSOA7j8/hqdefault.jpg" width="480" alt="forja-office demo video: FORJA Core runs shown as a 3D office"></a>
+</p>
+
+<p align="center"><a href="https://youtu.be/EXVfoSOA7j8">Watch the forja-office demo on YouTube</a> (demo mode with fictional projects).</p>
+
 <p align="center"><a href="#what-it-is">What it is</a> · <a href="#how-it-works">How it works</a> · <a href="#evidence">Evidence</a> · <a href="#design-decisions">Design decisions</a> · <a href="#quick-start">Quick start</a> · <a href="#troubleshooting">Troubleshooting</a> · <a href="#documentation">Docs</a></p>
 
 ## What it is
