@@ -35,6 +35,37 @@ do not reopen them.
   here. `docs/forja/DECISIONS.md` is Git-ignored and refused by the delivery
   privacy scan, so it is not used for this decision.
 
+### D-2026-10-03 (final): legacy removal released as 0.22.0
+
+- **Decision (Sponsor, 2026-10-03), final state:** the removal is complete and
+  released as 0.22.0 (minor). `package.json`, the README badge and release link
+  and the top CHANGELOG.md heading say 0.22.0; `test/readme.test.mjs` keeps them
+  in agreement. The CHANGELOG.md 0.22.0 entry carries the migration note (each
+  removed command, the crew agents and the legacy skills, and the Core command
+  to use instead), which repeats the table below.
+- **Implemented as decided above:** T2 viewer launcher, T3 monitoring backend
+  (`lib/process-lock.mjs`, registry golden test), T4 crew agents, legacy skills
+  and `bootstrap --legacy`, T5 legacy CLI commands and libraries (each refuses
+  with exit 2 and a pointer to `forja core`), T6 Core-only docs and the
+  reference proof, T7 release. `lib/core/` is byte-identical to `5089a41`
+  (`git diff --quiet 5089a41 -- lib/core` exits 0).
+- **Grep-proof result (2026-10-04, release task, before the release commit):**
+  `node --test test/legacy-references.test.mjs` passes (5 tests). It applied
+  patterns P1–P7 to the 237 files from
+  `git ls-files --cached --others --exclude-standard`: 235 text files scanned,
+  2 binary skipped, **0 matching lines outside the allowlist**, and every
+  relative Markdown link resolves. Matching lines remain only in allowlisted
+  files (27 files, 440 lines): CHANGELOG.md and this document (history and
+  migration note), `lib/core/init.mjs` and `lib/core/instructions.mjs` with
+  `examples/sample-project/AGENTS.md` (legacy detection, frozen), the
+  historical event readers and `/legacy` session page (`viewer/lib/state.mjs`,
+  `viewer/lib/feed.mjs`, `viewer/index.html`, `viewer/mobile.html`,
+  `viewer/assets/viewer.js`, `viewer/assets/viewer.css`) with their tests and
+  `test/fixtures/`, and the refusal and detection tests. In `bin/forja.mjs`
+  and `lib/bootstrap.mjs` matches occur only inside the marked refusal regions.
+  The history docs on the allowlist (RESEARCH, MODEL-BENCHMARK,
+  ADAPTIVE-ORCHESTRATION) have no matching line.
+
 ## Legacy detection that stays
 
 Older projects can still contain legacy files. Core keeps recognising them,

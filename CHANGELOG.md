@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.22.0 — Core is the only workflow: legacy crew workflow removed
+
+Sponsor decision 2026-10-03, recorded in [docs/LEGACY-REMOVAL.md](docs/LEGACY-REMOVAL.md) (decision log, inventory, migration note and reference proof). 0.21.2 is the last release with the legacy workflow; it stays available through Git history.
+
+- Removed the legacy crew workflow: the legacy CLI commands, the nine crew agents (`.claude/agents/`), the fourteen legacy skills, `bootstrap --legacy`/`--keep-legacy`, the legacy runner and its libraries (`lib/runner.mjs`, `lib/driver.mjs`, `lib/autonomy.mjs`, `lib/models.mjs`, `lib/run-cost.mjs`, `lib/obsidian-sync.mjs`, `lib/usage-counts.mjs`, `config/mcp-forja.json`), the legacy measurement tools (`tools/content.mjs`, `tools/first.mjs`, `tools/par3.mjs`, `tools/perrun.mjs`, `tools/subcontent.mjs`, `tools/usage.mjs`, `tools/medir-contexto.mjs`, `tools/stats.mjs`), `docs/LEGACY-CLAUDE.md`, `docs/RUNBOOK-UNATTENDED.md`, the legacy sections of `docs/ARCHITECTURE.md`, and the legacy-only tests. The same agents and skills were removed from `examples/sample-project/`. `lib/state-files.mjs` keeps only its path and JSON helpers.
+- Every removed command exits 2 with an English message that names it, says it was removed in 0.22.0 and points to the Core command to use instead; it writes nothing. `bootstrap --legacy`/`--keep-legacy` refuse the same way. New test/legacy-cli.test.mjs covers each refusal and runs `core init`, `core status`, `start` and `resume`/`retry` on a fixture that still holds legacy files.
+- Viewer: the phone run launcher is gone; `GET /projects` and `POST /runs` answer 410 with a pointer to the terminal. The `/core` panel, the `/legacy` session page (replays historical events), the watchdog with the #28 Core transition behaviour and guard–viewer supervision are unchanged.
+- Monitoring: `guard` relaunches only dead Core controllers and never a legacy runner, even when a legacy `docs/forja/RUN.json` says `running`. `projects list` reads only Core state. `up`/`down` no longer recognise a legacy runner command line. The lock, pid and command-line helpers they share moved to the new `lib/process-lock.mjs`. `lib/notify.mjs` (ntfy) is unchanged.
+- Unchanged: `lib/core/` is byte-identical to 0.21.2, so the controller, workers, the six `forja-core-*` methods, checks, review, delivery and the `.forja/` state formats are the same. `core init` still recognises and archives legacy files of older projects (detection only). The registry `data/projects.json` keeps its byte format (new test/registry-format.test.mjs). `hooks/log-event.mjs` and the `.claude/settings.json` hooks stay.
+- `tools/check.mjs` drops the crew byte-copy, model-policy, autonomy-rule and TASKS.json checks. New test/legacy-references.test.mjs fails on any remaining reference to a removed command, flag, agent, skill, module or doc outside the allowlist in docs/LEGACY-REMOVAL.md, and on broken relative Markdown links. New test/readme.test.mjs checks that the package version, the README badge and release links and the top CHANGELOG heading agree.
+- README, CLAUDE.md, AGENTS.md, docs/CORE-RUNBOOK.md, docs/ARCHITECTURE.md (now only the viewer, guard, notifications and registry), docs/forja/CORE-CONVENTIONS.md and viewer/README.md describe Core as the only workflow. docs/CORE.md, the worker contract the controller sends to every session, already described Core only and is unchanged, so worker prompts are the same as in 0.21.2.
+
+### Migration from the legacy workflow
+
+Finish or abandon any legacy run before upgrading: 0.22.0 cannot continue one, and Core refuses to start while a legacy `docs/forja/RUN.json` is `running`. Run `forja core init` in an older project to archive its legacy agents, skills and run files. Global copies of the crew agents and skills outside this repository are not touched; remove them yourself.
+
+| Removed | Use instead |
+|---|---|
+| `forja run start --goal "..."` | `forja start --goal "..." --provider claude\|codex\|kilo` (or `--goal-file <path>`) |
+| `forja run resume`, `forja resume` | `forja core resume` |
+| `forja run checkpoint`, `forja run finish` | nothing: the Core controller records progress; inspect it with `forja core status` |
+| `forja run fail`, `forja run block` | `forja core abandon --why "..."` or `forja core stop` |
+| `forja run driver show\|set` | nothing: the Core controller always drives, and the guard relaunches a dead Core controller |
+| `forja task add\|show\|start\|review\|done\|fail\|block` | the Core planner and controller own tasks: `forja start --plan <json>` to supply a plan, `forja core status` to inspect, `forja core retry --task T1 --why "..."` (add `--reopen` for an approved task) |
+| `forja runner` | `forja start` for a new run, `forja core resume` to continue one |
+| `forja forjalvl show\|set`, `forja models` | a Core profile: `forja start --config <profile.json>`, checked with `forja core doctor --config <profile.json>` |
+| `forja autonomy show\|set` | Core budgets and the profile; paid choices always reach the Sponsor as a pending decision |
+| `forja decide "..."` | `forja core decide --run <id> --decision <D> --option <id> --why "..."` for Sponsor technology choices |
+| `forja decisions reindex`, `forja technology split` | nothing: Core records technology choices in its run state (`forja core decide`) |
+| `forja obsidian sync` | nothing: Obsidian is an optional human interface, not a FORJA step |
+| `forja ask`, `forja answers` | the pending Sponsor decision in `forja core status` and the viewer `/core` panel, answered with `forja core decide` |
+| `forja fallback` | the provider and model per phase in the Core profile (`--config`); `forja core retry` after a provider failure |
+| `forja progress`, `forja report` | `forja core status`, `forja core usage`, `forja core evidence`, viewer `/core` |
+| `forja notify` | automatic Core notifications (ntfy) |
+| `forja status` | `forja core status` |
+| `forja context` | `forja core context --query "..."` |
+| `forja bootstrap <repo> --legacy [--keep-legacy]` | `forja core init` in the repository, or `forja bootstrap <repo>` without flags |
+| crew agents (`architect`, `backend-dev`, `frontend-dev`, `product-designer`, `product-manager`, `qa`, `reviewer`, `security-reviewer`, `technology-scout`) | the Core controller phases (plan, develop, controller checks, independent review) |
+| legacy skills (`forja-lead`, `forja-crew`, `forja-plan`, `forja-product`, `forja-scout`, `forja-design`, `forja-implementer`, `forja-review`, `forja-qa`, `forja-security`, `forja-debug`, `forja-performance`, `forja-release`, `forja-visual-check`) | the six frozen `forja-core-*` methods (planner, reviewer, design, frontend, backend, security), selected by the controller |
+| phone run launcher in the viewer (`POST /runs`) | `forja start` / `forja core resume` in a terminal; the viewer `/core` panel to follow the run |
+
+Kept commands: `start`, `core *`, `serve`, `up`, `down`, `token`, `autostart`, `guard`, `projects`, `bootstrap <repo> [--dry-run]`.
+
 ## 0.21.2 — Delivery: Git configuration of sibling worktrees no longer voids approvals
 
 Fixes #35 (related #30).

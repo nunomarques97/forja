@@ -7,7 +7,7 @@
 <p align="center">A small controller that turns a goal into code changes, executed checks and an independent review.<br>Claude Code and Codex do the engineering. FORJA owns the state, the limits and the definition of done.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.21.2"><img src="https://img.shields.io/badge/version-0.21.2-ff9955" alt="Version 0.21.2"></a>
+  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.22.0"><img src="https://img.shields.io/badge/version-0.22.0-ff9955" alt="Version 0.22.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -159,7 +159,7 @@ Start with `node $forja core status`. A stopped run reports a fixed `recovery.co
 |---|---|
 | Sequential Core workflow, separate review, controller-run checks, protected acceptance, context rotation, crash recovery, explicit routing, isolated checks, reviewer-approved delivery, viewer and diagnostics. | Economy/Ollama presets are opt-in experiments. Dynamic specialist allocation, parallel writers in one project and adaptive replanning are **not implemented**. |
 
-**Current release: [v0.20.1](https://github.com/nunomarques97/forja/releases/tag/v0.20.1).** The privacy scan no longer blocks Core delivery on REST API and route paths such as `users/me/` (#26). Builds on 0.20.0, which adds an optional reviewed commit per task, lets you reopen an approved task with `core retry --reopen`, keeps oversized worker results instead of blocking the run, and stops false dead-session alerts. Earlier releases are listed in the [changelog](CHANGELOG.md) and the [tags](https://github.com/nunomarques97/forja/tags). Core is the only workflow: the legacy crew workflow and its commands were removed ([what changed and what to use instead](docs/LEGACY-REMOVAL.md#removed-cli-commands-and-core-replacements-migration-note)).
+**Current release: [v0.22.0](https://github.com/nunomarques97/forja/releases/tag/v0.22.0).** Core is the only workflow: the legacy crew workflow, its commands, crew agents and skills were removed ([what changed and what to use instead](docs/LEGACY-REMOVAL.md#removed-cli-commands-and-core-replacements-migration-note)). Builds on 0.21, which adds the Kilo CLI provider, stops binary files from counting toward the delivery review limit and stops Git configuration of sibling worktrees from voiding delivery approvals. Earlier releases are listed in the [changelog](CHANGELOG.md) and the [tags](https://github.com/nunomarques97/forja/tags).
 
 For development, run `npm test`, `npm run check` and `npm run release:check`. The release guard scans Git's index for credential-shaped values and private run material before any commit. Read the [publication rules](docs/RELEASE.md) before you stage evidence.
 
