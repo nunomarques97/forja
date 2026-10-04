@@ -1,7 +1,7 @@
 // Viewer request helpers and the retired phone run launcher.
 //
 // GET /projects and POST /runs used to list the registered projects with their
-// legacy runner and start or relaunch `forja runner` from the phone. Core is the
+// legacy run and start or relaunch it from the phone. Core is the
 // only workflow now (docs/LEGACY-REMOVAL.md), and a Core run is started or
 // resumed in the terminal, so both routes answer 410 Gone with a JSON pointer
 // and never read the registry, the body or start a process. Core runs are

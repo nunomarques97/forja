@@ -40,7 +40,7 @@ export const STATES = Object.freeze({
   PAUSA: 'em pausa',
 });
 
-// Fixed roster (docs/ARCHITECTURE.md §2): ten roles, plain English names.
+// Fixed historical roster of the legacy workflow (removed in 0.22.0, docs/LEGACY-REMOVAL.md): ten roles, plain English names.
 // `core` roles take part in every run; the others are woken on trigger and
 // shown as idle until then (never hidden). `types` are the agent_type values
 // that map to each role; the legacy forge names come from older agent files
@@ -302,7 +302,7 @@ function setTask(run, id, patch, t) {
 }
 
 // ---------- Forja CLI events (hook_event_name: "Forja") ----------
-// O forjalvl do run (docs/ARCHITECTURE.md §6) chega no `run.start` e em cada
+// O forjalvl de um run legado histórico (docs/LEGACY-REMOVAL.md) chega no `run.start` e em cada
 // `runner.session`, com os dois nomes aceites: `forjalvl` (desde a decisão do
 // Sponsor de 17 set 2026) e o antigo `model_level`, para um stream gravado antes
 // da mudança reproduzir na mesma. O snapshot expõe os dois — `modelLevel` é só
@@ -317,7 +317,7 @@ function setForjalvl(run, f, { keepWhenMissing = false } = {}) {
   run.forja.modelLevel = run.forja.forjalvl;
 }
 
-// A autonomia do run (docs/ARCHITECTURE.md §6b) chega no `run.start` e em cada
+// A autonomia de um run legado histórico (docs/LEGACY-REMOVAL.md) chega no `run.start` e em cada
 // `runner.session`. Um evento gravado antes desta funcionalidade não a traz e lê
 // como `normal`, que foi o que esses runs fizeram; `keepWhenMissing` serve ao
 // `runner.session`, que não apaga o que já se sabia (só o `run.start` decide o
@@ -348,8 +348,8 @@ function applyForja(state, run, rec, t) {
       run.announced = true; // anunciou-se: é um run, nunca uma sessão solta (T-UI-9)
       run.forja.status = 'running'; run.forja.runId = f.run_id || run.forja.runId || rec.session_id; run.goal = f.goal || run.goal; run.goalSource = 'forja';
       if (f.model_floor) run.forja.modelFloor = f.model_floor;
-      setForjalvl(run, f); // forjalvl do run (docs/ARCHITECTURE.md §6)
-      setAutonomy(run, f); // autonomia do run (docs/ARCHITECTURE.md §6b)
+      setForjalvl(run, f); // forjalvl de um run legado histórico
+      setAutonomy(run, f); // autonomia de um run legado histórico
       note(run, t, 'run.start', `Run começou: ${clip(f.goal || '', 120)}`); break;
     case 'run.resume':
       run.announced = true; // idem: retomar um run é anunciá-lo (T-UI-9)

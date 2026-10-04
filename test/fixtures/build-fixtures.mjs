@@ -323,7 +323,7 @@ fixtures['all-states'] = [
   mainTool(1600, 'Bash', { command: 'node "C:/forja/bin/forja.mjs" status', description: 'estado do run' }),
 ];
 
-// 12. The ten roles (docs/ARCHITECTURE.md §2) in one run with the new agent_type
+// 12. The ten historical legacy roles (removed in 0.22.0, docs/LEGACY-REMOVAL.md) in one run with the new agent_type
 // values, in different states: a SECURITY-REJECT, a `QA FAIL`, FRAME/PLAN/DONE S<n>
 // hand-backs, two Backend Dev sessions, a Product Designer gone silent, and a
 // usage-limit `run.pause` at the very end (the run is left paused, session still

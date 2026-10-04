@@ -159,7 +159,7 @@ Start with `node $forja core status`. A stopped run reports a fixed `recovery.co
 |---|---|
 | Sequential Core workflow, separate review, controller-run checks, protected acceptance, context rotation, crash recovery, explicit routing, isolated checks, reviewer-approved delivery, viewer and diagnostics. | Economy/Ollama presets are opt-in experiments. Dynamic specialist allocation, parallel writers in one project and adaptive replanning are **not implemented**. |
 
-**Current release: [v0.20.1](https://github.com/nunomarques97/forja/releases/tag/v0.20.1).** The privacy scan no longer blocks Core delivery on REST API and route paths such as `users/me/` (#26). Builds on 0.20.0, which adds an optional reviewed commit per task, lets you reopen an approved task with `core retry --reopen`, keeps oversized worker results instead of blocking the run, and stops false dead-session alerts. Earlier releases are listed in the [changelog](CHANGELOG.md) and the [tags](https://github.com/nunomarques97/forja/tags). The legacy `runner` remains available as a compatibility workflow.
+**Current release: [v0.20.1](https://github.com/nunomarques97/forja/releases/tag/v0.20.1).** The privacy scan no longer blocks Core delivery on REST API and route paths such as `users/me/` (#26). Builds on 0.20.0, which adds an optional reviewed commit per task, lets you reopen an approved task with `core retry --reopen`, keeps oversized worker results instead of blocking the run, and stops false dead-session alerts. Earlier releases are listed in the [changelog](CHANGELOG.md) and the [tags](https://github.com/nunomarques97/forja/tags). Core is the only workflow: the legacy crew workflow and its commands were removed ([what changed and what to use instead](docs/LEGACY-REMOVAL.md#removed-cli-commands-and-core-replacements-migration-note)).
 
 For development, run `npm test`, `npm run check` and `npm run release:check`. The release guard scans Git's index for credential-shaped values and private run material before any commit. Read the [publication rules](docs/RELEASE.md) before you stage evidence.
 
@@ -171,6 +171,7 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. Th
 | [Routing, models and presets](docs/ROUTING.md) | [Scheduler](lib/core/engine.mjs) · [Adapters](lib/core/providers.mjs) · [Budgets](lib/core/budgets.mjs) |
 | [Isolated checks and delivery](docs/CONTROLLER-DELIVERY.md) | [Specialist methods](docs/CORE-SPECIALISTS.md) |
 | [Research and measured pilots](docs/RESEARCH.md) | [Adaptive orchestration study](docs/ADAPTIVE-ORCHESTRATION.md) |
+| [Viewer, guard and notifications](docs/ARCHITECTURE.md) | [Legacy workflow removal](docs/LEGACY-REMOVAL.md) |
 | [Release and privacy policy](docs/RELEASE.md) | [Changelog](CHANGELOG.md) |
 
 [MIT](LICENSE) · Copyright (c) 2026 Nuno Marques.

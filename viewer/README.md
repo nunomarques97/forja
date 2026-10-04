@@ -1,10 +1,10 @@
 # Viewer — API contract (server ↔ pages)
 
-`viewer/server.mjs` serves the pages and streams **state**, never raw events. The responsive workspace is `viewer/core.html` at `/`, `/core` and `/m`. Compatibility pages are `viewer/index.html` at `/legacy` and `viewer/mobile.html` at `/legacy/m`. Assets live under `viewer/assets/`. Everything below is what a page may rely on.
+`viewer/server.mjs` serves the pages and streams **state**, never raw events. The responsive workspace is `viewer/core.html` at `/`, `/core` and `/m`. The historical session pages (they replay `data/events.jsonl`, including runs of the legacy workflow removed in 0.22.0) are `viewer/index.html` at `/legacy` and `viewer/mobile.html` at `/legacy/m`. Assets live under `viewer/assets/`. Everything below is what a page may rely on.
 
 ## Auth
 
-The Core workspace and sign-in page use English. Project goals, task titles and decision content retain their original language. The compatibility pages at `/legacy` and `/legacy/m` retain their Portuguese interface.
+The Core workspace and sign-in page use English. Project goals, task titles and decision content retain their original language. The historical session pages at `/legacy` and `/legacy/m` retain their Portuguese interface.
 
 Every route except `/health` needs the token. A visitor without the cookie gets the **entry page** on `/` and `/m` (a form; `POST /login` sets the cookie) and 401 everywhere else; pasting `/?k=<token>` still works. Either way the server sets the `forja_k` HttpOnly cookie (`SameSite=Lax`, 30 days, `Secure` outside loopback) and redirects to the clean path. Pages never see or store the token; they just use `fetch`/`EventSource` with same-origin cookies. Nothing prints the token — not the startup banner, not `forja token` (its output is captured into `data/events.jsonl`); it is read from `data/viewer-token.txt` and rotated with `forja token rotate`.
 
@@ -13,12 +13,12 @@ Every route except `/health` needs the token. A visitor without the cookie gets 
 | Route | Returns |
 |---|---|
 | `GET /` · `GET /core` · `GET /m` | responsive Core workspace |
-| `GET /legacy` · `GET /legacy/m` | previous event/roster pages, desktop and phone |
+| `GET /legacy` · `GET /legacy/m` | historical session pages (event feed and roster), desktop and phone |
 | `GET /assets/<file>` | static files from `viewer/assets/` |
 | `GET /state` | the snapshot (below) |
 | `GET /events` | SSE: `event: state` with the snapshot on connect and on every change (debounced 250 ms); `event: ping` every 15 s |
 | `GET /feed` | the key-events feed (`viewer/lib/feed.mjs` → `feedSnapshot()`): `{ generatedAt, janelaHoras, agora: [ { projeto, estado: 'parou'\|'precisa'\|'pausa'\|'ativo'\|'terminou'\|'sem-run', ultimo, terminou, pendentes[] } ], itens: [ volta \| marco ] }`, newest first. Projects = `data/projects.json`; "next in the plan" reads each live project's `docs/forja/TASKS.json`. There is no raw-record route: the raw log is `data/events.jsonl` |
-| `POST /answers` `{ project, id: "Q3", answer }` | stores the Sponsor's answer for the lead (`forja answers`) and emits `answer.pending`; `{ ok: true }` · 400 bad input · 404 no such open question in a known run · 413 body over 64 KB |
+| `POST /answers` `{ project, id: "Q3", answer }` | stores an answer to a question on the historical session page (`/legacy`) in `data/answers/<project>.jsonl` and emits `answer.pending`; no command reads it since 0.22.0 (Core decisions are answered at `/core`); `{ ok: true }` · 400 bad input · 404 no such open question in a known run · 413 body over 64 KB |
 | `GET /projects` · `POST /runs` (any method) | 410 Gone: the phone run launcher was removed. `{ ok: false, error, start: 'forja start --goal "..."', resume: 'forja core resume', monitor: '/core' }`; reads no body or registry and starts no process. Start or resume a Core run in the terminal |
 | `GET /health` | `{ ok: true }` (no auth; nothing else) |
 
@@ -64,7 +64,7 @@ Timeline `kind` values: `run.start`, `run.resume`, `checkpoint`, `run.finish`, `
 
 ## Core
 
-Open `/` (or `/core` or `/m`) for the Core workspace. It summarizes current runs, prioritizes projects needing attention, and supports search and status filters. Tasks, checks, review and session consumption are expandable. This is the current run per project, not a historical run browser. Legacy event/roster pages remain under the secondary compatibility link. `core init` and `start` register projects; native usage is shown with measurement coverage and optional USD estimates, never presented as a subscription invoice. Authentication and host checks are shared with the existing viewer. Paid or unknown-cost alternatives pause work until a choice is submitted; no radio option is preselected. Other recovery stays in `core resume` / `core retry`; the guard only resumes interrupted running jobs. Restart an already-running viewer/guard to load this implementation. See [Core runbook](../docs/CORE-RUNBOOK.md).
+Open `/` (or `/core` or `/m`) for the Core workspace. It summarizes current runs, prioritizes projects needing attention, and supports search and status filters. Tasks, checks, review and session consumption are expandable. This is the current run per project, not a historical run browser. The historical session pages remain under the secondary link in the footer. `core init` and `start` register projects; native usage is shown with measurement coverage and optional USD estimates, never presented as a subscription invoice. Authentication and host checks are shared with the existing viewer. Paid or unknown-cost alternatives pause work until a choice is submitted; no radio option is preselected. Other recovery stays in `core resume` / `core retry`; the guard only resumes interrupted running jobs. Restart an already-running viewer/guard to load this implementation. See [Core runbook](../docs/CORE-RUNBOOK.md).
 
 `GET /api/core` includes `legacy_only_projects`, a non-negative integer count of existing registered projects that have no Core state. It is aggregate discovery metadata only: names, paths and legacy state are not added. Malformed or unreadable Core state remains an error project in `projects` and is never included in this count. Clients talking to an older server may treat a missing field as zero.
 

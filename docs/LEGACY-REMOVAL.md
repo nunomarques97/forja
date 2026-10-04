@@ -313,7 +313,9 @@ is the Markdown escape of `|`.
 6. Refusal and detection tests: `test/legacy-references.test.mjs`,
    `test/legacy-cli.test.mjs`, `test/cli.test.mjs`, `test/bootstrap.test.mjs`,
    `test/core-migration.test.mjs`, `test/init-rollback.test.mjs`,
-   `test/guard.test.mjs`.
+   `test/guard.test.mjs`, and the negative cases proving that a legacy runner
+   command line is no longer recognised or spared (`test/up.test.mjs`,
+   `test/supervise.test.mjs`).
 7. Refusal code regions in `bin/forja.mjs` and `lib/bootstrap.mjs`, only
    between the comment markers `legacy-references:allow-begin` and
    `legacy-references:allow-end`.

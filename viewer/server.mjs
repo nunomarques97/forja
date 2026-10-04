@@ -21,8 +21,9 @@
 //   unresponsive, or a run waiting on quota, is not (both can still recover
 //   on their own).
 // - Answers from the phone: POST /answers writes data/answers/<project>.jsonl
-//   and emits a Forja `answer.pending` event; the lead picks it up with
-//   `forja answers`. The server never writes outside <forja>/data.
+//   and emits a Forja `answer.pending` event for the historical session page
+//   (/legacy). Since 0.22.0 no command reads it: Core decisions are answered at
+//   /core. The server never writes outside <forja>/data.
 //
 // Run: node viewer/server.mjs   (or: node bin/forja.mjs serve)
 // Env: PORT (4317), HOST (127.0.0.1), FORJA_DATA_DIR, EVENTS_FILE, FORJA_ALLOWED_HOSTS
@@ -610,7 +611,7 @@ export function startServer(opts = {}) {
           const rec = { ts: new Date().toISOString(), project, id, answer, via: 'viewer' };
           try { mkdirSync(join(dataDir, 'answers'), { recursive: true }); appendFileSync(join(dataDir, 'answers', `${project}.jsonl`), JSON.stringify(rec) + '\n'); }
           catch (err) { return json(res, 500, { error: String(err.message) }); }
-          // Tell the viewer (and the lead's next `forja answers`) that an answer is waiting.
+          // Tell the session page that an answer is waiting.
           const ev = { ts: rec.ts, project, session_id: run.sessions.at(-1), cwd: run.cwd, hook_event_name: 'Forja', forja: { kind: 'answer.pending', run_id: run.runId, id, text: answer, via: 'viewer' } };
           try { appendFileSync(eventsPath, JSON.stringify(ev) + '\n'); } catch {}
           return json(res, 200, { ok: true });

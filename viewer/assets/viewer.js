@@ -46,7 +46,7 @@ export function memberName(run, who) {
 const leadOf = run => ((run && run.roster) || []).find(c => c.key === 'lead') || { name: 'Lead' };
 
 // Tom = família de cor da palavra de estado (docs/design/DESIGN.md, tabela de estados).
-// forjalvl do run (docs/ARCHITECTURE.md §6, `run.forja.forjalvl`), em português.
+// forjalvl de um run legado histórico (removido na 0.22.0, docs/LEGACY-REMOVAL.md; `run.forja.forjalvl`), em português.
 // `Object.hasOwn`, nunca um lookup simples: "constructor" e outras chaves
 // herdadas de Object.prototype não podem "resolver-se" a uma função.
 export const FORJALVL_LABEL = { max: 'máximo', high: 'alto', eco: 'económico' };
