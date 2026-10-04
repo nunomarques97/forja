@@ -68,7 +68,7 @@ describe('a reprodução do diagnóstico (guardPlan puro)', () => {
     assert.deepEqual(a.actions, []);
     const b = guardPlan(proof(null), a.state, 1_120_001);
     assert.deepEqual(b.actions, [], 'um run sem responsável conhecido nunca recebe um runner');
-    assert.match(b.skips[0].why, /desconhecido/);
+    assert.match(b.skips[0].why, /não é Core/);
   });
   test('um run interativo nunca recebe um runner, por muito tempo que passe', () => {
     let s = {};
@@ -79,22 +79,11 @@ describe('a reprodução do diagnóstico (guardPlan puro)', () => {
       s = JSON.parse(JSON.stringify(r.state));
     }
   });
-  test('o mesmo run, do runner: a recuperação de sempre continua (uma ação depois da graça)', () => {
+  test('o mesmo run, do runner: desde 0.22.0 a guarda só relança controladores Core', () => {
     const a = guardPlan(proof('runner'), {}, 1_000_000);
-    const b = guardPlan(proof('runner'), JSON.parse(JSON.stringify(a.state)), 1_000_000 + GUARD_DEAD_GRACE_MS);
-    assert.equal(b.actions.length, 1);
-    assert.equal(b.actions[0].attempt, 1);
-  });
-  test('passar de interativo para runner recomeça a graça a partir da mudança, não do passado', () => {
-    let s = {};
-    for (let t = 0; t < 30; t++) s = JSON.parse(JSON.stringify(guardPlan(proof('interactive'), s, 1_000_000 + t * MIN).state));
-    const change = 1_000_000 + 30 * MIN;
-    const first = guardPlan(proof('runner'), s, change);
-    assert.deepEqual(first.actions, [], 'nada no próprio instante da mudança');
-    const inside = guardPlan(proof('runner'), JSON.parse(JSON.stringify(first.state)), change + GUARD_DEAD_GRACE_MS - 1);
-    assert.deepEqual(inside.actions, [], 'dentro da graça contada desde a mudança');
-    const afterGrace = guardPlan(proof('runner'), JSON.parse(JSON.stringify(inside.state)), change + GUARD_DEAD_GRACE_MS);
-    assert.equal(afterGrace.actions.length, 1);
+    const b = guardPlan(proof('runner'), JSON.parse(JSON.stringify(a.state)), 1_000_000 + 6 * 60 * MIN);
+    assert.deepEqual(b.actions, []);
+    assert.match(b.skips[0].why, /não é Core/);
   });
   test('passar de runner para interativo guarda o contador deste run_id mas não age', () => {
     const s = { version: 1, projects: { 'interactive-proof': { run_id: 'R-proof', attempts: 2, dead_since: new Date(T0 - 60 * MIN).toISOString() } } };
@@ -116,7 +105,7 @@ describe('critério 1 — um run interativo, observado durante muitas voltas e r
     assert.equal(spawns.length, 0);
     const log = [];
     await runGuardOnce({ dataDir: p.dataDir, now: T0 + 181 * MIN, spawn: () => { throw new Error('nunca'); }, spawnPeer: () => 1, notify: async () => ({}), log: l => log.push(l) });
-    assert.match(log[0], /conversa: run conduzido por uma conversa interativa/);
+    assert.match(log[0], /conversa: sem run Core legível/, 'um RUN.json legado nunca chega à guarda');
   });
   test('o mesmo com o run bloqueado e depois retomado: continua a ser da conversa', async () => {
     const p = project('conversa-bloq', { run_id: 'R-20260918-aa02', status: 'blocked', driver: 'interactive' });
@@ -126,24 +115,22 @@ describe('critério 1 — um run interativo, observado durante muitas voltas e r
   });
 });
 
-describe('critério 2 — um run do runner comprovado que perde o runner continua a ser recuperado', () => {
-  test('driver runner: uma relançamento depois da graça, nenhum duplicado nas voltas seguintes', async () => {
+describe('critério 2 — um run do runner que perde o runner já não é relançado (0.22.0: só Core)', () => {
+  test('driver runner: nenhum relançamento, por muitas voltas que passem', async () => {
     const p = project('autonomo', { run_id: 'R-20260918-bb01', status: 'running', visible: true, driver: 'runner' });
-    const spawns = await guardTicks({ dataDir: p.dataDir, from: T0, ticks: 14 }); // 13 min: graça + relançamento + espera de 15 min
-    assert.equal(spawns.length, 1, 'exatamente um');
-    assert.deepEqual(spawns[0].extraArgs, ['--visivel'], 'no modo em que o run arrancou');
-    assert.equal(spawns[0].goal, null);
-    assert.equal(spawns[0].via, 'guard');
+    const spawns = await guardTicks({ dataDir: p.dataDir, from: T0, ticks: 60 });
+    assert.equal(spawns.length, 0);
+    assert.equal(runSummary(p.path), null, 'o estado do projeto vem só do Core');
   });
-  test('run anterior ao campo com registos do runner para o MESMO run_id: é do runner e é recuperado', async () => {
+  test('run anterior ao campo com registos do runner para o MESMO run_id: é do runner, e a guarda não age', async () => {
     const p = project('legado', { run_id: 'R-20260917-bb02', status: 'running', visible: false });
     mkdirSync(join(p.dataDir, 'runner'), { recursive: true });
     writeFileSync(join(p.dataDir, 'runner', 'R-20260917-bb02-03-task-T2-a1.log'), 'saída de uma sessão\n');
-    const s = runSummary(p.path, p.dataDir);
+    const s = resolveDriver(readRunOf(p.path), p.path, p.dataDir);
     assert.equal(s.driver, 'runner');
-    assert.match(s.driver_source, /evidência do runner/);
-    const spawns = await guardTicks({ dataDir: p.dataDir, from: T0, ticks: 3 });
-    assert.equal(spawns.length, 1);
+    assert.match(s.source, /evidência do runner/);
+    const spawns = await guardTicks({ dataDir: p.dataDir, from: T0, ticks: 30 });
+    assert.equal(spawns.length, 0);
   });
   test('com um runner vivo (lock deste projeto, heartbeat fresco, dono que é mesmo um runner) não há relançamento', async () => {
     const p = project('vivo', { run_id: 'R-20260918-bb03', status: 'running', driver: 'runner' });
@@ -160,7 +147,7 @@ describe('critério 2 — um run do runner comprovado que perde o runner continu
 describe('critério 3 — dados antigos, ilegíveis, locks de outro run e PID reutilizado', () => {
   test('sem campo e sem evidência: desconhecido, e a guarda não age', async () => {
     const p = project('sem-campo', { run_id: 'R-20260918-cc01', status: 'running' });
-    assert.equal(runSummary(p.path, p.dataDir).driver, 'unknown');
+    assert.equal(resolveDriver(readRunOf(p.path), p.path, p.dataDir).driver, 'unknown');
     assert.equal((await guardTicks({ dataDir: p.dataDir, from: T0, ticks: 30 })).length, 0);
   });
   test('um lock deste projeto mas de OUTRO run não é evidência (nem um lock antigo sem run_id)', () => {
@@ -192,7 +179,7 @@ describe('critério 3 — dados antigos, ilegíveis, locks de outro run e PID re
   });
   test('RUN.json a meio de uma escrita (ou lixo): sem run legível, nenhuma ação e nenhum contador perdido', async () => {
     const p = project('meio', '{ "run_id": "R-20260918-cc07", "status": "runn');
-    assert.equal(runSummary(p.path, p.dataDir), null);
+    assert.equal(runSummary(p.path), null);
     assert.equal((await guardTicks({ dataDir: p.dataDir, from: T0, ticks: 5 })).length, 0);
   });
   test('valor inválido no disco: desconhecido, dito como tal', () => {
@@ -296,7 +283,7 @@ describe('CLI: run start, run resume, task start e run driver', () => {
     const r3 = forja(p, data, ['task', 'start', 'T1'], { FORJA_RUNNER: '1' });
     assert.equal(r3.status, 4, 'uma sessão do runner não começa uma task num run da conversa');
   });
-  test('passar ao runner exige a task em curso fechada ou devolvida; depois disso a guarda passa a tratar dele', async () => {
+  test('passar ao runner exige a task em curso fechada ou devolvida; a guarda continua sem relançar runners', async () => {
     const data = fresh('data');
     const p = fresh('cli-passagem');
     forja(p, data, ['run', 'start', '--goal', 'conversa que vai passar']);
@@ -312,7 +299,7 @@ describe('CLI: run start, run resume, task start e run driver', () => {
     assert.equal(readRunOf(p).driver, 'runner');
     upsertProject({ path: p }, data);
     const spawns = await guardTicks({ dataDir: data, from: T0, ticks: 4 });
-    assert.equal(spawns.length, 1, 'agora é um run autónomo sem runner: a guarda recupera-o');
+    assert.equal(spawns.length, 0, 'a guarda só relança controladores Core');
   });
   test('run driver show diz a verdade, com a origem', () => {
     const data = fresh('data');

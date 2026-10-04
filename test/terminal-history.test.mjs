@@ -61,8 +61,8 @@ function legacyRun(status) {
 }
 
 function assertSelection(f, expected, driver, alive) {
-  const observed = projectStatus(f.project, f.data, NOW);
-  const summary = runSummary(f.project.path, f.data);
+  const observed = projectStatus(f.project);
+  const summary = runSummary(f.project.path);
   for (const run of [observed.run, summary]) {
     assert.ok(run, 'a valid run must be selected');
     assert.equal(run.run_id, expected.run_id);
@@ -76,58 +76,31 @@ function assertSelection(f, expected, driver, alive) {
   return { ...f.project, ...observed };
 }
 
-test('failed Core yields to running legacy; recovery waits for the full grace period', (t) => {
+test('failed Core history is kept over a running legacy run, which the guard never relaunches', (t) => {
   const legacy = legacyRun('running');
   const f = fixture(t, 'failed', legacy);
-  const selected = assertSelection(f, legacy, 'runner', false);
-  assert.equal(selected.run.visible, true);
+  const selected = assertSelection(f, f.core, 'core', false);
   const initialState = EMPTY_STATE();
-  const first = guardPlan([selected], initialState, NOW);
-  assert.deepEqual(first.actions, []);
-  assert.deepEqual(first.giveUps, []);
-  assert.equal(first.state.projects[f.project.name].run_id, legacy.run_id);
-  assert.equal(
-    first.state.projects[f.project.name].dead_since,
-    new Date(NOW).toISOString(),
-  );
+  let state = initialState;
+  for (const now of [NOW, NOW + GUARD_DEAD_GRACE_MS, NOW + 86_400_000]) {
+    const plan = guardPlan([selected], state, now);
+    assert.deepEqual(plan.actions, [], 'a legacy RUN.json is never a relaunch candidate');
+    assert.deepEqual(plan.giveUps, []);
+    assert.equal(plan.state.projects[f.project.name].run_id, f.core.run_id);
+    state = plan.state;
+  }
   assert.deepEqual(
     initialState,
     EMPTY_STATE(),
     'planning must not mutate its input',
   );
-
-  const before = guardPlan(
-    [selected],
-    first.state,
-    NOW + GUARD_DEAD_GRACE_MS - 1,
-  );
-  assert.deepEqual(
-    before.actions,
-    [],
-    'one millisecond before grace is too early',
-  );
-  const after = guardPlan([selected], before.state, NOW + GUARD_DEAD_GRACE_MS);
-  assert.deepEqual(
-    after.actions,
-    [
-      {
-        name: f.project.name,
-        path: f.project.path,
-        visible: true,
-        attempt: 1,
-      },
-    ],
-    'propose exactly one legacy recovery, preserving visibility',
-  );
-  assert.deepEqual(after.giveUps, []);
-  assert.equal(after.state.projects[f.project.name].run_id, legacy.run_id);
 });
 
-test('done Core yields to blocked legacy without proposing recovery', (t) => {
+test('done Core history is kept over a blocked legacy run without proposing recovery', (t) => {
   const legacy = legacyRun('blocked');
   const f = fixture(t, 'done', legacy);
-  const selected = assertSelection(f, legacy, 'runner', false);
-  // An already elapsed death clock must not make a blocked run recoverable.
+  const selected = assertSelection(f, f.core, 'core', false);
+  // An already elapsed death clock for the legacy run_id must not matter.
   let state = {
     version: 1,
     projects: {
@@ -141,10 +114,20 @@ test('done Core yields to blocked legacy without proposing recovery', (t) => {
     const plan = guardPlan([selected], state, now);
     assert.deepEqual(plan.actions, []);
     assert.deepEqual(plan.giveUps, []);
-    assert.equal(plan.state.projects[f.project.name].run_id, legacy.run_id);
+    assert.equal(plan.state.projects[f.project.name].run_id, f.core.run_id);
     assert.equal(plan.state.projects[f.project.name].dead_since, null);
     state = plan.state;
   }
+});
+
+test('a running legacy run without any Core state reads as no run', (t) => {
+  const f = fixture(t, 'done', legacyRun('running'));
+  rmSync(join(f.project.path, '.forja'), { recursive: true, force: true });
+  assert.deepEqual(projectStatus(f.project), { run: null, runnerAlive: false });
+  assert.equal(runSummary(f.project.path), null);
+  const plan = guardPlan([{ ...f.project, ...projectStatus(f.project) }], EMPTY_STATE(), NOW + 86_400_000);
+  assert.deepEqual(plan.actions, []);
+  assert.deepEqual(plan.giveUps, []);
 });
 
 test('a malformed legacy object retains valid terminal Core history', (t) => {

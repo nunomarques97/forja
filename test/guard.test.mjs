@@ -1,4 +1,4 @@
-// lib/guard.mjs — a guarda dos runners (docs/ARCHITECTURE.md §12).
+// lib/guard.mjs — a guarda dos controladores Core e do viewer.
 //
 // The decision is pure and the clock is ALWAYS injected: not one test here
 // calls Date.now() to decide anything, because a rule like "15 minutes between
@@ -18,9 +18,9 @@ import {
   EMPTY_STATE, appendGuardLog, checkedPollMs, gaveUpMessage, guardAlive, guardLauncherFiles, guardLoop, guardPaths, guardPlan, guardStartupPaths,
   readGuardState, relaunchMessage, runGuardOnce, validRunId, writeGuardState,
 } from '../lib/guard.mjs';
-import { launchRunner } from '../lib/spawn-runner.mjs';
-import { isOurUp, isRunnerCmd, planKillTree } from '../lib/up.mjs';
-import { LOCK_STALE_MS, RUNNER_CMD_RE, lockPath } from '../lib/runner.mjs';
+import { launchCore } from '../lib/spawn-runner.mjs';
+import { isOurUp, isCoreRunCmd, planKillTree } from '../lib/up.mjs';
+import { LOCK_STALE_MS } from '../lib/process-lock.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cli = join(here, '..', 'bin', 'forja.mjs');
@@ -29,12 +29,12 @@ after(() => rmSync(root, { recursive: true, force: true }));
 const fresh = name => { const d = join(root, `${name}-${Math.random().toString(36).slice(2, 8)}`); mkdirSync(d, { recursive: true }); return d; };
 
 // A project the way `listProjectsWithStatus` hands it over.
-const RUN_ID = 'R-20260917-ab12';
+const RUN_ID = 'F-20260917-ab12';
 const T0 = Date.parse('2026-09-17T18:00:00.000Z');
 const MIN = 60_000;
 const proj = (over = {}) => ({
   name: 'velora', path: join(root, 'velora'), bootstrappedAt: null,
-  run: { run_id: RUN_ID, status: 'running', driver: 'runner', goal: 'objetivo secreto do run', started_at: null, visible: false },
+  run: { run_id: RUN_ID, status: 'running', driver: 'core', goal: 'objetivo secreto do run', started_at: null },
   runnerAlive: false, ...over,
 });
 const stateOf = (entry, name = 'velora') => ({ version: 1, projects: { [name]: entry } });
@@ -87,19 +87,18 @@ describe('guardPaths e o ficheiro de estado', () => {
   });
 });
 
-describe('runSummary leva o modo do run (lib/projects.mjs)', () => {
-  test('visible vem do RUN.json e é sempre um booleano', async () => {
-    const { runSummary } = await import('../lib/projects.mjs');
+describe('o estado vem só do Core (lib/projects.mjs)', () => {
+  test('runSummary lê .forja/current.json; um RUN.json legado "running" nunca é lido', async () => {
+    const { runSummary, projectStatus } = await import('../lib/projects.mjs');
     const p = projectFolder('modo');
-    const write = run => writeFileSync(join(p, 'docs', 'forja', 'RUN.json'), JSON.stringify(run));
-    write({ run_id: RUN_ID, status: 'running', driver: 'runner', visible: true });
-    assert.equal(runSummary(p).visible, true);
-    write({ run_id: RUN_ID, status: 'running', driver: 'runner', visible: false });
-    assert.equal(runSummary(p).visible, false);
-    write({ run_id: RUN_ID, status: 'running', driver: 'runner' });
-    assert.equal(runSummary(p).visible, false, 'um run antigo, sem o campo, é um run normal');
-    write({ run_id: RUN_ID, status: 'running', driver: 'runner', visible: 'sim' });
-    assert.equal(runSummary(p).visible, false, 'só `true` conta: nada de valores estranhos a virar flags');
+    writeLegacyRun(p, { run_id: 'R-20260917-ab12', status: 'running', driver: 'runner' });
+    assert.equal(runSummary(p), null, 'sem estado Core não há run: o RUN.json legado é história');
+    assert.deepEqual(projectStatus({ path: p }), { run: null, runnerAlive: false });
+    writeCore(p);
+    assert.equal(runSummary(p).run_id, RUN_ID);
+    assert.equal(runSummary(p).driver, 'core');
+    assert.equal(runSummary(p).status, 'running');
+    assert.equal(projectStatus({ path: p }).runnerAlive, false, 'sem .forja/lock.json o controlador está morto');
   });
 });
 
@@ -108,7 +107,7 @@ describe('as duas mensagens (só estado, nunca caminhos)', () => {
     for (const msg of [relaunchMessage('velora poker', 2, 3), gaveUpMessage('velora poker', 3)]) {
       assert.equal(msg.includes('\\'), false, msg);
       assert.equal(msg.includes('/'), false, `"2/3" seria um caminho para quem lê: ${msg}`);
-      assert.equal(/R-\d{8}-[0-9a-f]{4}/.test(msg), false, 'nada que se pareça com um run_id');
+      assert.equal(/[FR]-\d{8}-[0-9a-f]{4}/.test(msg), false, 'nada que se pareça com um run_id');
       assert.equal(/objetivo secreto/.test(msg), false);
       assert.ok(msg.includes('velora poker'));
     }
@@ -120,10 +119,10 @@ describe('as duas mensagens (só estado, nunca caminhos)', () => {
 });
 
 describe('guardPlan (pura: sem relógio real, sem I/O)', () => {
-  test('sem run legível: nada a fazer — e o contador NÃO se perde (o RUN.json pode estar a meio de uma escrita)', () => {
+  test('sem run legível: nada a fazer — e o contador NÃO se perde (o estado Core pode estar a meio de uma escrita)', () => {
     const r = guardPlan([proj({ run: null })], stateOf({ run_id: RUN_ID, attempts: 2, gave_up_at: new Date(T0).toISOString() }), T0);
     assert.deepEqual(r.actions, []); assert.deepEqual(r.giveUps, []);
-    assert.deepEqual(r.skips, [{ name: 'velora', why: 'sem run legível neste projeto — o contador fica como está' }]);
+    assert.deepEqual(r.skips, [{ name: 'velora', why: 'sem run Core legível neste projeto — o contador fica como está' }]);
     assert.deepEqual(r.state.projects.velora, {
       run_id: RUN_ID, attempts: 2, failed_spawns: 0, dead_since: null, last_attempt_at: null, alive_since: null, gave_up_at: new Date(T0).toISOString(),
     }, 'uma leitura falhada não é prova de nada: nem zera tentativas, nem apaga uma desistência já anunciada');
@@ -132,13 +131,13 @@ describe('guardPlan (pura: sem relógio real, sem I/O)', () => {
     assert.deepEqual(novo.state.projects.velora, { run_id: null, attempts: 0, failed_spawns: 0, dead_since: null, last_attempt_at: null, alive_since: null, gave_up_at: null });
   });
 
-  test('a corrida real: um RUN.json apanhado a meio da escrita lê-se como nulo — e as 2 tentativas gastas sobrevivem-lhe', async () => {
+  test('a corrida real: um current.json ilegível lê-se como nulo — e as 2 tentativas gastas sobrevivem-lhe', async () => {
     const { runSummary } = await import('../lib/projects.mjs');
     const p = projectFolder('meia-escrita');
-    const file = join(p, 'docs', 'forja', 'RUN.json');
-    const inteiro = JSON.stringify({ run_id: RUN_ID, status: 'running', driver: 'runner', visible: false }, null, 2) + '\n';
-    // lib/state-files.mjs escreve o RUN.json com um writeFileSync simples (sem
-    // tmp+rename): quem lê no milissegundo errado vê isto.
+    const file = join(p, '.forja', 'current.json');
+    const inteiro = JSON.stringify(coreState(), null, 2) + '\n';
+    // Um ficheiro truncado (disco cheio, cópia a meio) é o que um leitor no
+    // milissegundo errado vê.
     writeFileSync(file, inteiro.slice(0, 20));
     assert.equal(runSummary(p), null, 'meio ficheiro não é JSON: o leitor vê "sem run"');
     const gasto = stateOf({ run_id: RUN_ID, attempts: 2, dead_since: new Date(T0 - 60 * MIN).toISOString(), last_attempt_at: new Date(T0 - 30 * MIN).toISOString() });
@@ -167,10 +166,10 @@ describe('guardPlan (pura: sem relógio real, sem I/O)', () => {
     assert.deepEqual(semEstado.skips, [{ name: 'velora', why: 'run sem estado' }]);
   });
 
-  test('runner vivo: nada a fazer e o relógio de morte é limpo', () => {
+  test('controlador vivo: nada a fazer e o relógio de morte é limpo', () => {
     const r = guardPlan([proj({ runnerAlive: true })], stateOf({ run_id: RUN_ID, attempts: 1, dead_since: new Date(T0 - 30 * MIN).toISOString() }), T0);
     assert.deepEqual(r.actions, []);
-    assert.deepEqual(r.skips, [{ name: 'velora', why: 'runner vivo' }]);
+    assert.deepEqual(r.skips, [{ name: 'velora', why: 'controlador vivo' }]);
     assert.equal(r.state.projects.velora.dead_since, null);
     assert.equal(r.state.projects.velora.alive_since, new Date(T0).toISOString(), 'a série de saúde começa a contar agora');
     assert.equal(r.state.projects.velora.attempts, 1, 'estar vivo um instante não perdoa as tentativas já gastas');
@@ -188,11 +187,25 @@ describe('guardPlan (pura: sem relógio real, sem I/O)', () => {
   test('morto depois da graça: uma ação, tentativa 1, e o modo visível do run vai com ela', () => {
     const state = roundTrip(guardPlan([proj()], { version: 1, projects: {} }, T0).state);
     const r = guardPlan([proj()], state, T0 + GUARD_DEAD_GRACE_MS);
-    assert.deepEqual(r.actions, [{ name: 'velora', path: join(root, 'velora'), visible: false, attempt: 1 }]);
+    assert.deepEqual(r.actions, [{ name: 'velora', path: join(root, 'velora'), attempt: 1, driver: 'core', runId: RUN_ID }]);
     assert.deepEqual(r.giveUps, []); assert.deepEqual(r.skips, []);
     assert.equal(r.state.projects.velora.attempts, 0, 'o contador só sobe depois de o processo ter mesmo arrancado');
-    const vis = guardPlan([proj({ run: { run_id: RUN_ID, status: 'running', driver: 'runner', visible: true } })], state, T0 + GUARD_DEAD_GRACE_MS);
-    assert.equal(vis.actions[0].visible, true, 'um run --visivel é relançado --visivel, senão ficam sessões claude --bg órfãs para sempre');
+  });
+
+  test('só um controlador Core é relançado: um run legado (ou sem driver) nunca produz uma ação', () => {
+    for (const driver of ['runner', 'claude-bg', undefined]) {
+      const state = stateOf({ run_id: RUN_ID, attempts: 1, dead_since: new Date(T0 - 60 * MIN).toISOString() });
+      let s = roundTrip(state);
+      for (const t of [T0, T0 + GUARD_DEAD_GRACE_MS, T0 + 10 * GUARD_RETRY_MS]) {
+        const r = guardPlan([proj({ run: { run_id: RUN_ID, status: 'running', driver } })], s, t);
+        assert.deepEqual(r.actions, [], `driver ${driver}`);
+        assert.deepEqual(r.giveUps, [], 'nem desistência: não há nada a tentar');
+        assert.match(r.skips[0].why, /só relança controladores Core/);
+        assert.equal(r.state.projects.velora.dead_since, null);
+        assert.equal(r.state.projects.velora.attempts, 1);
+        s = roundTrip(r.state);
+      }
+    }
   });
 
   test('as três tentativas, com 15 min entre elas, e a desistência à quarta morte — uma só vez', () => {
@@ -206,11 +219,11 @@ describe('guardPlan (pura: sem relógio real, sem I/O)', () => {
     assert.match(aindaCedo.skips[0].why, /última tentativa há 6 min/);
     // Passados os 15 min: tentativa 2.
     const dois = guardPlan([proj()], roundTrip(aindaCedo.state), T0 + GUARD_RETRY_MS);
-    assert.deepEqual(dois.actions, [{ name: 'velora', path: join(root, 'velora'), visible: false, attempt: 2 }]);
+    assert.deepEqual(dois.actions, [{ name: 'velora', path: join(root, 'velora'), attempt: 2, driver: 'core', runId: RUN_ID }]);
     // ... e a 3.
     state = stateOf({ run_id: RUN_ID, attempts: 2, dead_since: new Date(T0 + GUARD_RETRY_MS).toISOString(), last_attempt_at: new Date(T0 + GUARD_RETRY_MS).toISOString() });
     const tres = guardPlan([proj()], roundTrip(state), T0 + 2 * GUARD_RETRY_MS);
-    assert.deepEqual(tres.actions, [{ name: 'velora', path: join(root, 'velora'), visible: false, attempt: 3 }]);
+    assert.deepEqual(tres.actions, [{ name: 'velora', path: join(root, 'velora'), attempt: 3, driver: 'core', runId: RUN_ID }]);
     assert.equal(GUARD_MAX_ATTEMPTS, 3);
     // Quarta morte: desisto, uma vez.
     state = stateOf({ run_id: RUN_ID, attempts: 3, dead_since: new Date(T0 + 2 * GUARD_RETRY_MS).toISOString(), last_attempt_at: new Date(T0 + 2 * GUARD_RETRY_MS).toISOString() });
@@ -232,13 +245,13 @@ describe('guardPlan (pura: sem relógio real, sem I/O)', () => {
   // A guarda é a única peça do Forja que arranca um processo sem ninguém a
   // olhar: antes dela, relançar um run exigia um toque no telemóvel, e esse
   // toque era a última pessoa a ver o run_id que vem do disco. Um projeto
-  // preparado pode trazer um RUN.json com um run_id forjado, e esse id acaba no
-  // `--name` de uma linha de comandos com shell no Windows.
+  // preparado pode trazer estado com um run_id forjado, e esse id acaba no
+  // `--expected-run` de uma linha de comandos.
   test('um run_id forjado (aspas, &, espaços, controlo) nunca produz uma ação — e também não zera nem repete o id', () => {
     const maus = [
-      'R" & calc.exe & "x',        // as aspas que a citação do runner não escapa
-      'R-2026 0917-ab12',          // espaço
-      'R-20260917-ab12 ',     // carácter de controlo
+      'R" & calc.exe & "x',        // aspas e & de uma linha de comandos com shell
+      'F-2026 0917-ab12',          // espaço
+      'F-20260917-ab12\u0000',     // carácter de controlo
       'R\nX',                      // quebra de linha (forjaria uma linha de log)
       'R;whoami',
       'R`$(whoami)`',
@@ -246,11 +259,11 @@ describe('guardPlan (pura: sem relógio real, sem I/O)', () => {
       '/etc/passwd',
       'R'.repeat(65),              // comprido de mais
       '',
-      'R-2026—0917',               // travessão, não é hífen
+      'F-2026—0917',               // travessão, não é hífen
     ];
     for (const id of maus) {
       const gasto = stateOf({ run_id: RUN_ID, attempts: 2, dead_since: new Date(T0 - 60 * MIN).toISOString(), last_attempt_at: new Date(T0 - 60 * MIN).toISOString() });
-      const mau = proj({ run: { run_id: id, status: 'running', driver: 'runner', visible: true } });
+      const mau = proj({ run: { run_id: id, status: 'running', driver: 'core' } });
       // Várias voltas, incluindo bem depois da graça e dos 15 min: era aí que o
       // relançamento sairia se o id não fosse validado.
       let s = roundTrip(gasto);
@@ -259,16 +272,16 @@ describe('guardPlan (pura: sem relógio real, sem I/O)', () => {
         assert.deepEqual(r.actions, [], `run_id ${JSON.stringify(id)} não pode gerar um relançamento (volta em +${(t - T0) / MIN} min)`);
         assert.deepEqual(r.giveUps, []);
         assert.match(r.skips[0].why, /run_id/);
-        assert.equal(/["&;`$ \n\\/]|calc|whoami|passwd/.test(r.skips[0].why), false, `o id forjado nunca é repetido no log: ${r.skips[0].why}`);
+        assert.equal(/["&;`$\u0000\n\\/]|calc|whoami|passwd/.test(r.skips[0].why), false, `o id forjado nunca é repetido no log: ${r.skips[0].why}`);
         assert.equal(r.state.projects.velora.attempts, 2, 'um id ilegível não é prova de nada: o contador fica como está');
         assert.equal(r.state.projects.velora.run_id, RUN_ID, 'e o id bom que estava guardado não é substituído pelo forjado');
         s = roundTrip(r.state);
       }
     }
     // E um id legítimo continua a passar, em qualquer das formas que o Forja escreve.
-    for (const bom of [RUN_ID, 'R-20260917-0000', 'a', 'A'.repeat(64), 'run_1.2-3']) {
+    for (const bom of [RUN_ID, 'F-20260917-0000', 'a', 'A'.repeat(64), 'run_1.2-3']) {
       assert.equal(validRunId(bom), true, bom);
-      const r = guardPlan([proj({ run: { run_id: bom, status: 'running', driver: 'runner', visible: false } })], stateOf({ run_id: bom, dead_since: new Date(T0 - 60 * MIN).toISOString() }), T0);
+      const r = guardPlan([proj({ run: { run_id: bom, status: 'running', driver: 'core' } })], stateOf({ run_id: bom, dead_since: new Date(T0 - 60 * MIN).toISOString() }), T0);
       assert.deepEqual(r.actions.map(a => a.attempt), [1], bom);
     }
   });
@@ -283,22 +296,22 @@ describe('guardPlan (pura: sem relógio real, sem I/O)', () => {
 
   test('reset (a): outro run_id no disco põe o contador a zero e limpa a desistência', () => {
     const state = stateOf({ run_id: RUN_ID, attempts: 3, gave_up_at: new Date(T0).toISOString(), dead_since: new Date(T0).toISOString(), last_attempt_at: new Date(T0).toISOString() });
-    const novo = proj({ run: { run_id: 'R-20260918-ffff', status: 'running', driver: 'runner', visible: false } });
+    const novo = proj({ run: { run_id: 'F-20260918-ffff', status: 'running', driver: 'core' } });
     const dentroDaGraca = guardPlan([novo], roundTrip(state), T0 + 10 * MIN);
     assert.deepEqual(dentroDaGraca.actions, [], 'o run novo começa com a graça do zero');
     assert.equal(dentroDaGraca.state.projects.velora.attempts, 0);
     assert.equal(dentroDaGraca.state.projects.velora.gave_up_at, null);
-    assert.equal(dentroDaGraca.state.projects.velora.run_id, 'R-20260918-ffff');
+    assert.equal(dentroDaGraca.state.projects.velora.run_id, 'F-20260918-ffff');
     const r = guardPlan([novo], roundTrip(dentroDaGraca.state), T0 + 10 * MIN + GUARD_DEAD_GRACE_MS);
     assert.deepEqual(r.actions.map(a => a.attempt), [1]);
   });
 
-  test('reset (c): runner vivo há 30 min zera o contador e a desistência; menos do que isso não mexe em nada', () => {
+  test('reset (c): controlador vivo há 30 min zera o contador e a desistência; menos do que isso não mexe em nada', () => {
     const state = stateOf({ run_id: RUN_ID, attempts: 3, gave_up_at: new Date(T0).toISOString(), last_attempt_at: new Date(T0).toISOString(), alive_since: new Date(T0).toISOString() });
     const cedo = guardPlan([proj({ runnerAlive: true })], roundTrip(state), T0 + GUARD_HEALTHY_MS - MIN);
     assert.equal(cedo.state.projects.velora.attempts, 3, 'ainda não esteve vivo tempo que chegue');
     assert.equal(cedo.state.projects.velora.gave_up_at, new Date(T0).toISOString());
-    assert.deepEqual(cedo.skips, [{ name: 'velora', why: 'runner vivo' }]);
+    assert.deepEqual(cedo.skips, [{ name: 'velora', why: 'controlador vivo' }]);
     const curado = guardPlan([proj({ runnerAlive: true })], roundTrip(state), T0 + GUARD_HEALTHY_MS);
     assert.equal(curado.state.projects.velora.attempts, 0);
     assert.equal(curado.state.projects.velora.gave_up_at, null);
@@ -342,7 +355,7 @@ describe('guardPlan (pura: sem relógio real, sem I/O)', () => {
     const list = [
       proj(),
       proj({ name: 'gearlift', path: join(root, 'gearlift'), runnerAlive: true }),
-      proj({ name: 'job-hunter', path: join(root, 'job-hunter'), run: { run_id: 'R-20260917-cccc', status: 'finished' } }),
+      proj({ name: 'job-hunter', path: join(root, 'job-hunter'), run: { run_id: 'F-20260917-cccc', status: 'finished' } }),
     ];
     const state = { version: 1, projects: { velora: { run_id: RUN_ID, dead_since: new Date(T0 - 10 * MIN).toISOString() }, apagado: { run_id: 'x', attempts: 2 } } };
     const r = guardPlan(list, state, T0);
@@ -362,22 +375,30 @@ function fakes() {
     log: line => lines.push(line),
   };
 }
-const projectFolder = name => { const p = join(root, 'projetos', name); mkdirSync(join(p, 'docs', 'forja'), { recursive: true }); return p; };
+const projectFolder = name => {
+  const p = join(root, 'projetos', name);
+  mkdirSync(join(p, 'docs', 'forja'), { recursive: true }); mkdirSync(join(p, '.forja'), { recursive: true });
+  return p;
+};
+// The Core state a controller writes; no .forja/lock.json means its controller is dead.
+const coreState = (over = {}) => ({ version: 1, run_id: RUN_ID, status: 'running', goal: 'objetivo secreto do run', created_at: new Date(T0).toISOString(), tasks: [], ...over });
+const writeCore = (p, over) => writeFileSync(join(p, '.forja', 'current.json'), JSON.stringify(coreState(over), null, 2));
+const writeLegacyRun = (p, run) => writeFileSync(join(p, 'docs', 'forja', 'RUN.json'), JSON.stringify(run, null, 2));
 
 describe('runGuardOnce (spawn, notify e relógio injetados)', () => {
-  test('um runner morto: um spawn só, sem --goal, com via=guard, estado gravado e uma notificação low', async () => {
+  test('um controlador Core morto: um spawn só, sem objetivo, um resume do mesmo run_id com via=guard, estado gravado e sem notificação', async () => {
     const dir = fresh('pass'); const path = projectFolder('velora');
     const f = fakes();
     const list = () => [proj({ path, runnerAlive: false })];
     writeGuardState(guardPaths(dir).state, stateOf({ run_id: RUN_ID, dead_since: new Date(T0 - 10 * MIN).toISOString() }));
     const r = await runGuardOnce({ dataDir: dir, forjaRoot: 'C:\\forja', list, spawn: f.spawn, notify: f.notify, log: f.log, now: T0 });
     assert.equal(f.spawned.length, 1);
-    assert.deepEqual(f.spawned[0].project, { name: 'velora', path });
-    assert.equal(f.spawned[0].goal, null, 'a guarda nunca arranca um run novo: só retoma o que existe');
-    assert.deepEqual(f.spawned[0].extraArgs, []);
+    assert.deepEqual(f.spawned[0].project, { name: 'velora', path, runId: RUN_ID });
+    assert.equal('goal' in f.spawned[0], false, 'a guarda nunca arranca um run novo: só retoma o que existe');
+    assert.equal(f.spawned[0].action, 'resume');
     assert.equal(f.spawned[0].via, 'guard');
     assert.equal(f.spawned[0].dataDir, dir);
-    assert.deepEqual(r.launched, [{ name: 'velora', pid: 4242, attempt: 1, visible: false }]);
+    assert.deepEqual(r.launched, [{ name: 'velora', pid: 4242, attempt: 1 }]);
     const state = readGuardState(guardPaths(dir).state);
     assert.equal(state.projects.velora.attempts, 1);
     assert.equal(state.projects.velora.last_attempt_at, new Date(T0).toISOString());
@@ -388,41 +409,52 @@ describe('runGuardOnce (spawn, notify e relógio injetados)', () => {
     assert.equal(/objetivo secreto/.test(f.lines[0]), false, 'o log da guarda não leva o texto do objetivo');
   });
 
-  test('um run visível é relançado com --visivel', async () => {
-    const dir = fresh('visivel'); const path = projectFolder('visivel');
-    const f = fakes();
-    const list = () => [proj({ path, run: { run_id: RUN_ID, status: 'running', driver: 'runner', visible: true } })];
-    writeGuardState(guardPaths(dir).state, stateOf({ run_id: RUN_ID, dead_since: new Date(T0 - 10 * MIN).toISOString() }));
-    await runGuardOnce({ dataDir: dir, forjaRoot: 'C:\\forja', list, spawn: f.spawn, notify: f.notify, log: f.log, now: T0 });
-    assert.deepEqual(f.spawned[0].extraArgs, ['--visivel']);
-  });
-
-  test('a linha de comandos e o ambiente reais do relançamento (launchRunner com o spawn de baixo falso)', async () => {
+  test('a linha de comandos e o ambiente reais do relançamento (launchCore com o spawn de baixo falso)', async () => {
     const dir = fresh('argv'); const path = projectFolder('argv');
+    writeCore(path);
     const calls = [];
     const spawnRunner = (command, args, options) => { calls.push({ command, args, options }); return { pid: 777 }; };
     const f = fakes();
     process.env.CLAUDE_CODE_SESSION_ID = 'sessao-de-quem-lancou';
     process.env.FORJA_PROJECT_ROOT = 'C:\\outro\\projeto';
+    let r;
     try {
       writeGuardState(guardPaths(dir).state, stateOf({ run_id: RUN_ID, dead_since: new Date(T0 - 10 * MIN).toISOString() }, 'argv'));
-      await runGuardOnce({
+      r = await runGuardOnce({
         dataDir: dir, forjaRoot: 'C:\\forja', log: f.log, notify: f.notify, now: T0,
-        list: () => [proj({ name: 'argv', path, run: { run_id: RUN_ID, status: 'running', driver: 'runner', visible: true } })],
-        spawn: opts => launchRunner({ ...opts, spawnRunner }),
+        list: () => [proj({ name: 'argv', path })],
+        spawn: opts => launchCore({ ...opts, spawnRunner }),
       });
     } finally { delete process.env.CLAUDE_CODE_SESSION_ID; delete process.env.FORJA_PROJECT_ROOT; }
+    assert.deepEqual(r.launched, [{ name: 'argv', pid: 777, attempt: 1 }]);
     assert.equal(calls.length, 1);
     const { command, args, options } = calls[0];
     assert.equal(command, process.execPath);
-    assert.deepEqual(args, [join('C:\\forja', 'bin', 'forja.mjs'), 'runner', '--visivel']);
+    assert.deepEqual(args, [join('C:\\forja', 'bin', 'forja.mjs'), 'core', 'resume', '--expected-run', RUN_ID]);
     assert.equal(args.includes('--goal'), false);
     assert.equal(options.cwd, path);
     assert.equal(options.env.FORJA_DATA_DIR, dir);
     assert.equal('CLAUDE_CODE_SESSION_ID' in options.env, false, 'a sessão de quem lançou nunca entra no run');
     assert.equal('FORJA_PROJECT_ROOT' in options.env, false);
-    const spawnLog = readFileSync(join(dir, 'runner', 'spawn.log'), 'utf8');
-    assert.match(spawnLog, /project=argv action=resume pid=777 goal_chars=0 via=guard/);
+    assert.equal(dirname(options.logPath), join(dir, 'core'));
+  });
+
+  test('launchCore recusa no último instante: outro run_id, um run que já não corre, um controlador vivo ou só um RUN.json legado', () => {
+    const dir = fresh('recusa');
+    const calls = [];
+    const spawnRunner = (...a) => { calls.push(a); return { pid: 1 }; };
+    const launch = (path, runId = RUN_ID) => launchCore({ dataDir: dir, forjaRoot: 'C:\\forja', project: { name: 'recusa', path, runId }, spawnRunner });
+    const legado = projectFolder('recusa-legado');
+    writeLegacyRun(legado, { run_id: 'R-20260917-ab12', status: 'running', driver: 'runner' });
+    assert.equal(launch(legado, 'R-20260917-ab12'), undefined, 'um RUN.json legado "running" nunca é relançado');
+    const outro = projectFolder('recusa-outro'); writeCore(outro, { run_id: 'F-20260918-ffff' });
+    assert.equal(launch(outro), undefined, 'o run no disco mudou desde a decisão');
+    const acabado = projectFolder('recusa-acabado'); writeCore(acabado, { status: 'done' });
+    assert.equal(launch(acabado), undefined);
+    const vivo = projectFolder('recusa-vivo'); writeCore(vivo);
+    writeFileSync(join(vivo, '.forja', 'lock.json'), JSON.stringify({ pid: process.pid }));
+    assert.equal(launch(vivo), undefined, 'nunca por cima de um controlador vivo');
+    assert.deepEqual(calls, []);
   });
 
   test('um spawn sem pid (ou que rebenta) não gasta tentativa, fica escrito, e a volta continua para os outros projetos', async () => {
@@ -444,7 +476,7 @@ describe('runGuardOnce (spawn, notify e relógio injetados)', () => {
     assert.equal(state.projects.a.failed_spawns, 1);
     assert.equal(state.projects.b.failed_spawns, 1);
     assert.equal(state.projects.a.last_attempt_at, new Date(T0).toISOString(), 'o relógio das tentativas corre também para um spawn que falhou');
-    assert.equal(state.projects.a.dead_since, new Date(T0 - 10 * MIN).toISOString(), 'e o runner continua morto desde quando morreu: nada foi relançado');
+    assert.equal(state.projects.a.dead_since, new Date(T0 - 10 * MIN).toISOString(), 'e o controlador continua morto desde quando morreu: nada foi relançado');
     assert.deepEqual(r.failed, ['a', 'b']);
     assert.deepEqual(sent, [], 'não se anuncia um relançamento que não aconteceu');
     assert.match(lines[0], /a: relançamento falhou \(sem pid\)/);
@@ -483,23 +515,28 @@ describe('runGuardOnce (spawn, notify e relógio injetados)', () => {
     assert.ok(lines.slice(-1)[0].includes('já desisti'), lines.slice(-1)[0]);
   });
 
-  test('um RUN.json com um run_id forjado nunca chega ao spawn (é aqui que já não há uma pessoa a olhar)', async () => {
+  test('um current.json com um run_id forjado nunca chega ao spawn (é aqui que já não há uma pessoa a olhar)', async () => {
     const dir = fresh('runIdMau'); const path = projectFolder('runIdMau');
     const f = fakes();
-    const forjado = 'R-2026" & calc.exe & "0917';
-    writeFileSync(join(path, 'docs', 'forja', 'RUN.json'), JSON.stringify({ run_id: forjado, status: 'running', driver: 'runner', visible: true }, null, 2));
-    const { runSummary } = await import('../lib/projects.mjs');
-    assert.equal(runSummary(path).run_id, forjado, 'o ficheiro é lido tal como está…');
+    const forjado = 'F-2026" & calc.exe & "0917';
+    writeCore(path, { run_id: forjado });
+    const { runSummary, projectStatus } = await import('../lib/projects.mjs');
+    assert.equal(runSummary(path), null, 'o leitor Core recusa o id: não há run');
     writeGuardState(guardPaths(dir).state, stateOf({ run_id: RUN_ID, attempts: 1, dead_since: new Date(T0 - 60 * MIN).toISOString(), last_attempt_at: new Date(T0 - 60 * MIN).toISOString() }, 'runIdMau'));
-    const r = await runGuardOnce({
-      dataDir: dir, forjaRoot: 'C:\\forja', spawn: f.spawn, notify: f.notify, log: f.log, now: T0,
-      list: () => [{ name: 'runIdMau', path, run: runSummary(path), runnerAlive: false }],
-    });
+    for (const list of [
+      () => [{ name: 'runIdMau', path, ...projectStatus({ path }) }],
+      // Even when a caller hands the forged id over, the guard's own gate refuses it.
+      () => [{ name: 'runIdMau', path, run: { run_id: forjado, status: 'running', driver: 'core' }, runnerAlive: false }],
+    ]) {
+      f.lines.length = 0;
+      const r = await runGuardOnce({ dataDir: dir, forjaRoot: 'C:\\forja', spawn: f.spawn, notify: f.notify, log: f.log, now: T0, list });
+      assert.deepEqual(r.actions, []);
+      assert.equal(/calc\.exe|"/.test(f.lines[0]), false, f.lines[0]);
+    }
     assert.deepEqual(f.spawned, [], '…e nunca vira um processo');
-    assert.deepEqual(r.actions, []); assert.deepEqual(f.sent, []);
-    assert.equal(existsSync(join(dir, 'runner', 'spawn.log')), false, 'nem sequer uma linha de arranque');
+    assert.deepEqual(f.sent, []);
+    assert.equal(existsSync(join(dir, 'core')), false, 'nem sequer um log de arranque');
     assert.match(f.lines[0], /run_id/);
-    assert.equal(/calc\.exe|"/.test(f.lines[0]), false, f.lines[0]);
     assert.equal(readGuardState(guardPaths(dir).state).projects.runIdMau.attempts, 1, 'e o contador do run bom não foi zerado por causa dele');
   });
 
@@ -512,7 +549,7 @@ describe('runGuardOnce (spawn, notify e relógio injetados)', () => {
     writeGuardState(guardPaths(dir).state, stateOf({ run_id: RUN_ID, dead_since: new Date(T0 - 10 * MIN).toISOString() }, '__proto__'));
     // Primeira volta: relançado, como qualquer outro projeto.
     const r = await runGuardOnce({ dataDir: dir, forjaRoot: 'C:\\forja', list, spawn: f.spawn, notify: f.notify, log: f.log, now: T0 });
-    assert.deepEqual(r.launched, [{ name: '__proto__', pid: 4242, attempt: 1, visible: false }]);
+    assert.deepEqual(r.launched, [{ name: '__proto__', pid: 4242, attempt: 1 }]);
     // E o contador foi mesmo gravado: no ficheiro, como propriedade própria.
     const cru = JSON.parse(readFileSync(guardPaths(dir).state, 'utf8'));
     assert.ok(Object.prototype.hasOwnProperty.call(cru.projects, '__proto__'), 'num mapa `{}` esta escrita perdia-se em silêncio');
@@ -593,35 +630,38 @@ describe('runGuardOnce (spawn, notify e relógio injetados)', () => {
   test('o log escreve uma linha por volta, com os projetos sem ação e o porquê', async () => {
     const dir = fresh('log');
     const f = fakes();
-    const list = () => [proj({ runnerAlive: true }), proj({ name: 'parado', run: { run_id: 'R-20260917-dddd', status: 'finished' } })];
+    const list = () => [proj({ runnerAlive: true }), proj({ name: 'parado', run: { run_id: 'F-20260917-dddd', status: 'finished' } })];
     await runGuardOnce({ dataDir: dir, forjaRoot: 'C:\\forja', list, spawn: f.spawn, notify: f.notify, now: T0 });
     const log = readFileSync(guardPaths(dir).log, 'utf8').trim().split('\n');
     assert.equal(log.length, 1);
     assert.match(log[0], /^\d{4}-\d{2}-\d{2}T[\d:.]+Z guarda: 2 projeto\(s\)/);
-    assert.match(log[0], /velora: runner vivo/);
+    assert.match(log[0], /velora: controlador vivo/);
     assert.match(log[0], /parado: run finished/);
   });
 
-  test('a volta nunca decide a partir de uma liveness em cache (resetAliveCache)', async () => {
-    // Sem o reset, esta volta leria "runner vivo" de uma medição anterior e não
-    // relançaria nada — exatamente o erro que faz uma guarda parecer viva e não
-    // fazer nada. O lock aponta para um pid que não existe; a cache diz o contrário.
-    const dir = fresh('cache'); const path = projectFolder('cache');
-    const { ownerAliveCached, resetAliveCache, runnerAlive } = await import('../lib/projects.mjs');
-    const pid = 4000000;
-    mkdirSync(join(dir, 'runner'), { recursive: true });
-    writeFileSync(lockPath(path, join(dir, 'runner')), JSON.stringify({ pid, project: path, since: new Date().toISOString(), beat: new Date().toISOString() }));
-    resetAliveCache();
-    assert.equal(ownerAliveCached(pid, Date.now(), () => true), true, 'a cache guarda "vivo"');
-    assert.equal(runnerAlive(path, dir), true, 'e é isso que um leitor com cache veria');
+  test('com o registo e o disco reais: o Core morto é relançado, o Core vivo não, e um RUN.json legado "running" nunca', async () => {
+    const dir = fresh('real');
+    const { upsertProject } = await import('../lib/projects.mjs');
+    const morto = projectFolder('real-morto'); writeCore(morto);
+    // A lock whose pid is gone is a dead controller (no live owner, no live worker).
+    writeFileSync(join(morto, '.forja', 'lock.json'), JSON.stringify({ pid: 4000000 }));
+    const vivo = projectFolder('real-vivo'); writeCore(vivo);
+    writeFileSync(join(vivo, '.forja', 'lock.json'), JSON.stringify({ pid: process.pid }));
+    const legado = projectFolder('real-legado');
+    writeLegacyRun(legado, { run_id: 'R-20260917-ab12', status: 'running', driver: 'runner', visible: true });
+    for (const [name, path] of [['morto', morto], ['vivo', vivo], ['legado', legado]]) upsertProject({ name, path }, dir);
     const f = fakes();
-    writeGuardState(guardPaths(dir).state, stateOf({ run_id: RUN_ID, dead_since: new Date(T0 - 10 * MIN).toISOString() }, 'cache'));
-    await runGuardOnce({
-      dataDir: dir, forjaRoot: 'C:\\forja', spawn: f.spawn, notify: f.notify, log: f.log, now: T0,
-      // `list` real: é ele que chama runnerAlive e cai na cache.
-      list: d => [{ name: 'cache', path, run: { run_id: RUN_ID, status: 'running', driver: 'runner', visible: false }, runnerAlive: runnerAlive(path, d) }],
-    });
-    assert.equal(f.spawned.length, 1, 'com a cache limpa, o pid morto lê-se como morto e o runner é relançado');
+    const stale = { run_id: RUN_ID, dead_since: new Date(T0 - 10 * MIN).toISOString() };
+    writeGuardState(guardPaths(dir).state, { version: 1, projects: { morto: stale, vivo: { ...stale }, legado: { run_id: 'R-20260917-ab12', dead_since: stale.dead_since } } });
+    // No `list` injected: the real listProjectsWithStatus reads data/projects.json and each .forja/.
+    const r = await runGuardOnce({ dataDir: dir, forjaRoot: 'C:\\forja', spawn: f.spawn, notify: f.notify, log: f.log, now: T0 });
+    assert.deepEqual(f.spawned.map(s => s.project), [{ name: 'morto', path: morto, runId: RUN_ID }]);
+    assert.deepEqual(r.launched.map(l => l.name), ['morto']);
+    assert.match(f.lines[0], /vivo: controlador vivo/);
+    assert.match(f.lines[0], /legado: sem run Core legível/);
+    // Many ticks later the legacy run is still never touched.
+    for (let i = 1; i <= 6; i++) await runGuardOnce({ dataDir: dir, forjaRoot: 'C:\\forja', spawn: f.spawn, notify: f.notify, log: f.log, now: T0 + i * GUARD_RETRY_MS });
+    assert.equal(f.spawned.filter(s => s.project.name !== 'morto').length, 0);
   });
 });
 
@@ -636,12 +676,12 @@ describe('guardAlive e GUARD_CMD_RE', () => {
       assert.equal(guardAlive(estranho.pid), false, 'o pid pode ter sido reutilizado: a linha de comandos é que decide');
     } finally { spawnSync('taskkill', ['/PID', String(estranho.pid), '/T', '/F'], { encoding: 'utf8' }); }
   });
-  test('a expressão separa guarda de runner nos dois sentidos', () => {
+  test('a expressão separa guarda de controlador Core nos dois sentidos', () => {
     assert.equal(GUARD_CMD_RE.test('node C:/f/bin/forja.mjs guard run'), true);
     assert.equal(GUARD_CMD_RE.test('"C:\\nodejs\\node.exe" "C:\\f\\bin\\forja.mjs" guard'), true);
-    assert.equal(GUARD_CMD_RE.test('node C:/f/bin/forja.mjs runner --goal x'), false);
+    assert.equal(GUARD_CMD_RE.test('node C:/f/bin/forja.mjs core resume --expected-run F-1'), false);
     assert.equal(GUARD_CMD_RE.test('node C:/f/bin/forja.mjs guardian'), false);
-    assert.equal(RUNNER_CMD_RE.test('node C:/f/bin/forja.mjs guard run'), false, 'uma guarda nunca conta como runner');
+    assert.equal(isCoreRunCmd('node C:/f/bin/forja.mjs guard run'), false, 'uma guarda nunca conta como controlador');
   });
 });
 
@@ -691,7 +731,7 @@ describe('guardLoop', () => {
     const dir = fresh('segunda');
     const paths = guardPaths(dir);
     // Um processo vivo cuja linha de comandos é a de uma guarda — como no teste
-    // do runner em test/up.test.mjs, sem precisar de uma segunda guarda a sério.
+    // do controlador em test/up.test.mjs, sem precisar de uma segunda guarda a sério.
     const falsa = spawn(process.execPath, ['-e', 'setTimeout(function(){},60000)', 'C:\\naoexiste\\forja\\bin\\forja.mjs', 'guard', 'run'], { stdio: 'ignore', windowsHide: true });
     await new Promise(r => setTimeout(r, 1000));
     try {
@@ -735,23 +775,23 @@ describe('a CLI: guard status e guard stop (registo temporário, nada lançado)'
   test('status: diz o que faria, sem lançar nada e sem escrever o estado', () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'projects.json'), JSON.stringify({ version: 1, projects: [{ name: 'cli-velora', path: projeto, bootstrappedAt: null }] }, null, 2));
-    writeFileSync(join(projeto, 'docs', 'forja', 'RUN.json'), JSON.stringify({ run_id: RUN_ID, status: 'running', driver: 'runner', goal: 'objetivo secreto do run', visible: true }, null, 2));
+    writeCore(projeto);
     const before = existsSync(guardPaths(dir).state);
     const r = forja('guard', 'status');
     assert.equal(r.code, 0, r.err);
     assert.equal(r.json.ok, true);
     assert.equal(r.json.running, false, 'não há guarda viva neste data dir');
     assert.deepEqual(r.json.policy, { poll_ms: GUARD_POLL_MS, dead_grace_ms: GUARD_DEAD_GRACE_MS, retry_ms: GUARD_RETRY_MS, max_attempts: GUARD_MAX_ATTEMPTS, healthy_ms: GUARD_HEALTHY_MS });
-    assert.deepEqual(r.json.projects, [{ name: 'cli-velora', status: 'running', driver: 'runner', visible: true, runnerAlive: false }]);
-    // Primeira volta: o runner acabou de ser visto morto, por isso ainda está na graça.
+    assert.deepEqual(r.json.projects, [{ name: 'cli-velora', status: 'running', driver: 'core', runnerAlive: false }]);
+    // Primeira volta: o controlador acabou de ser visto morto, por isso ainda está na graça.
     assert.deepEqual(r.json.plan.actions, []);
     assert.match(r.json.plan.skips[0].why, /dentro da graça/);
     assert.equal(existsSync(guardPaths(dir).state), before, 'o status não escreve o estado');
-    assert.equal(existsSync(join(dir, 'runner', 'spawn.log')), false, 'e não lança runner nenhum');
+    assert.equal(existsSync(join(dir, 'core')), false, 'e não lança controlador nenhum');
   });
 
-  test('stop: escreve o ficheiro de paragem e mais nada — não mata runners, não mexe em docs/', () => {
-    const marca = join(projeto, 'docs', 'forja', 'RUN.json');
+  test('stop: escreve o ficheiro de paragem e mais nada — não mata controladores, não mexe no projeto', () => {
+    const marca = join(projeto, '.forja', 'current.json');
     const antes = readFileSync(marca, 'utf8');
     const r = forja('guard', 'stop');
     assert.equal(r.code, 0, r.err);
@@ -759,7 +799,7 @@ describe('a CLI: guard status e guard stop (registo temporário, nada lançado)'
     assert.equal(r.json.stopFile, guardPaths(dir).stop);
     assert.equal(r.json.guardPid, null);
     assert.ok(existsSync(guardPaths(dir).stop));
-    assert.equal(readFileSync(marca, 'utf8'), antes, 'docs/ do projeto fica exatamente como estava');
+    assert.equal(readFileSync(marca, 'utf8'), antes, 'o estado Core do projeto fica exatamente como estava');
     assert.ok(existsSync(projeto));
     rmSync(guardPaths(dir).stop, { force: true });
   });
@@ -801,11 +841,11 @@ describe('checkedPollMs (o --poll-ms validado como o --forjalvl da CLI)', () => 
 });
 
 describe('`forja down` não conhece a guarda', () => {
-  test('nem por linha de comandos (isOurUp / isRunnerCmd), nem pela árvore de processos', () => {
+  test('nem por linha de comandos (isOurUp / isCoreRunCmd), nem pela árvore de processos', () => {
     const forja = 'C:\\Fixtures\\x\\forja';
     const cmd = 'node C:/Fixtures/x/forja/bin/forja.mjs guard run';
     assert.equal(isOurUp({ Name: 'node.exe', CommandLine: cmd }, { forja }), false, '`down` só mata o `forja up` deste repo');
-    assert.equal(isRunnerCmd(cmd), false);
+    assert.equal(isCoreRunCmd(cmd), false);
     // A guarda arranca do seu próprio .vbs, fora da árvore do `up`: o plano de
     // morte de um `down` nunca lhe chega.
     const procs = [
@@ -967,7 +1007,7 @@ describe('a guarda vigia o viewer (data/guard/state.json → chave `up`)', () =>
     assert.deepEqual(spawned[0].args, ['up']);
     assert.equal(spawned[0].via, 'guard');
     assert.equal(spawned[0].dataDir, dir);
-    assert.equal('goal' in spawned[0], false, 'o viewer não tem objetivos: isto não é um runner');
+    assert.equal('goal' in spawned[0], false, 'o viewer não tem objetivos: isto não é um run');
     assert.equal(sent.length, 0, 'relançamento bem sucedido não avisa o telemóvel — nada espera pelo Sponsor');
     assert.equal(lines.length, 10);
     assert.ok(lines.slice(1).every(l => /espero 15 min entre tentativas|dentro da graça/.test(l)), lines.join('\n'));
@@ -1033,7 +1073,7 @@ describe('a guarda vigia o viewer (data/guard/state.json → chave `up`)', () =>
     assert.ok(typeof json.viewer.plan.why === 'string' && json.viewer.plan.why.length > 0);
     assert.equal(readFileSync(guardPaths(dir).state, 'utf8'), antes, 'o status não escreve o estado');
     assert.equal(existsSync(join(dir, 'up-watch')), false);
-    assert.equal(existsSync(join(dir, 'runner', 'spawn.log')), false, 'e não lança nada');
+    assert.equal(existsSync(join(dir, 'core')), false, 'e não lança nada');
     // Com o pedido de paragem em pé, o bloco di-lo.
     writeFileSync(join(dir, 'up.stop'), 'forja down\n');
     const r2 = spawnSync(process.execPath, [cli, 'guard', 'status'], { env: { ...process.env, FORJA_DATA_DIR: dir, FORJA_NTFY_SERVER: 'http://127.0.0.1:9' }, encoding: 'utf8', timeout: 120_000 });

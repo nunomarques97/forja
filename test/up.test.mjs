@@ -159,7 +159,7 @@ describe('autostart install/remove via the CLI (temp APPDATA + temp data dir)', 
   const forja = (...args) => { const r = spawnSync(process.execPath, [cli, ...args], { env, encoding: 'utf8' }); return { code: r.status, out: r.stdout, err: r.stderr, json: (() => { try { return JSON.parse(r.stdout); } catch { return null; } })() }; };
   after(() => rmSync(root, { recursive: true, force: true }));
 
-  // Four files since the guarda dos runners exists (lib/guard.mjs, §12): the
+  // Four files since the guard exists (lib/guard.mjs, §12): the
   // pair for `up` and the pair for `guard`, two independent loops. The guard's
   // own contents are tested in test/guard.test.mjs; here only the pair is.
   test('install writes the four files (JSON lists them), second install is unchanged, remove deletes, second remove finds nothing', () => {
@@ -188,7 +188,7 @@ describe('autostart install/remove via the CLI (temp APPDATA + temp data dir)', 
   });
 });
 
-describe('killTree (Windows: the child tree dies, live runners in it do not)', () => {
+describe('killTree (Windows: the child tree dies, live Core controllers in it do not)', () => {
   test('kills the whole tree: the child node and the grandchild node it started are both gone', async () => {
     const child = spawn(process.execPath, ['-e', "require('node:child_process').spawn(process.execPath, ['-e', 'setTimeout(function(){},60000)'], { stdio: 'ignore' }); setTimeout(function(){}, 60000)"], { stdio: 'ignore', windowsHide: true });
     const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -204,26 +204,26 @@ describe('killTree (Windows: the child tree dies, live runners in it do not)', (
   });
 
   // The 17 set 2026 incident: a `down` that killed the viewer's tree killed two
-  // live runners with it. A run is never collateral damage of stopping the viewer.
-  test('spares a live runner: a process with `forja.mjs runner` on its command line survives the kill', async () => {
-    const fake = spawn(process.execPath, ['-e', 'setTimeout(function(){},60000)', 'C:\\naoexiste\\forja\\bin\\forja.mjs', 'runner', '--goal', 'x'], { stdio: 'ignore', windowsHide: true });
+  // live runs with it. A run is never collateral damage of stopping the viewer.
+  test('spares a live Core controller: a process with `forja.mjs core resume` on its command line survives the kill', async () => {
+    const fake = spawn(process.execPath, ['-e', 'setTimeout(function(){},60000)', 'C:\\naoexiste\\forja\\bin\\forja.mjs', 'core', 'resume'], { stdio: 'ignore', windowsHide: true });
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const alive = pid => spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH'], { encoding: 'utf8' }).stdout.includes(` ${pid} `);
     await sleep(1200);
     try {
-      assert.equal(alive(String(fake.pid)), true, 'o runner falso arrancou');
+      assert.equal(alive(String(fake.pid)), true, 'o controlador falso arrancou');
       const r = killTree(fake);
       await sleep(800);
-      assert.equal(alive(String(fake.pid)), true, 'o runner continua vivo depois do killTree');
+      assert.equal(alive(String(fake.pid)), true, 'o controlador continua vivo depois do killTree');
       assert.deepEqual(r.spared, [fake.pid], 'e a chamada diz que o poupou');
     } finally { spawnSync('taskkill', ['/PID', String(fake.pid), '/T', '/F'], { encoding: 'utf8' }); }
   });
 
-  // Without the enumeration there is no way to tell a runner from a viewer, so
+  // Without the enumeration there is no way to tell a controller from a viewer, so
   // the old blind `taskkill /T` — the kill that took two runs down — is never
   // the fallback: only the root dies, and the note says the children are alive.
   test('enumeration failed: only the root is stopped, children stay alive and it is written down', async () => {
-    // `detached` como um filho que é para sobreviver ao pai (um runner, o túnel):
+    // `detached` como um filho que é para sobreviver ao pai (um controlador Core, o túnel):
     // um filho normal morre com o pai pelo Job object do Windows, diga o plano o
     // que disser, e o que está a ser testado aqui é o `/T`.
     const child = "require('node:child_process').spawn(process.execPath,['-e','setTimeout(function(){},60000)'],{stdio:'ignore',windowsHide:true,detached:true}).unref();setTimeout(function(){},60000)";
@@ -243,8 +243,8 @@ describe('killTree (Windows: the child tree dies, live runners in it do not)', (
     } finally { spawnSync('taskkill', ['/PID', grand, '/T', '/F'], { encoding: 'utf8' }); killTree(proc); }
   });
 
-  test('enumeration failed and the root itself is a runner: nothing is killed at all', async () => {
-    const fake = spawn(process.execPath, ['-e', 'setTimeout(function(){},60000)', 'C:\\naoexiste\\forja\\bin\\forja.mjs', 'runner'], { stdio: 'ignore', windowsHide: true });
+  test('enumeration failed and the root itself is a Core controller: nothing is killed at all', async () => {
+    const fake = spawn(process.execPath, ['-e', 'setTimeout(function(){},60000)', 'C:\\naoexiste\\forja\\bin\\forja.mjs', 'start', '--goal', 'x'], { stdio: 'ignore', windowsHide: true });
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const alive = pid => spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH'], { encoding: 'utf8' }).stdout.includes(` ${pid} `);
     await sleep(1200);
@@ -260,14 +260,14 @@ describe('killTree (Windows: the child tree dies, live runners in it do not)', (
 // Verbatim shape of the failure this cost us: PowerShell writes the console
 // codepage to the pipe, so a live `claude -p` whose prompt carries "→" or "§"
 // (every Forja session) lands in the enumeration as a raw 0x1A. JSON.parse threw,
-// the list came back empty, and `down` killed the very runners it had to spare.
+// the list came back empty, and `down` killed the very runs it had to spare.
 describe('parseProcJson (pure)', () => {
   test('a raw control character in one command line costs that field, never the whole list', () => {
-    const text = `[{"ProcessId":100,"ParentProcessId":1,"Name":"node.exe","CommandLine":"node forja.mjs runner --goal capability \u001a choice"},{"ProcessId":200,"ParentProcessId":100,"Name":"node.exe","CommandLine":"claude -p"}]`;
+    const text = `[{"ProcessId":100,"ParentProcessId":1,"Name":"node.exe","CommandLine":"node forja.mjs start --goal capability \u001a choice"},{"ProcessId":200,"ParentProcessId":100,"Name":"node.exe","CommandLine":"claude -p"}]`;
     assert.throws(() => JSON.parse(text), SyntaxError, 'é mesmo JSON inválido');
     const procs = parseProcJson(text);
     assert.deepEqual(procs.map(p => p.ProcessId), [100, 200]);
-    assert.equal(planKillTree(100, procs).spared.length, 1, 'e o runner continua a ser reconhecido');
+    assert.equal(planKillTree(100, procs).spared.length, 1, 'e o controlador continua a ser reconhecido');
   });
   test('one object, empty output and garbage all come back as an array', () => {
     assert.deepEqual(parseProcJson('{"ProcessId":7}'), [{ ProcessId: 7 }]);
@@ -282,18 +282,28 @@ describe('planKillTree (pure)', () => {
     { ProcessId: 100, ParentProcessId: 1, Name: 'node.exe', CommandLine: 'node C:\\f\\bin\\forja.mjs up' },
     { ProcessId: 200, ParentProcessId: 100, Name: 'node.exe', CommandLine: 'node C:\\f\\viewer\\server.mjs' },
     { ProcessId: 300, ParentProcessId: 100, Name: 'cloudflared.exe', CommandLine: 'cloudflared tunnel --url http://127.0.0.1:4317' },
-    { ProcessId: 400, ParentProcessId: 200, Name: 'node.exe', CommandLine: 'node "C:/f/bin/forja.mjs" runner --goal fazer algo' },
+    { ProcessId: 400, ParentProcessId: 200, Name: 'node.exe', CommandLine: 'node "C:/f/bin/forja.mjs" core resume' },
     { ProcessId: 500, ParentProcessId: 400, Name: 'node.exe', CommandLine: 'claude -p --model opus' },
-    { ProcessId: 600, ParentProcessId: 1, Name: 'node.exe', CommandLine: 'node C:\\f\\bin\\forja.mjs runner' },
+    { ProcessId: 600, ParentProcessId: 1, Name: 'node.exe', CommandLine: 'node C:\\f\\bin\\forja.mjs core retry --task T1' },
   ];
-  test('the tree dies children-first, the runner and everything under it is spared', () => {
+  test('the tree dies children-first, the Core controller and everything under it is spared', () => {
     const r = planKillTree(100, procs);
-    assert.deepEqual(r.spared, [400], 'o runner é poupado');
-    assert.deepEqual(r.kill, [200, 300, 100], 'filhos antes dos pais, e sem a sessão claude do runner');
-    assert.equal(r.kill.includes(500), false, 'o que está debaixo do runner também não é tocado');
-    assert.equal(r.kill.includes(600), false, 'um runner de outra árvore nem entra no plano');
+    assert.deepEqual(r.spared, [400], 'o controlador é poupado');
+    assert.deepEqual(r.kill, [200, 300, 100], 'filhos antes dos pais, e sem a sessão claude do controlador');
+    assert.equal(r.kill.includes(500), false, 'o que está debaixo do controlador também não é tocado');
+    assert.equal(r.kill.includes(600), false, 'um controlador de outra árvore nem entra no plano');
   });
-  test('a runner as the root spares everything; an unknown pid is a plan of one', () => {
+  // The legacy runner is gone (0.22.0): its command line is nothing to spare, and
+  // a read-only Core command is not a run either.
+  test('a legacy `forja.mjs runner` or a `core status` in the tree is killed like any other child', () => {
+    const tree = [
+      { ProcessId: 100, ParentProcessId: 1, Name: 'node.exe', CommandLine: 'node C:\\f\\bin\\forja.mjs up' },
+      { ProcessId: 200, ParentProcessId: 100, Name: 'node.exe', CommandLine: 'node "C:/f/bin/forja.mjs" runner --goal x' },
+      { ProcessId: 300, ParentProcessId: 100, Name: 'node.exe', CommandLine: 'node C:\\f\\bin\\forja.mjs core status' },
+    ];
+    assert.deepEqual(planKillTree(100, tree), { kill: [200, 300, 100], spared: [] });
+  });
+  test('a Core controller as the root spares everything; an unknown pid is a plan of one', () => {
     assert.deepEqual(planKillTree(400, procs), { kill: [], spared: [400] });
     assert.deepEqual(planKillTree(999, procs), { kill: [999], spared: [] }, 'sem informação (enumeração falhada) mata-se só o pid pedido');
   });
@@ -407,25 +417,25 @@ describe('down and the pid/stop protocol (CLI, temp data dir, --no-tunnel, no ne
   });
   // The incident of 17 set 2026: `down` stopped the viewer and took the two runs
   // started from the phone with it. A run is never collateral damage of a `down`.
-  test('a `forja.mjs runner` inside the tree survives the down, which says «poupados: N runners»', async () => {
-    // `detached` like a real runner: on Windows libuv puts a non-detached child
+  test('a Core controller inside the tree survives the down, which says «poupados: N controladores Core»', async () => {
+    // `detached` like a real controller: on Windows libuv puts a non-detached child
     // in the parent's Job object, and it would die with the parent whatever the
     // kill plan says (that is the other half of the same incident).
-    const child = "require('node:child_process').spawn(process.execPath,['-e','setTimeout(function(){},60000)','C:\\\\naoexiste\\\\bin\\\\forja.mjs','runner','--goal','x'],{stdio:'ignore',windowsHide:true,detached:true}).unref();setTimeout(function(){},60000)";
-    const proc = spawn(process.execPath, ['-e', child], { stdio: 'ignore', windowsHide: true }); // stands in for `up`: a tree with a runner in it
+    const child = "require('node:child_process').spawn(process.execPath,['-e','setTimeout(function(){},60000)','C:\\\\naoexiste\\\\bin\\\\forja.mjs','core','resume'],{stdio:'ignore',windowsHide:true,detached:true}).unref();setTimeout(function(){},60000)";
+    const proc = spawn(process.execPath, ['-e', child], { stdio: 'ignore', windowsHide: true }); // stands in for `up`: a tree with a Core controller in it
     await sleep(1500);
-    const runnerPid = spawnSync('powershell.exe', ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ParentProcessId=${proc.pid} AND Name='node.exe'").ProcessId`], { encoding: 'utf8' }).stdout.trim();
-    assert.match(runnerPid, /^\d+$/, 'o runner falso arrancou dentro da árvore');
+    const controllerPid = spawnSync('powershell.exe', ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ParentProcessId=${proc.pid} AND Name='node.exe'").ProcessId`], { encoding: 'utf8' }).stdout.trim();
+    assert.match(controllerPid, /^\d+$/, 'o controlador falso arrancou dentro da árvore');
     try {
       writeFileSync(c.pid, `${proc.pid}\n${processInfo(proc.pid).CreationDate}\n`);
       const r = forja('down');
       assert.equal(r.code, 0, r.err);
       assert.deepEqual(r.json.killed, [proc.pid], 'o "up" morreu');
       assert.equal(alive(String(proc.pid)), false);
-      assert.equal(alive(runnerPid), true, 'o runner que estava na árvore continua vivo');
+      assert.equal(alive(controllerPid), true, 'o controlador que estava na árvore continua vivo');
       assert.equal(r.json.sparedRunners, 1);
-      assert.ok((r.json.notes || []).some(n => /^poupados: 1 runner\b/.test(n)), `notas: ${JSON.stringify(r.json.notes)}`);
-    } finally { spawnSync('taskkill', ['/PID', String(runnerPid), '/T', '/F'], { encoding: 'utf8' }); killTree(proc); }
+      assert.ok((r.json.notes || []).some(n => /^poupados: 1 controlador Core\b/.test(n)), `notas: ${JSON.stringify(r.json.notes)}`);
+    } finally { spawnSync('taskkill', ['/PID', String(controllerPid), '/T', '/F'], { encoding: 'utf8' }); killTree(proc); }
   });
   test('up --no-tunnel writes up.pid (its own pid), deletes a stale up.stop; a second up exits 3 on stderr; down kills it, removes up.pid + tunnel.json, leaves up.stop; autostart remove reports killed', async () => {
     writeFileSync(c.stop, 'old\n');

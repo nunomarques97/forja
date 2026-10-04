@@ -28,7 +28,7 @@ import {
   upAlive, upWatchPaths, writeUpWatchState,
 } from '../lib/supervise.mjs';
 import { launchForja } from '../lib/spawn-runner.mjs';
-import { LOCK_STALE_MS } from '../lib/runner.mjs';
+import { LOCK_STALE_MS } from '../lib/process-lock.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'forja-supervise-'));
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -438,7 +438,7 @@ describe('launchForja (a linha de comandos e o ambiente reais, com o spawn de ba
     assert.match(readFileSync(join(dir, 'runner', 'spawn.log'), 'utf8'), /peer=up action=relaunch pid=\? via=guard/);
   });
 
-  test('vai pelo MESMO intermediário do launchRunner (o filho não fica na árvore de quem o lançou)', async () => {
+  test('vai pelo MESMO intermediário do launchCore (o filho não fica na árvore de quem o lançou)', async () => {
     // A propriedade que interessa: um `forja guard` lançado pelo viewer não pode
     // morrer no `forja down` seguinte, e o `planKillTree` só poupa runners.
     const { DETACH_SCRIPT, defaultSpawnRunner } = await import('../lib/spawn-runner.mjs');
@@ -446,7 +446,7 @@ describe('launchForja (a linha de comandos e o ambiente reais, com o spawn de ba
     const dir = fresh('intermediario');
     const calls = [];
     launchForja({ dataDir: dir, forjaRoot: 'C:\\forja', args: ['up'], logPath: join(dir, 'x.log'), spawnRunner: (...a) => { calls.push(a); return {}; } });
-    assert.equal(calls.length, 1, 'passa pelo mesmo seam que o launchRunner substitui nos testes');
+    assert.equal(calls.length, 1, 'passa pelo mesmo seam que o launchCore substitui nos testes');
     assert.equal(typeof defaultSpawnRunner, 'function');
   });
 });

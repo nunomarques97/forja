@@ -1,11 +1,11 @@
 // viewer/runs-api.mjs + lib/projects.mjs against a temp data dir: the registry
-// (liveness from a real lock with a live/dead owner), the 410 of the retired
+// (status from each project's Core state only), the 410 of the retired
 // phone launcher (GET /projects, POST /runs) and the request helpers Core still
 // uses (readBody, crossSite). The server runs in-process with a fake spawnRunner
 // that must never be called; the data dir is a tmpdir (never data/).
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { EventEmitter, once } from 'node:events';
 import { request } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unwatchFile, writeFileSync } from 'node:fs';
@@ -14,10 +14,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer } from '../viewer/server.mjs';
 import { MAX_BODY, crossSite, readBody } from '../viewer/runs-api.mjs';
-import { acquireLock, lockPath, ownerAlive, releaseLock } from '../lib/runner.mjs';
-import { ALIVE_TTL_MS, listProjectsWithStatus, loadProjects, missingProjects, ownerAliveAsync, ownerAliveCached, projectsPath, pruneProjects, readProjects, removeProject, resetAliveCache, safeName, upsertProject } from '../lib/projects.mjs';
+import { listProjectsWithStatus, loadProjects, missingProjects, projectsPath, pruneProjects, readProjects, removeProject, safeName, upsertProject } from '../lib/projects.mjs';
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const here = dirname(fileURLToPath(import.meta.url));
 const forja = join(here, '..');
@@ -26,7 +24,7 @@ const root = mkdtempSync(join(tmpdir(), 'forja-runs-api-'));
 const dataDir = join(root, 'data');
 mkdirSync(dataDir, { recursive: true });
 
-// Four projects, one per state the phone has to tell apart.
+// Four projects with legacy history only (never a Core run).
 const projDir = name => join(root, 'projects', name);
 function makeProject(name, run = null) {
   const p = projDir(name);
@@ -37,11 +35,11 @@ function makeProject(name, run = null) {
 }
 const RUNNING = { run_id: 'R-20260916-aaaa', project: 'x', goal: 'continuar o que ficou a meio', status: 'running', started_at: '2026-09-16T10:00:00.000Z' };
 const alpha = makeProject('alpha');                                        // never ran
-const beta = makeProject('beta', RUNNING);                                 // running + live runner
+const beta = makeProject('beta', RUNNING);                                 // running legacy run with a runner lock
 const gama = makeProject('gama', { ...RUNNING, run_id: 'R-20260916-bbbb', status: 'finished' });
 const delta = makeProject('delta', { ...RUNNING, run_id: 'R-20260916-cccc', driver: 'runner' }); // running, runner-driven, no runner
 
-let decoy; let deadPid; let server; let token; let port;
+let server; let token; let port;
 const spawned = [];
 const fakeSpawn = (command, args, options) => { spawned.push({ command, args, options }); return { pid: 4242 + spawned.length }; };
 
@@ -55,15 +53,11 @@ const http = (path, { method = 'GET', headers = {}, body = null, auth = true } =
 const post = (payload, opts = {}) => http('/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: typeof payload === 'string' ? payload : JSON.stringify(payload), ...opts });
 
 before(async () => {
-  // A live "runner": a node process whose command line matches forja.mjs runner
-  // (pid reuse on Windows means ownerAlive checks the command line, not the pid).
-  decoy = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)', '--', 'forja.mjs', 'runner'], { stdio: 'ignore' });
-  acquireLock(lockPath(beta, join(dataDir, 'runner')), { pid: decoy.pid, project: beta, alive: () => true });
-  // A dead owner: a process that existed and is gone.
-  const corpse = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
-  deadPid = corpse.pid;
-  await once(corpse, 'exit');
-  acquireLock(lockPath(gama, join(dataDir, 'runner')), { pid: deadPid, project: gama, alive: () => true });
+  // A leftover runner lock naming this very process: before 0.22.0 it made
+  // beta "alive"; now project status never reads a runner lock.
+  const lock = join(dataDir, 'runner', `lock-${beta.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.json`);
+  mkdirSync(dirname(lock), { recursive: true });
+  writeFileSync(lock, JSON.stringify({ pid: process.pid, run_id: RUNNING.run_id, project: beta, since: new Date().toISOString(), beat: new Date().toISOString() }));
 
   server = startServer({ dataDir, port: 0, host: '127.0.0.1', noWatchdog: true, spawnRunner: fakeSpawn });
   await once(server.server, 'listening');
@@ -73,8 +67,6 @@ before(async () => {
 after(() => {
   try { server.server.close(); } catch {}
   try { unwatchFile(join(dataDir, 'events.jsonl')); } catch {}
-  try { releaseLock(lockPath(beta, join(dataDir, 'runner')), decoy.pid); } catch {}
-  try { decoy.kill(); } catch {}
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -102,33 +94,12 @@ describe('registry (lib/projects.mjs)', () => {
     assert.equal(safeName('a/b\\c'), 'a-b-c');
     assert.equal(safeName(''), 'projeto');
   });
-  test('liveness comes from the lock: a live runner owner is true, a dead pid false', () => {
-    assert.ok(ownerAlive(decoy.pid), 'decoy recognised as a runner');
+  test('status comes from Core state only: legacy RUN.json and runner locks read as no run, not alive', () => {
     const byName = Object.fromEntries(listProjectsWithStatus(dataDir).map(p => [p.name, p]));
-    assert.equal(byName.beta.runnerAlive, true);
-    assert.equal(byName.gama.runnerAlive, false, 'lock with a dead owner is not a live runner');
-    assert.equal(byName.alpha.runnerAlive, false, 'no lock at all');
-  });
-  test('the async liveness check gives the same answer as the blocking one', async () => {
-    assert.equal(await ownerAliveAsync(decoy.pid), true, 'a live runner');
-    assert.equal(await ownerAliveAsync(deadPid), false, 'a pid that is gone');
-  });
-  test('after the TTL the cache answers with the last known value and refreshes in the background', async () => {
-    resetAliveCache();
-    const pid = 987654; // never looked up for real: both checks are injected
-    let sync = 0; let background = 0;
-    const blocking = () => { sync++; return true; };
-    const inBackground = async () => { background++; return false; };
-    const t0 = Date.now();
-    assert.equal(ownerAliveCached(pid, t0, blocking, inBackground), true, 'first sighting: measured, not guessed');
-    assert.equal(ownerAliveCached(pid, t0 + 1000, blocking, inBackground), true);
-    assert.equal(sync, 1, 'inside the TTL nothing is checked again');
-    assert.equal(ownerAliveCached(pid, t0 + ALIVE_TTL_MS + 1, blocking, inBackground), true, 'stale: the last known value, without blocking');
-    assert.equal(sync, 1, 'the blocking check is never repeated');
-    await sleep(20);
-    assert.equal(background, 1, 'exactly one background refresh in flight');
-    assert.equal(ownerAliveCached(pid, Date.now(), blocking, inBackground), false, 'the refresh updated the value');
-    assert.equal(sync, 1);
+    for (const name of ['alpha', 'beta', 'gama', 'delta']) {
+      assert.equal(byName[name].run, null, `${name}: no Core run`);
+      assert.equal(byName[name].runnerAlive, false, `${name}: a runner lock is not liveness`);
+    }
   });
 });
 

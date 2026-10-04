@@ -17,7 +17,7 @@ import { upsertProject, projectStatus, runSummary } from '../lib/projects.mjs';
 import { renderProject } from '../viewer/assets/core.js';
 import { startServer } from '../viewer/server.mjs';
 import { once } from 'node:events';
-import { isRunnerCmd, planKillTree } from '../lib/up.mjs';
+import { isCoreRunCmd, planKillTree } from '../lib/up.mjs';
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'forja-observe-'));
@@ -259,45 +259,27 @@ test('guard uses existing grace/caps for Core and never retries a blocked task',
   assert.equal(guardPlan([p], second.state, 9999999).actions.length, 0);
 });
 
-test('retained terminal Core history does not hide a later legacy run from status or guard', (t) => {
+test('a later legacy RUN.json is history: status stays Core and the guard never relaunches it', (t) => {
   const f = fixture(t);
   f.state.status = 'done';
   f.state.created_at = '2026-09-20T10:00:00.000Z';
   f.save();
   mkdirSync(join(f.project, 'docs/forja'), { recursive: true });
-  const legacy = {
-    run_id: 'R-later',
-    status: 'running',
-    driver: 'runner',
-    started_at: '2026-09-21T10:00:00.000Z',
-  };
-  const saveLegacy = () =>
-    writeFileSync(
-      join(f.project, 'docs/forja/RUN.json'),
-      JSON.stringify(legacy),
-    );
-  saveLegacy();
+  writeFileSync(
+    join(f.project, 'docs/forja/RUN.json'),
+    JSON.stringify({ run_id: 'R-later', status: 'running', driver: 'runner', started_at: '2026-09-21T10:00:00.000Z' }),
+  );
   const status = projectStatus({ path: f.project }, f.data);
-  assert.equal(status.run.run_id, 'R-later');
-  assert.equal(status.run.driver, 'runner');
-  assert.equal(runSummary(f.project, f.data).run_id, 'R-later');
+  assert.equal(status.run.run_id, 'F-123-ab');
+  assert.equal(status.run.driver, 'core');
+  assert.equal(runSummary(f.project, f.data).run_id, 'F-123-ab');
   const project = { name: 'Project', path: f.project, ...status };
   const first = guardPlan([project], EMPTY_STATE(), 1000);
-  assert.deepEqual(
-    guardPlan([project], first.state, 1000 + GUARD_DEAD_GRACE_MS).actions,
-    [{ name: 'Project', path: f.project, visible: false, attempt: 1 }],
-  );
-  legacy.status = 'finished';
-  saveLegacy();
-  assert.equal(runSummary(f.project, f.data).run_id, 'R-later');
-  legacy.started_at = '2026-09-19T10:00:00.000Z';
-  saveLegacy();
-  assert.equal(runSummary(f.project, f.data).driver, 'core');
-  legacy.status = 'running';
-  saveLegacy();
-  f.state.status = 'blocked';
-  f.save();
-  assert.equal(runSummary(f.project, f.data).driver, 'core');
+  assert.deepEqual(guardPlan([project], first.state, 1000 + GUARD_DEAD_GRACE_MS).actions, []);
+  // Even handed a legacy summary directly, the guard skips it.
+  const legacy = { name: 'Project', path: f.project, run: { run_id: 'R-later', status: 'running', driver: 'runner' }, runnerAlive: false };
+  const once = guardPlan([legacy], EMPTY_STATE(), 1000);
+  assert.deepEqual(guardPlan([legacy], once.state, 1000 + GUARD_DEAD_GRACE_MS).actions, []);
 });
 
 test('Core recovery launch uses argv and strips inherited runner/provider session', (t) => {
@@ -403,8 +385,8 @@ test('stopping the viewer preserves Core executors and their provider subtrees',
     'core resume',
     'core retry --task fix',
   ])
-    assert.equal(isRunnerCmd('node "C:/forja/bin/forja.mjs" ' + action), true);
-  assert.equal(isRunnerCmd('node C:/forja/bin/forja.mjs core status'), false);
+    assert.equal(isCoreRunCmd('node "C:/forja/bin/forja.mjs" ' + action), true);
+  assert.equal(isCoreRunCmd('node C:/forja/bin/forja.mjs core status'), false);
   const tree = [
     {
       ProcessId: 100,
