@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lab": "C:\\Users\\User\\Desktop\\Externos\\forja-lab",
+  "lab": "../forja-lab",
   "wallClockMinutes": 180,
   "runMinutes": { "screening": 20, "full": 25 },
   "fullCandidates": 3,

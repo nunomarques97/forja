@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lab": "C:\\Users\\User\\Desktop\\Externos\\forja-lab",
+  "lab": "../forja-lab",
   "wallClockMinutes": 660,
   "categories": ["bug", "failing-tests", "regression", "ambiguous", "security", "multi-file-feature", "dependency-config", "windows-paths"],
   "kinds": ["new-project", "unfamiliar-codebase"],
