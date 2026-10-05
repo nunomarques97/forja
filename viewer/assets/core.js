@@ -12,11 +12,33 @@ export function renderLegacyNotice(value) {
   const noun = count === 1 ? 'project has' : 'projects have';
   return `<p id="legacy-discovery-text"><strong>${number(count)} registered ${noun} no Core run.</strong> You can still view ${count === 1 ? 'it' : 'them'} in the legacy workspace.</p><a href="/legacy">Open legacy viewer</a>`;
 }
+// Untrusted server data: a blocked run's usage-limit wait is shown only with a valid
+// reset time and resume flags; anything else (or an older server) keeps the blocked card.
+export function usageLimitWait(run) {
+  const w = run?.usage_limit_wait;
+  if (run?.status !== 'blocked' || !w || typeof w !== 'object' || Array.isArray(w) || typeof w.reset_at !== 'string' || !Number.isFinite(Date.parse(w.reset_at)) ||
+    typeof w.auto_resume !== 'boolean' || !['provider', 'default'].includes(w.source)) return null;
+  const max = Number.isSafeInteger(w.max_resumes) && w.max_resumes > 0 ? w.max_resumes : null;
+  return { at: Date.parse(w.reset_at), iso: new Date(Date.parse(w.reset_at)).toISOString(), estimated: w.source === 'default', auto: w.auto_resume, stopRequested: w.stop_requested === true,
+    capReached: max !== null && Number.isSafeInteger(w.resumes) && w.resumes >= max, max };
+}
+const localTime = at => new Date(at).toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' });
+function waitText(w, now) {
+  const time = `<time datetime="${esc(w.iso)}">${esc(localTime(w.at))}</time>`;
+  const reset = `${w.at > now ? 'The usage limit resets' : 'The usage limit reset'} at ${time} (your local time)${w.estimated ? ', an estimate because the provider gave no reset time' : ''}.`;
+  const why = w.stopRequested ? 'A stop was requested for this run, so it does not resume automatically.'
+    : w.capReached ? `This run already used all ${number(w.max)} automatic resumes.`
+      : 'Automatic resume is turned off for this run.';
+  return { reset, resume: w.auto ? 'It resumes automatically about a minute after that.' : `${why} Resume it in the terminal after that time.` };
+}
 export function projectState(p) {
   const c = p.core;
   if (c.error) return { group: 'attention', key: 'failed', label: 'Status unavailable' };
   if (c.technology?.length) return { group: 'attention', key: 'blocked', label: 'Needs you' };
   if (c.run.status === 'running' && !c.runnerAlive) return { group: 'attention', key: 'blocked', label: 'Interrupted' };
+  // An automatic resume needs nothing from the Sponsor; a manual one needs attention.
+  const wait = usageLimitWait(c.run);
+  if (wait) return { group: wait.auto ? 'running' : 'attention', key: 'waiting', label: 'Waiting for usage limit' };
   if (['blocked', 'failed'].includes(c.run.status)) return { group: 'attention', key: c.run.status, label: labels[c.run.status] };
   return { group: c.run.status === 'done' ? 'done' : 'running', key: c.run.status, label: labels[c.run.status] || c.run.status };
 }
@@ -48,18 +70,23 @@ const decisions = (name, c) => (c.technology || []).map(d => `<form class="techn
   <p class="eyebrow">YOUR DECISION · WORK PAUSED</p><fieldset><legend>${esc(d.capability)}</legend><p>${esc(d.constraints)}</p>
   <div class="options">${d.options.map(o => `<div class="option"><label class="technology-option"><input type="radio" name="choice" value="${esc(o.id)}" required><span><strong>${esc(o.name)}</strong><span class="cost">${esc(costs[o.cost])}</span><span>${esc(o.cost_basis)}</span><span>${esc(o.tradeoffs)}</span>${o.id === d.recommended ? '<span class="recommendation">Recommended by FORJA</span>' : ''}</span></label>${(o.sources || []).map(s => `<a class="source" href="${esc(s)}" target="_blank" rel="noopener noreferrer">View source ↗</a>`).join('')}</div>`).join('')}</div></fieldset>
   <p><strong>Why this recommendation:</strong> ${esc(d.rationale)}</p><p class="hint">Choose an option to continue. This choice does not make any payments.</p><button type="submit">Confirm choice <span aria-hidden="true">↗</span></button><p class="decision-result" role="status"></p></form>`).join('');
-export function renderProject(p) {
+export function renderProject(p, now = Date.now()) {
   const { name, core: c } = p, state = projectState(p), key = esc(projectKey(p));
   if (c.error) return `<article class="project needs-attention" data-key="${key}"><div class="project-top"><h3>${esc(name)}</h3>${status(state.key, state.label)}</div><p class="warning">${esc(c.error)}</p><p class="muted">Could not read this project. Other projects are still available.</p></article>`;
   const r = c.run, u = c.usage.totals, tasks = c.tasks || [], completed = tasks.filter(t => t.status === 'done').length;
   const currentTask = tasks.find(t => t.id === c.pending?.task);
-  const activity = r.status === 'done' ? 'Run completed' : c.technology?.length ? 'Waiting for your choice' : !c.runnerAlive ? 'No active process' : c.pending ? `${labels[c.pending.phase] || c.pending.phase}${currentTask ? ' · ' + currentTask.title : ''}` : 'Process active · waiting for the next step';
+  const wait = state.key === 'waiting' ? usageLimitWait(r) : null, waiting = wait && waitText(wait, now);
+  const activity = r.status === 'done' ? 'Run completed' : c.technology?.length ? 'Waiting for your choice' : wait ? 'Paused until the provider usage limit resets' : !c.runnerAlive ? 'No active process' : c.pending ? `${labels[c.pending.phase] || c.pending.phase}${currentTask ? ' · ' + currentTask.title : ''}` : 'Process active · waiting for the next step';
+  const note = waiting ? `${waiting.reset} ${waiting.resume}` : r.status === 'blocked' && !c.technology?.length ? 'Check the tasks and review before resuming in the terminal.' : `${number(c.invocations)} session${c.invocations === 1 ? '' : 's'} started`;
+  const recovery = waiting
+    ? `<strong>Provider usage limit reached</strong><p>Work on disk is kept, and the limit did not use up an implementation attempt. Each resume starts a new session.</p>`
+    : c.recovery ? `<strong>${esc(c.recovery.title)}</strong><p>${esc(c.recovery.guidance)}</p>` : '';
   return `<article class="project ${state.group === 'attention' ? 'needs-attention' : ''}" data-key="${key}">
     <div class="project-top"><div class="project-name"><span class="project-icon" aria-hidden="true">${esc(name.slice(0, 1).toLocaleUpperCase())}</span><h3>${esc(name)}</h3></div>${status(state.key, state.label)}</div>
     <p class="goal">${esc(r.goal || 'Goal unavailable')}</p>
-    <div class="work-progress"><div><p class="activity"><span class="activity-mark ${state.key}" aria-hidden="true"></span>${esc(activity)}</p><p class="muted">${r.status === 'blocked' && !c.technology?.length ? 'Check the tasks and review before resuming in the terminal.' : `${number(c.invocations)} session${c.invocations === 1 ? '' : 's'} started`}</p></div><div class="progress-summary"><span><strong>${completed}</strong> / ${tasks.length} tasks completed</span><progress max="${Math.max(tasks.length, 1)}" value="${completed}" aria-label="Completed tasks in ${esc(name)}"></progress></div></div>
+    <div class="work-progress"><div><p class="activity"><span class="activity-mark ${state.key}" aria-hidden="true"></span>${esc(activity)}</p><p class="${waiting ? 'wait-note' : 'muted'}">${waiting ? note : esc(note)}</p></div><div class="progress-summary"><span><strong>${completed}</strong> / ${tasks.length} tasks completed</span><progress max="${Math.max(tasks.length, 1)}" value="${completed}" aria-label="Completed tasks in ${esc(name)}"></progress></div></div>
     ${decisions(name, c)}
-    ${c.recovery ? `<aside class="recovery-note" aria-label="Recovery guidance"><strong>${esc(c.recovery.title)}</strong><p>${esc(c.recovery.guidance)}</p><p class="hint">Recovery is performed in the terminal. Saved work still needs validation and independent review.</p><details data-section="budgets"><summary data-focus="budgets">Execution limits</summary><p>Total sessions: ${number(c.recovery.sessions?.used)} / ${number(c.recovery.sessions?.limit)} · Cloud sessions: ${number(c.recovery.cloud_sessions?.used)} / ${number(c.recovery.cloud_sessions?.limit)}</p><p>Run time cap: ${number(c.recovery.minutes_per_call)} minutes per call. A route may set a lower cap.</p><p>Configured context threshold: ${number(c.recovery.context_tokens)} tokens.</p><p class="hint">${esc(c.recovery.context_note)}</p></details></aside>` : ''}
+    ${c.recovery ? `<aside class="recovery-note${wait?.auto ? ' waiting' : ''}" aria-label="Recovery guidance">${recovery}<p class="hint">Recovery is performed in the terminal. Saved work still needs validation and independent review.</p><details data-section="budgets"><summary data-focus="budgets">Execution limits</summary><p>Total sessions: ${number(c.recovery.sessions?.used)} / ${number(c.recovery.sessions?.limit)} · Cloud sessions: ${number(c.recovery.cloud_sessions?.used)} / ${number(c.recovery.cloud_sessions?.limit)}</p><p>Run time cap: ${number(c.recovery.minutes_per_call)} minutes per call. A route may set a lower cap.</p><p>Configured context threshold: ${number(c.recovery.context_tokens)} tokens.</p><p class="hint">${esc(c.recovery.context_note)}</p></details></aside>` : ''}
     ${renderValidation(name, c.validation_summary)}
     <div class="project-details"><details data-section="tasks"><summary data-focus="tasks">Tasks and validation <span class="detail-count">${tasks.length}</span></summary><div class="task-list">${tasks.length ? tasks.map(t => `<div class="task"><span class="task-id">${esc(t.id)}</span><div class="task-title">${esc(t.title)}<small>${t.checks_passed}/${t.checks_total} checks · Review ${esc(labels[t.review] || t.review || 'pending')} · ${t.attempts} attempt${t.attempts === 1 ? '' : 's'}${t.rotations ? ` · ${t.rotations} rotation${t.rotations === 1 ? '' : 's'}` : ''}</small></div>${status(t.status)}</div>`).join('') : '<p class="muted">The task plan is not available yet.</p>'}</div></details>
     <details data-section="sessions"><summary data-focus="sessions">Sessions and usage <span class="detail-count">${c.usage.rows.length}</span></summary>
@@ -74,6 +101,8 @@ export function renderEmptyState(projectCount, legacyOnlyProjects) {
   if (safeCount(legacyOnlyProjects)) return empty('No Core runs yet', 'Projects without a Core run remain available in the legacy viewer above.');
   return empty('It starts with a goal.', 'Start a run in the terminal. Its project, tasks and decisions will appear here automatically.');
 }
+// Polite announcement of usage-limit waits, so the state is not conveyed by color alone.
+const waitingNotice = projects => { const n = projects.filter(p => projectState(p).key === 'waiting').length; return n ? `${number(n)} ${n === 1 ? 'is' : 'are'} waiting for a usage limit to reset. ` : ''; };
 export function bootCore({ doc = document, fetchImpl = globalThis.fetch, intervalMs = 5000, timeoutMs = 10000 } = {}) {
   const root = doc.getElementById('projects'), refreshButton = doc.getElementById('refresh'), life = new AbortController();
   const legacyNotice = doc.createElement('aside');
@@ -145,9 +174,9 @@ export function bootCore({ doc = document, fetchImpl = globalThis.fetch, interva
       }
     }
     if (!visible.size) root.insertAdjacentHTML('beforeend', renderEmptyState(projects.length, legacyOnlyProjects));
-    const states = JSON.stringify([legacyOnlyProjects, projects.map(p => [projectKey(p), projectState(p).label, p.core.recovery?.code, p.core.tasks?.map(t => t.status)])]);
+    const states = JSON.stringify([legacyOnlyProjects, projects.map(p => [projectKey(p), projectState(p).label, projectState(p).group, p.core.recovery?.code, p.core.tasks?.map(t => t.status)])]);
     if (states !== lastStates) {
-      if (!first) announce('Project status updated. ' + projects.filter(p => projectState(p).group === 'attention').length + ' need attention. ' + (legacyOnlyProjects ? `${legacyOnlyProjects} ${legacyOnlyProjects === 1 ? 'project is' : 'projects are'} available in the legacy viewer.` : 'No projects are available only in the legacy viewer.'));
+      if (!first) announce('Project status updated. ' + projects.filter(p => projectState(p).group === 'attention').length + ' need attention. ' + waitingNotice(projects) + (legacyOnlyProjects ? `${legacyOnlyProjects} ${legacyOnlyProjects === 1 ? 'project is' : 'projects are'} available in the legacy viewer.` : 'No projects are available only in the legacy viewer.'));
       lastStates = states; first = false;
     }
   }

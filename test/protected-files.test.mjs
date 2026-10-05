@@ -117,7 +117,9 @@ test('review cannot approve after mutating an ignored protected file', async () 
 
 test('final regression checks also preserve protected files after later tasks', async () => {
   const root = repo({ ignored: true });
-  const second = { ...task(), id: 'T2', title: 'Add another file', files: ['extra.mjs'], after: ['T1'] };
+  // T2 has its own check: an identical check already passed on the final tree
+  // by T2's validation would be reused instead of running again.
+  const second = { ...task(), id: 'T2', title: 'Add another file', files: ['extra.mjs'], after: ['T1'], checks: [{ command: 'node', args: ['acceptance.mjs', 'T2'] }] };
   start(root, {}, { decisions: [], tasks: [task(), second] }); let calls = 0, checks = 0;
   const run = await drive(root, { ...driveOptions, providerCall: async (_, options) => {
     calls++;

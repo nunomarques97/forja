@@ -29,6 +29,15 @@ const sleeper = "setTimeout(() => {}, 120000)";
 // child would leave the process group, which a worker could also do.
 const launcher = stay => `const c = require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(sleeper)}], { stdio: 'ignore', windowsHide: true, detached: process.platform === 'win32' }); c.unref(); console.log('GRANDCHILD ' + c.pid); setTimeout(() => {}, ${stay});`;
 const grandchildOf = stdout => Number(/GRANDCHILD (\d+)/.exec(stdout)?.[1]);
+// Records the PIDs cleanup asked to end. Survivors are judged against this
+// record, not against wall-clock liveness: under a loaded suite the last
+// snapshot can still list a descendant that was already exiting (such as the
+// root's console host), which is a correct report, not a leak.
+const recorder = (fail = null) => {
+  const asked = new Set();
+  return { asked, terminate: pids => { pids.forEach(p => asked.add(p)); if (fail) throw new Error(fail); } };
+};
+const reportedOnly = (survivors, asked) => survivors.every(p => asked.has(p) && p !== process.pid);
 
 test('a grandchild left behind by an exited process is terminated, and an unrelated process survives', async t => {
   const unrelated = spawn(process.execPath, ['-e', sleeper], { stdio: 'ignore', windowsHide: true });
@@ -62,23 +71,27 @@ test('after a timeout the orphan of an exited intermediate process is terminated
 });
 
 test('a process that cleanup cannot end is reported with its PID, and the session result is kept', async t => {
-  const out = await execute(process.execPath, ['-e', launcher(0)], { timeoutMs: 60000, processTree: { ...tree, terminate: () => {} } });
+  const kept = recorder();
+  const out = await execute(process.execPath, ['-e', launcher(0)], { timeoutMs: 60000, processTree: { ...tree, terminate: kept.terminate } });
   const pid = grandchildOf(out.stdout);
   reap(t, pid);
   assert.equal(out.code, 0);
   assert.match(out.stdout, /GRANDCHILD/);
   assert.ok(alive(pid));
-  assert.deepEqual(out.processCleanup.survivors, [pid]);
+  assert.ok(out.processCleanup.survivors.includes(pid), JSON.stringify(out.processCleanup));
+  assert.ok(reportedOnly(out.processCleanup.survivors, kept.asked), 'only processes cleanup tried to end are reported');
   assert.deepEqual(out.processCleanup.terminated, []);
   assert.match(processCleanupNote(out.processCleanup), new RegExp(`PID ${pid}\\b`));
 
-  const failed = await execute(process.execPath, ['-e', launcher(0)], { timeoutMs: 60000, processTree: { ...tree, terminate: () => { throw new Error('access denied'); } } });
+  const denied = recorder('access denied');
+  const failed = await execute(process.execPath, ['-e', launcher(0)], { timeoutMs: 60000, processTree: { ...tree, terminate: denied.terminate } });
   const other = grandchildOf(failed.stdout);
   reap(t, other);
   assert.equal(failed.code, 0);
   assert.match(failed.stdout, /GRANDCHILD/);
   assert.equal(failed.processCleanup.error, 'access denied');
-  assert.deepEqual(failed.processCleanup.survivors, [other]);
+  assert.ok(failed.processCleanup.survivors.includes(other), JSON.stringify(failed.processCleanup));
+  assert.ok(reportedOnly(failed.processCleanup.survivors, denied.asked), 'only processes cleanup tried to end are reported');
   assert.match(processCleanupNote(failed.processCleanup), /could not complete: access denied/);
 });
 

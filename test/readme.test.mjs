@@ -67,5 +67,5 @@ test('the forja-office section follows the badges block and links the demo video
   assert.match(section, /reads FORJA's registry and run state files and never writes them/);
   assert.match(section, /<a href="https:\/\/youtu\.be\/EXVfoSOA7j8"><img src="https:\/\/img\.youtube\.com\/vi\/EXVfoSOA7j8\/hqdefault\.jpg"[^>]*alt="[^"]+"><\/a>/);
   assert.match(section, /<a href="https:\/\/youtu\.be\/EXVfoSOA7j8">[^<]+<\/a> \(demo mode with fictional projects\)/);
-  for (const line of section.split(/\r?\n/).filter(Boolean)) assert.match(line, /^(<h2 align="center">|<p align="center">|  <a |<\/p>)/);
+  for (const line of section.split(/\r?\n/).filter(line => line.trim())) assert.match(line, /^(<h2 align="center">|<p align="center">|  <a |<\/p>)/);
 });

@@ -1,0 +1,8 @@
+{
+  "name": "tallybook",
+  "version": "0.4.2",
+  "private": true,
+  "type": "module",
+  "bin": { "tally": "src/cli.mjs" },
+  "scripts": { "test": "node --test" }
+}

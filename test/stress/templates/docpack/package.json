@@ -1,0 +1,8 @@
+{
+  "name": "docpack",
+  "version": "1.6.1",
+  "private": true,
+  "type": "module",
+  "bin": { "docpack": "src/cli.mjs" },
+  "scripts": { "test": "node --test", "docs": "node src/cli.mjs build site dist" }
+}

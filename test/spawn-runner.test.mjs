@@ -9,10 +9,10 @@
 import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { defaultSpawnRunner } from '../lib/spawn-runner.mjs';
+import { defaultSpawnRunner, launchCore, launchCoreQueue, DETACH_SCRIPT } from '../lib/spawn-runner.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'forja-spawn-'));
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -126,5 +126,119 @@ describe('the runner leaves the caller\'s process tree (T-RUN-2)', () => {
       await sleep(1000); // give the tree walk time to reach a child, if it had one
       assert.equal(alive(runnerPid), true, 'o runner continua vivo depois de a árvore do chamador ser morta');
     } finally { spawnSync('taskkill', ['/PID', String(runnerPid), '/F', '/T'], { encoding: 'utf8' }); }
+  });
+});
+
+// launchCore (lib/spawn-runner.mjs): the guard's only way into a Core run. It
+// resumes a running run whose controller died, or a due usage-limit wait of the
+// same run_id; every other blocked run is refused before anything is spawned.
+describe('launchCore and the usage-limit wait', () => {
+  const RUN = 'F-1791068167545-6aaf68';
+  const MIN = 60_000;
+  // Fixed instant passed to launchCore: due or not is judged against it, never
+  // against how long the test took.
+  const T0 = Date.parse('2026-10-04T03:00:00.000Z');
+  const project = (state, lock = null) => {
+    const path = mkdtempSync(join(root, 'core-'));
+    mkdirSync(join(path, '.forja'), { recursive: true });
+    writeFileSync(join(path, '.forja', 'current.json'), JSON.stringify({ version: 1, run_id: RUN, status: 'blocked', provider: 'claude', goal: 'Goal', tasks: [], invocations: 1, config: {}, ...state }));
+    if (lock) writeFileSync(join(path, '.forja', 'lock.json'), JSON.stringify(lock));
+    return path;
+  };
+  const due = (over = {}) => ({ stopCode: 'provider_limit', usageLimitWait: { reset_at: new Date(T0 - 5 * MIN).toISOString(), source: 'provider', recorded_at: new Date(T0 - 70 * MIN).toISOString(), resumes: 0 }, ...over });
+  const launch = (path, runId = RUN) => {
+    const calls = [];
+    const pid = launchCore({ dataDir: join(root, 'data'), forjaRoot: root, project: { name: 'Project', path, ...(runId ? { runId } : {}) }, now: T0,
+      spawnRunner: (...args) => { calls.push(args); return { pid: 77 }; } });
+    return { pid, calls };
+  };
+
+  test('a due wait of the same run_id starts core resume --expected-run, hidden through the default spawner', () => {
+    const { pid, calls } = launch(project(due()));
+    assert.equal(pid, 77);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0][1].slice(1), ['core', 'resume', '--expected-run', RUN]);
+    assert.equal(calls[0][2].env.CLAUDECODE, undefined);
+    // The default spawner hides every child on Windows (go-between and runner).
+    assert.match(DETACH_SCRIPT, /windowsHide:true/);
+  });
+
+  test('refuses a wait that is not due, opted out, capped, of another run_id, without run_id or under a live lock', () => {
+    const later = due(); later.usageLimitWait.reset_at = new Date(T0 + 30 * MIN).toISOString();
+    const margin = due(); margin.usageLimitWait.reset_at = new Date(T0 - 20_000).toISOString();
+    for (const [label, path, runId] of [
+      ['not due', project(later)],
+      ['inside the margin', project(margin)],
+      ['opt-out', project(due({ config: { usageLimitResume: false } }))],
+      ['cap', project(due({ usageLimitResumes: 6 }))],
+      ['other run', project(due()), 'F-1-abcdef'],
+      ['no run id', project(due()), null],
+      ['live lock', project(due(), { pid: process.pid, token: 'x' })],
+      ['malformed wait', project(due({ usageLimitWait: { reset_at: 'soon', source: 'provider' } }))],
+    ]) {
+      const { pid, calls } = launch(path, runId === undefined ? RUN : runId);
+      assert.equal(pid, undefined, label);
+      assert.equal(calls.length, 0, label);
+    }
+  });
+
+  test('refuses every other blocked run, even with a forged due wait', () => {
+    for (const stopCode of ['timeout', 'provider', 'output', 'attempts', 'operator_stop', 'inspect', 'check_writes', 'check_timeout', 'sessions', undefined]) {
+      const { pid, calls } = launch(project(due({ stopCode })));
+      assert.equal(pid, undefined, String(stopCode));
+      assert.equal(calls.length, 0, String(stopCode));
+    }
+    for (const status of ['done', 'failed']) assert.equal(launch(project(due({ status }))).pid, undefined, status);
+  });
+});
+
+describe('launchCoreQueue and the goal queue after a done run', () => {
+  const RUN = 'F-1791068167545-6aaf68';
+  const GOAL = 'Secret queued goal text';
+  const entry = { id: 'Q-1791068167545-abcdef', added_at: '2026-10-04T00:00:00.000Z', provider: 'claude', goal: GOAL, config: null, budgets: {} };
+  const project = (state = {}, { queue = { version: 1, entries: [entry] }, lock = null } = {}) => {
+    const path = mkdtempSync(join(root, 'queue-'));
+    mkdirSync(join(path, '.forja'), { recursive: true });
+    writeFileSync(join(path, '.forja', 'current.json'), JSON.stringify({ version: 1, run_id: RUN, status: 'done', provider: 'claude', goal: 'Goal', tasks: [], invocations: 1, config: {}, ...state }));
+    if (queue !== null) writeFileSync(join(path, '.forja', 'queue.json'), typeof queue === 'string' ? queue : JSON.stringify(queue));
+    if (lock) writeFileSync(join(path, '.forja', 'lock.json'), JSON.stringify(lock));
+    return path;
+  };
+  const launch = (path, runId = RUN) => {
+    const calls = [];
+    const pid = launchCoreQueue({ dataDir: join(root, 'data'), forjaRoot: root, project: { name: 'Project', path, ...(runId ? { runId } : {}) },
+      spawnRunner: (...args) => { calls.push(args); return { pid: 88 }; } });
+    return { pid, calls };
+  };
+
+  test('a done run of the same run_id with a queued goal starts core queue start --expected-run, without the goal in argv', () => {
+    const { pid, calls } = launch(project());
+    assert.equal(pid, 88);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0][1].slice(1), ['core', 'queue', 'start', '--expected-run', RUN]);
+    assert.doesNotMatch(JSON.stringify(calls[0][1]), /Secret queued goal/);
+    assert.equal(calls[0][2].env.CLAUDECODE, undefined);
+    assert.equal(calls[0][2].env.FORJA_PROJECT_ROOT, undefined);
+    assert.match(calls[0][2].logPath, /queue-Project-/);
+    assert.match(DETACH_SCRIPT, /windowsHide:true/);
+  });
+
+  test('refuses blocked, failed, running, another run_id, no run_id, a live lock, an empty or corrupt queue', () => {
+    for (const [label, path, runId] of [
+      ['blocked', project({ status: 'blocked', stopCode: 'inspect' })],
+      ['due usage-limit wait', project({ status: 'blocked', stopCode: 'provider_limit', usageLimitWait: { reset_at: new Date(Date.now() - 600000).toISOString(), source: 'provider', resumes: 0 } })],
+      ['failed', project({ status: 'failed' })],
+      ['running', project({ status: 'running' })],
+      ['other run', project(), 'F-1-abcdef'],
+      ['no run id', project(), null],
+      ['live lock', project({}, { lock: { pid: process.pid, token: 'x' } })],
+      ['empty queue', project({}, { queue: { version: 1, entries: [] } })],
+      ['no queue file', project({}, { queue: null })],
+      ['corrupt queue', project({}, { queue: '{oops' })],
+    ]) {
+      const { pid, calls } = launch(path, runId === undefined ? RUN : runId);
+      assert.equal(pid, undefined, label);
+      assert.equal(calls.length, 0, label);
+    }
   });
 });

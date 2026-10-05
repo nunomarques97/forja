@@ -1,0 +1,4 @@
+{
+  "title": "Docpack",
+  "nav": ["index.md", "guide/install.md", "guide/config.md", "roadmap.md"]
+}

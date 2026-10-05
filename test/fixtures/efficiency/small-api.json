@@ -1,0 +1,41 @@
+{
+  "name": "small-api",
+  "description": "Three-task change in a small Node module with a few knowledge notes; covers plan, develop, review and the retry/rotation scenarios.",
+  "goal": "Make the cart module correct: total() sums item prices, prices are rounded to cents with half-up rounding, and format() renders a total as euros with two decimals. Keep the public API unchanged and add focused tests.",
+  "files": {
+    "package.json": "{\n  \"name\": \"bench-small\",\n  \"private\": true,\n  \"type\": \"module\"\n}\n",
+    "AGENTS.md": "# Agent notes\n\nUse Node 24 built-ins only. Keep functions pure and exported by name.\n",
+    "src/cart.mjs": "export function total(items) {\n  return 0;\n}\n",
+    "src/price.mjs": "export function cents(value) {\n  return value;\n}\n",
+    "src/format.mjs": "export function format(value) {\n  return String(value);\n}\n",
+    "docs/forja/DECISIONS.md": { "words": 220, "seed": 11, "title": "Decisions" },
+    "docs/notes/pricing.md": { "words": 480, "seed": 12, "title": "Pricing rules", "extra": "Prices are rounded to cents with half-up rounding before summing." },
+    "docs/notes/format.md": { "words": 360, "seed": 13, "title": "Formatting", "extra": "Totals render as euros with two decimals." },
+    "docs/notes/history.md": { "words": 900, "seed": 14, "title": "Project history" },
+    "README.md": { "words": 300, "seed": 15, "title": "bench-small" }
+  },
+  "plan": {
+    "decisions": ["Rounding lives in price.mjs and cart.mjs uses it, so total() and cents() cannot disagree."],
+    "tasks": [
+      {
+        "id": "T1", "title": "Sum item prices in total()", "criteria": ["total() returns the sum of item prices", "an empty cart totals 0"],
+        "files": ["src/cart.mjs"], "risks": [], "complexity": "easy", "after": [], "expect_knowledge": ["docs/notes/pricing.md"],
+        "checks": [{ "command": "node", "args": ["--input-type=module", "-e", "import {total} from './src/cart.mjs'; if (total([{price:1},{price:2}]) !== 3) process.exit(1)"] }],
+        "solution": { "src/cart.mjs": "export function total(items) {\n  return items.reduce((sum, item) => sum + item.price, 0);\n}\n" }
+      },
+      {
+        "id": "T2", "title": "Round prices to cents half-up", "criteria": ["cents() rounds half-up to two decimals", "total() sums rounded prices"],
+        "files": ["src/price.mjs", "src/cart.mjs"], "risks": [], "complexity": "easy", "after": ["T1"], "expect_knowledge": ["docs/notes/pricing.md"],
+        "checks": [{ "command": "node", "args": ["--input-type=module", "-e", "import {cents} from './src/price.mjs'; if (cents(1.005) !== 1.01) process.exit(1)"] }],
+        "solution": { "src/price.mjs": "export function cents(value) {\n  return Math.round((value + Number.EPSILON) * 100) / 100;\n}\n" }
+      },
+      {
+        "id": "T3", "title": "Format totals as euros", "criteria": ["format(3) returns '3.00 EUR'"],
+        "files": ["src/format.mjs"], "risks": [], "complexity": "easy", "after": ["T1"], "expect_knowledge": ["docs/notes/format.md"],
+        "checks": [{ "command": "node", "args": ["--input-type=module", "-e", "import {format} from './src/format.mjs'; if (format(3) !== '3.00 EUR') process.exit(1)"] }],
+        "solution": { "src/format.mjs": "export function format(value) {\n  return `${value.toFixed(2)} EUR`;\n}\n" }
+      }
+    ]
+  },
+  "scenarios": ["happy", "review_reject_once", "check_fail_once", "context_rotation", "output_retry"]
+}

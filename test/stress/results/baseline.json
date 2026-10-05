@@ -1,0 +1,911 @@
+{
+  "version": 1,
+  "label": "baseline",
+  "run_started_at": "2026-10-05T05:58:51.905Z",
+  "run_finished_at": "2026-10-05T07:51:53.476Z",
+  "active_minutes": 113,
+  "profile": "config/core-local.json",
+  "profile_sha256": "2b0e281170f65cacf7cf28b80e2e0ddd4f3772387462ee347244233b7917322f",
+  "summary": {
+    "scenarios": 24,
+    "forja_done": 0,
+    "acceptance_passed": 5,
+    "completed": 0,
+    "completion_rate": 0,
+    "failures": {
+      "pipeline": 24,
+      "model": 0
+    },
+    "tokens": {
+      "input": 13832284,
+      "output": 196242
+    },
+    "sessions": 43,
+    "minutes": 111
+  },
+  "scenarios": [
+    {
+      "id": "bug-csv-quoted",
+      "category": "bug",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 4,
+        "fail": 1
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 1265388,
+        "output": 31774
+      },
+      "sessions": 2,
+      "phases": {
+        "plan": 1,
+        "develop": 1,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 948,
+      "tasks": 1,
+      "files_changed": 7,
+      "evidence": "<lab>/stress/baseline/runs/bug-csv-quoted-1/",
+      "forja_failure": "FORJA blocked: Invalid/oversize worker result: unknown status.",
+      "change": "wrong",
+      "judgement": "Quote handling loops 14 min, its own escaped-quote test fails, empty junk files Found and Next added.",
+      "failure": {
+        "class": "pipeline",
+        "area": "recovery",
+        "evidence": "call-2-stream.json (develop): final text {\"error\": \"No active session to summarize\"} after Kilo compaction; blocked as unknown status with 1 of 2 attempts unused",
+        "note": "model change also wrong"
+      }
+    },
+    {
+      "id": "bug-lru-recency",
+      "category": "bug",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 1,
+        "fail": 4
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 260756,
+        "output": 3700
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 155,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/bug-lru-recency-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change; the planner wrote the fix as prose instead of a plan.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): 7 calls to unavailable write/bash/question tools, then a develop-style JSON without tasks; blocked on the first plan call",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "bug-word-frequency",
+      "category": "bug",
+      "kind": "new-project",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 5,
+        "fail": 1
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 681547,
+        "output": 8848
+      },
+      "sessions": 3,
+      "phases": {
+        "plan": 1,
+        "develop": 1,
+        "review": 1
+      },
+      "cloud_sessions": 0,
+      "duration_s": 286,
+      "tasks": 1,
+      "files_changed": 2,
+      "evidence": "<lab>/stress/baseline/runs/bug-word-frequency-1/",
+      "forja_failure": "FORJA blocked: fix_word_frequency: review did not approve or reject.",
+      "change": "wrong",
+      "judgement": "Splitting, case and ties fixed; apostrophes, accented letters and digits still split words.",
+      "failure": {
+        "class": "pipeline",
+        "area": "review",
+        "evidence": "call-3-stream.json (review): 6 calls to unavailable edit/bash, prose ending without a verdict JSON; blocked with 1 attempt left",
+        "note": "model change partly wrong"
+      }
+    },
+    {
+      "id": "failing-month-math",
+      "category": "failing-tests",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "provider",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 2,
+        "fail": 1
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 1307727,
+        "output": 24824
+      },
+      "sessions": 2,
+      "phases": {
+        "plan": 1,
+        "develop": 1,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 827,
+      "tasks": 1,
+      "files_changed": 1,
+      "evidence": "<lab>/stress/baseline/runs/failing-month-math-1/",
+      "forja_failure": "FORJA blocked: Provider develop failed (Compaction exhausted: context still exceeds model limits after 3 attempts); see call-2-stream.json. No automatic retry of provider failures.",
+      "change": "wrong",
+      "judgement": "Loops on local time against UTC for 12 minutes; end-of-month clamping still wrong, own tests fail.",
+      "failure": {
+        "class": "pipeline",
+        "area": "recovery",
+        "evidence": "call-2-stream.json stderr (develop): Kilo \"Compaction exhausted\"; no automatic retry of provider failures, 1 attempt left",
+        "note": "model change also wrong"
+      }
+    },
+    {
+      "id": "failing-slugify",
+      "category": "failing-tests",
+      "kind": "new-project",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 1,
+        "fail": 2
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 223681,
+        "output": 2625
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 78,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/failing-slugify-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change; the planner wrote a full implementation in prose.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): 7 calls to unavailable task/question tools, prose and code without a plan JSON; blocked on the first plan call",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "failing-route-priority",
+      "category": "failing-tests",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "pass",
+      "acceptance_tests": {
+        "pass": 5,
+        "fail": 0
+      },
+      "verdict": "pass",
+      "tokens": {
+        "input": 1431642,
+        "output": 20772
+      },
+      "sessions": 3,
+      "phases": {
+        "plan": 1,
+        "develop": 2,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 597,
+      "tasks": 1,
+      "files_changed": 1,
+      "evidence": "<lab>/stress/baseline/runs/failing-route-priority-1/",
+      "forja_failure": "FORJA blocked: Invalid/oversize worker result: unknown status.",
+      "change": "correct",
+      "judgement": "Trailing slash and static-over-parameter priority both fixed, existing tests untouched; a correct change blocked.",
+      "failure": {
+        "class": "pipeline",
+        "area": "recovery",
+        "evidence": "call-3-stream.json (develop attempt 2): correct change, prose ending without a result JSON; blocked as unknown status before review"
+      }
+    },
+    {
+      "id": "regression-report-grouping",
+      "category": "regression",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 0,
+        "fail": 3
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 728177,
+        "output": 10033
+      },
+      "sessions": 2,
+      "phases": {
+        "plan": 1,
+        "develop": 1,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 326,
+      "tasks": 1,
+      "files_changed": 3,
+      "evidence": "<lab>/stress/baseline/runs/regression-report-grouping-1/",
+      "forja_failure": "FORJA blocked: Invalid/oversize worker result: unknown status.",
+      "change": "wrong",
+      "judgement": "Grouping still not normalized, own tests fail, scratch test_normalize.mjs left in the project.",
+      "failure": {
+        "class": "pipeline",
+        "area": "recovery",
+        "evidence": "call-2-stream.json (develop): status \"completed\" is outside the result enum; blocked with 1 attempt left",
+        "note": "model change also wrong"
+      }
+    },
+    {
+      "id": "regression-query-repeat",
+      "category": "regression",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 1,
+        "fail": 5
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 306529,
+        "output": 3328
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 170,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/regression-query-repeat-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): 7 calls to unavailable tools, then {\"status\":\"complete\"} without tasks; blocked on the first plan call",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "regression-config-merge",
+      "category": "regression",
+      "kind": "new-project",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 0,
+        "fail": 5
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 193417,
+        "output": 4109
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 115,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/regression-config-merge-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): 7 calls to unavailable edit/question tools, \"## Final Answer\" prose without a plan JSON",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "ambiguous-duration-style",
+      "category": "ambiguous",
+      "kind": "new-project",
+      "outcome": "blocked",
+      "stop_code": "provider",
+      "acceptance": "pass",
+      "acceptance_tests": {
+        "pass": 4,
+        "fail": 0
+      },
+      "verdict": "pass",
+      "tokens": {
+        "input": 481385,
+        "output": 5330
+      },
+      "sessions": 3,
+      "phases": {
+        "plan": 1,
+        "develop": 1,
+        "review": 1
+      },
+      "cloud_sessions": 0,
+      "duration_s": 200,
+      "tasks": 1,
+      "files_changed": 3,
+      "evidence": "<lab>/stress/baseline/runs/ambiguous-duration-style-1/",
+      "forja_failure": "FORJA blocked: Provider review failed (Kilo returned no final JSON result (last finish reason: stop)); see call-3-stream.json. No automatic retry of review provider failures.",
+      "change": "correct",
+      "judgement": "formatDuration follows docs/STYLE.md and status output uses it; a correct change blocked.",
+      "failure": {
+        "class": "pipeline",
+        "area": "review",
+        "evidence": "call-3-stream.json (review): a textual <function=read> tool call ended the Kilo session without a JSON result; no automatic retry of review provider failures"
+      }
+    },
+    {
+      "id": "ambiguous-entry-search",
+      "category": "ambiguous",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 2,
+        "fail": 1
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 728989,
+        "output": 8192
+      },
+      "sessions": 3,
+      "phases": {
+        "plan": 1,
+        "develop": 1,
+        "review": 1
+      },
+      "cloud_sessions": 0,
+      "duration_s": 288,
+      "tasks": 2,
+      "files_changed": 3,
+      "evidence": "<lab>/stress/baseline/runs/ambiguous-entry-search-1/",
+      "forja_failure": "FORJA blocked: search_impl: review did not approve or reject.",
+      "change": "wrong",
+      "judgement": "Searches every field and does not trim the query, so \"  coffee  \" finds nothing; progress-notes.md written into the project.",
+      "failure": {
+        "class": "pipeline",
+        "area": "review",
+        "evidence": "call-3-stream.json (review): prose \"complete and correct\" without a verdict JSON; blocked with 1 attempt left, second planned task never ran",
+        "note": "model change partly wrong"
+      }
+    },
+    {
+      "id": "ambiguous-rate-limit",
+      "category": "ambiguous",
+      "kind": "new-project",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 1,
+        "fail": 3
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 266395,
+        "output": 4941
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 186,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/ambiguous-rate-limit-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): 8 calls to unavailable edit/run/write tools, then {\"status\":\"success\"} claiming an implementation, no tasks",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "security-cache-leak",
+      "category": "security",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "pass",
+      "acceptance_tests": {
+        "pass": 5,
+        "fail": 0
+      },
+      "verdict": "pass",
+      "tokens": {
+        "input": 715161,
+        "output": 7267
+      },
+      "sessions": 2,
+      "phases": {
+        "plan": 1,
+        "develop": 1,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 272,
+      "tasks": 2,
+      "files_changed": 2,
+      "evidence": "<lab>/stress/baseline/runs/security-cache-leak-1/",
+      "forja_failure": "FORJA blocked: Invalid/oversize worker result: unknown status.",
+      "change": "correct",
+      "judgement": "Cache key is URL plus credential or anonymous, so no response crosses users; tests added. Correct change blocked.",
+      "failure": {
+        "class": "pipeline",
+        "area": "recovery",
+        "evidence": "call-2-stream.json (develop): status \"completed\" outside the result enum; correct change blocked before review"
+      }
+    },
+    {
+      "id": "security-static-traversal",
+      "category": "security",
+      "kind": "new-project",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 7,
+        "fail": 7
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 363059,
+        "output": 5047
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 222,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/security-static-traversal-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): 8 calls to unavailable edit/bash tools, then {\"status\":\"completed\"} claiming a fix, no tasks",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "security-admin-key",
+      "category": "security",
+      "kind": "new-project",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 3,
+        "fail": 3
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 270599,
+        "output": 3844
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 107,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/security-admin-key-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): 10 calls to unavailable write/task/bash tools, a prose \"Task Plan\" without a plan JSON",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "feature-allow-methods",
+      "category": "multi-file-feature",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 2,
+        "fail": 4
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 479293,
+        "output": 6387
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 279,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/feature-allow-methods-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): 9 calls to unavailable edit/bash tools, then {\"status\":\"completed\"} claiming an implementation, no tasks",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "feature-category-budgets",
+      "category": "multi-file-feature",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 1,
+        "fail": 5
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 490320,
+        "output": 5017
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 144,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/feature-category-budgets-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): 12 calls to unavailable bash/edit tools, a prose \"Implementation Plan\" without a plan JSON",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "feature-json-output",
+      "category": "multi-file-feature",
+      "kind": "new-project",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 1,
+        "fail": 4
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 195099,
+        "output": 3633
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 141,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/feature-json-output-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): 4 calls to unavailable edit, then a progress-notes-shaped JSON {completed, active, blocked, next}",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "dep-remove-date-lib",
+      "category": "dependency-config",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 3,
+        "fail": 1
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 439080,
+        "output": 5663
+      },
+      "sessions": 3,
+      "phases": {
+        "plan": 1,
+        "develop": 1,
+        "review": 1
+      },
+      "cloud_sessions": 0,
+      "duration_s": 202,
+      "tasks": 1,
+      "files_changed": 1,
+      "evidence": "<lab>/stress/baseline/runs/dep-remove-date-lib-1/",
+      "forja_failure": "FORJA blocked: replace_add_months: review did not approve or reject.",
+      "change": "wrong",
+      "judgement": "addMonths rewritten without date-fns and correct, but package.json still declares the dependency.",
+      "failure": {
+        "class": "pipeline",
+        "area": "review",
+        "evidence": "call-3-stream.json (review): {\"status\":\"done\"} instead of approve or reject; blocked with 1 attempt left",
+        "note": "model change incomplete"
+      }
+    },
+    {
+      "id": "dep-exports-map",
+      "category": "dependency-config",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "pass",
+      "acceptance_tests": {
+        "pass": 4,
+        "fail": 0
+      },
+      "verdict": "pass",
+      "tokens": {
+        "input": 716645,
+        "output": 6674
+      },
+      "sessions": 3,
+      "phases": {
+        "plan": 1,
+        "develop": 1,
+        "review": 1
+      },
+      "cloud_sessions": 0,
+      "duration_s": 226,
+      "tasks": 1,
+      "files_changed": 1,
+      "evidence": "<lab>/stress/baseline/runs/dep-exports-map-1/",
+      "forja_failure": "FORJA blocked: fix_package_exports: review did not approve or reject.",
+      "change": "correct",
+      "judgement": "Exports map points at the real files, undocumented paths stay closed; a correct change blocked.",
+      "failure": {
+        "class": "pipeline",
+        "area": "review",
+        "evidence": "call-3-stream.json (review): {\"status\":\"done\"} instead of approve or reject; correct change blocked"
+      }
+    },
+    {
+      "id": "dep-vendor-upgrade",
+      "category": "dependency-config",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 1,
+        "fail": 3
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 83031,
+        "output": 937
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 45,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/dep-vendor-upgrade-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): correct diagnosis, 4 calls to unavailable bash/edit, prose without a plan JSON",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "win-config-bom",
+      "category": "windows-paths",
+      "kind": "new-project",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 0,
+        "fail": 5
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 637493,
+        "output": 6364
+      },
+      "sessions": 1,
+      "phases": {
+        "plan": 1,
+        "develop": 0,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 264,
+      "tasks": 0,
+      "files_changed": 0,
+      "evidence": "<lab>/stress/baseline/runs/win-config-bom-1/",
+      "forja_failure": "FORJA blocked: Plan must contain 1–30 cohesive tasks.",
+      "change": "none",
+      "judgement": "No change.",
+      "failure": {
+        "class": "pipeline",
+        "area": "planning",
+        "evidence": "call-1-stream.json (plan): 52 tool calls (7 to unavailable tools), then {\"status\":\"completed\",\"objective\":...} without tasks",
+        "note": "planner ignored its role"
+      }
+    },
+    {
+      "id": "win-nav-backslashes",
+      "category": "windows-paths",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "fail",
+      "acceptance_tests": {
+        "pass": 2,
+        "fail": 1
+      },
+      "verdict": "fail",
+      "tokens": {
+        "input": 1095558,
+        "output": 12372
+      },
+      "sessions": 2,
+      "phases": {
+        "plan": 1,
+        "develop": 1,
+        "review": 0
+      },
+      "cloud_sessions": 0,
+      "duration_s": 395,
+      "tasks": 1,
+      "files_changed": 2,
+      "evidence": "<lab>/stress/baseline/runs/win-nav-backslashes-1/",
+      "forja_failure": "FORJA blocked: Invalid/oversize worker result: unknown status.",
+      "change": "wrong",
+      "judgement": "Backslashes normalized but \".\\\" entries still build a different site.",
+      "failure": {
+        "class": "pipeline",
+        "area": "recovery",
+        "evidence": "call-2-stream.json (develop): status \"completed\" outside the result enum; blocked with 1 attempt left",
+        "note": "model change partly wrong"
+      }
+    },
+    {
+      "id": "win-path-spaces",
+      "category": "windows-paths",
+      "kind": "unfamiliar-codebase",
+      "outcome": "blocked",
+      "stop_code": "inspect",
+      "acceptance": "pass",
+      "acceptance_tests": {
+        "pass": 3,
+        "fail": 0
+      },
+      "verdict": "pass",
+      "tokens": {
+        "input": 471313,
+        "output": 4561
+      },
+      "sessions": 3,
+      "phases": {
+        "plan": 1,
+        "develop": 1,
+        "review": 1
+      },
+      "cloud_sessions": 0,
+      "duration_s": 194,
+      "tasks": 1,
+      "files_changed": 6,
+      "evidence": "<lab>/stress/baseline/runs/win-path-spaces-1/",
+      "forja_failure": "FORJA blocked: fix_theme_path_resolution: review did not approve or reject.",
+      "change": "correct",
+      "judgement": "theme.mjs uses fileURLToPath; generated dist/ files were also left in the change (harmless). Correct change blocked.",
+      "failure": {
+        "class": "pipeline",
+        "area": "review",
+        "evidence": "call-3-stream.json (review): {\"status\":\"done\"} instead of approve or reject; correct change blocked"
+      }
+    }
+  ]
+}

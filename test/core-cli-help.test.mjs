@@ -57,7 +57,7 @@ function forja(t, cwd, args) {
   return { code: r.status, out: r.stdout, err: r.stderr, data: readdirSync(data) };
 }
 
-const subcommands = ['resume', 'retry', 'abandon', 'start', 'stop', 'deliver', 'decide', 'init', 'status', 'usage', 'doctor', 'context', 'evidence', 'diagnose', 'evaluation-plan', 'benchmark'];
+const subcommands = ['resume', 'retry', 'abandon', 'start', 'stop', 'deliver', 'decide', 'init', 'status', 'usage', 'doctor', 'context', 'evidence', 'diagnose', 'evaluation-plan', 'benchmark', 'queue'];
 
 test('--help and -h on start and every core subcommand print usage and leave a blocked run untouched', async t => {
   const root = await blockedProject(t);
@@ -74,6 +74,9 @@ test('--help and -h on start and every core subcommand print usage and leave a b
     ['core', 'stop', '--after-task', '-h'], ['core', 'deliver', '--retry', '-h'],
     ['core', 'retry', '--task', 'T1', '--why', 'x', '--validate-only', '-h'], ['core', 'retry', '--task', 'T1', '--why', 'x', '--reopen', '-h'],
     ['core', 'resume', '--expected-run', '-h'], ['start', '--goal', 'g', '--provider', 'custom', '--allow-dirty', '-h'],
+    ['core', 'queue', 'add', '--goal-file', 'goal.txt', '--help'], ['core', 'queue', 'list', '-h'], ['core', 'queue', 'remove', 'Q-1-abcdef', '-h'],
+    ['core', 'queue', 'start', '--expected-run', '-h'],
+    ['core', 'status', '--all', '--help'], ['core', 'status', '--all', '--json', '-h'],
   ];
   for (const args of invocations) {
     const r = forja(t, root, args);
@@ -81,6 +84,8 @@ test('--help and -h on start and every core subcommand print usage and leave a b
     assert.equal(r.code, 0, `${shown}: ${r.err}`);
     assert.match(r.out, /FORJA core/, shown);
     assert.match(r.out, /core resume/, shown);
+    assert.match(r.out, /core queue add --goal-file/, shown);
+    assert.match(r.out, /core status --all \[--json\]/, shown);
     assert.equal(r.err, '', shown);
     assert.deepEqual(r.data, [], `${shown} wrote FORJA data`);
     assert.equal(existsSync(join(forjaDir, 'lock.json')), false, `${shown} left a lock`);
@@ -108,6 +113,19 @@ test('state-changing commands refuse unknown flags and stray arguments before an
     [['core', 'retry', 'T1', '--why', 'again'], /"T1"/],
     [['core', 'abandon', '--why', 'Stop', 'here'], /"here"/],
     [['core', 'stop', 'please'], /"please"/],
+    [['core', 'queue'], /core queue add --goal-file/],
+    [['core', 'queue', 'bogus'], /core queue add --goal-file/],
+    [['core', 'queue', 'add', '--goal-file', 'goal.txt', '--allow-dirty'], /--allow-dirty/],
+    [['core', 'queue', 'add', '--goal-file', 'goal.txt', '--bogus', 'x'], /--bogus/],
+    [['core', 'queue', 'add', '--goal', 'Inline goal'], /--goal/],
+    [['core', 'queue', 'add', '--goal-file', 'goal.txt', 'extra'], /"extra"/],
+    [['core', 'queue', 'list', 'extra'], /"extra"/],
+    [['core', 'queue', 'list', '--all'], /--all/],
+    [['core', 'queue', 'remove'], /queue entry id/],
+    [['core', 'queue', 'remove', 'Q-1-abcdef', 'Q-2-abcdef'], /"Q-2-abcdef"/],
+    [['core', 'queue', 'remove', '../x'], /queue entry id/],
+    [['core', 'queue', 'start'], /internal and needs --expected-run/],
+    [['core', 'queue', 'start', '--expected-run', 'F-1-abcdef', '--goal-file', 'goal.txt'], /--goal-file/],
   ];
   for (const [args, message] of refused) {
     const r = forja(t, root, args);

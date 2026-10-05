@@ -421,6 +421,18 @@ p {
   background:#372c20;
 }
 
+/* Usage-limit wait: calm, not an alarm; the label and note carry the meaning. */
+.status.waiting {
+  color:var(--text);
+  background:var(--soft);
+  box-shadow:inset 0 0 0 1px var(--border);
+}
+
+.status.waiting>span {
+  background:transparent;
+  box-shadow:inset 0 0 0 1px currentColor;
+}
+
 .goal {
   font-size:17px;
   color:var(--text);
@@ -460,6 +472,22 @@ p {
 .activity-mark.running {
   background:var(--accent);
   border-color:var(--accent);
+}
+
+.activity-mark.waiting {
+  border-color:var(--text);
+}
+
+.wait-note {
+  font-size:13px;
+  line-height:1.6;
+  color:var(--text);
+  max-width:70ch;
+}
+
+.wait-note time {
+  font-weight:600;
+  white-space:nowrap;
 }
 
 .progress-summary {
@@ -1115,3 +1143,6 @@ footer {
 :root .recovery-note { margin: 16px 0; padding: 16px; border: 1px solid #76613b; border-radius: 12px; background: #222219; overflow-wrap: anywhere; }
 :root .recovery-note strong { color: #f2d09b; }
 :root .recovery-note p { margin: 8px 0; line-height: 1.5; }
+/* An automatic usage-limit wait needs nothing from the Sponsor: neutral, not a warning. */
+:root .recovery-note.waiting { border-color: var(--border); background: var(--soft); }
+:root .recovery-note.waiting strong { color: var(--text); }

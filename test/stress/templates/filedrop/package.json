@@ -1,0 +1,7 @@
+{
+  "name": "filedrop",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test", "start": "node src/server.mjs" }
+}

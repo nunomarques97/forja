@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { privatePath, contentFindings, inspectIndex, reviewedFixture, fileFindings, envTemplateProblem, scanTree } from '../tools/release-check.mjs';
+import { privatePath, contentFindings, inspectIndex, reviewedFixture, fileFindings, envTemplateProblem, scanTree, redactPrivateText } from '../tools/release-check.mjs';
 
 test('release paths exclude raw execution and private research, allow curated knowledge', () => {
   for (const path of ['.forja/run.json', 'data/log.jsonl', 'docs/forja/RUN.json', 'docs/NEXT-RESUME.md', 'docs/CONTINUATION-REPORT.md', 'docs/benchmarks/raw.json', '.env.local', 'chat-history.json']) assert.equal(privatePath(path), true, path);
@@ -180,4 +180,32 @@ test('the base scan reports every tracked finding with file and line, and skips 
   const report = scanTree(root, 'HEAD');
   assert.equal(report.files, 3);
   assert.deepEqual(report.findings, [{ path: 'CLAUDE.md', reason: 'personal home path', line: 3 }]);
+});
+test('private text redaction reuses the detectors and replaces the project root first', () => {
+  const bs = '\\';
+  const home = ['C:', 'Users', 'someone'].join(bs);
+  const root = [home, 'project'].join(bs);
+  const key = ['-----BEGIN', 'PRIVATE KEY-----\nabc\n-----END PRIVATE', 'KEY----- after'].join(' ');
+  const route = 'https://api.example.com' + ['', 'users', 'octocat', 'repos'].join('/');
+  const cases = [
+    [[root, 'lib', 'a.mjs:3 failed'].join(bs), ['<project>', 'lib', 'a.mjs:3 failed'].join(bs)],
+    [root.toLowerCase().replaceAll(bs, '/') + '/lib/a.mjs', '<project>/lib/a.mjs'],
+    [JSON.stringify({ at: [root, 'a.js'].join(bs) }), JSON.stringify({ at: ['<project>', 'a.js'].join(bs) })],
+    [[root + 'sibling', 'x.txt'].join(bs), '<home>'],
+    ['see ' + [home, 'other', 'notes.md'].join(bs) + ' here', 'see <home> here'],
+    ['open ' + ['', 'home', 'someone', 'x', 'y.txt'].join('/') + ' now', 'open <home> now'],
+    ['key ' + ['sk', 'proj', 'z'.repeat(30)].join('-') + ' and ' + ['gh', 'p_' + 'q'.repeat(36)].join(''), 'key <redacted> and <redacted>'],
+    [key, '<redacted> after'],
+    [route, route],
+  ];
+  for (const [input, expected] of cases) {
+    const output = redactPrivateText(input, { root });
+    assert.equal(output, expected, input);
+    assert.deepEqual(contentFindings(Buffer.from(output)), [], output);
+  }
+  // Without a root, a project path under a home directory is still redacted.
+  assert.equal(redactPrivateText([root, 'a.mjs'].join(bs)), '<home>');
+  // A conversation export cannot be redacted; callers drop text that keeps a finding.
+  const exported = JSON.stringify({ role: 'user', content: 'private' });
+  assert.deepEqual(contentFindings(Buffer.from(redactPrivateText(exported, { root }))), ['possible conversation export']);
 });

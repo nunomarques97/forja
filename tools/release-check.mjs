@@ -56,6 +56,30 @@ export function contentFindings(buffer) {
   return contentFindingLines(buffer).map(finding => finding.reason);
 }
 
+// Redaction for derived private text (such as lessons) built from the same
+// detectors: a path match extends to the end of its path token, a private key
+// to its END line. The project root, in its slash, backslash and JSON-escaped
+// forms, becomes <project> first so project-relative structure survives.
+// Unredactable shapes (conversation exports) stay; callers drop text whose
+// contentFindings are still not empty.
+const PATH_REST = "[^\\s\"'`<>]*";
+const REDACTIONS = DETECTORS.flatMap(([reason, patterns]) => patterns.map(pattern => {
+  const rest = reason === 'personal home path' ? PATH_REST
+    : reason === 'private key' ? '[\\s\\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)' : '';
+  const placeholder = reason === 'personal home path' ? '<home>' : reason === 'credential-like value' || reason === 'private key' ? '<redacted>' : null;
+  return placeholder && [new RegExp(pattern.source + rest, pattern.flags.replace('g', '') + 'g'), placeholder];
+})).filter(Boolean);
+const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export function redactPrivateText(text, { root } = {}) {
+  let value = String(text);
+  if (typeof root === 'string' && root.replace(/[\\/]+$/, '').length > 1) {
+    const parts = root.replace(/[\\/]+$/, '').split(/[\\/]+/).map(escapeRegExp);
+    value = value.replace(new RegExp(parts.join('(?:\\\\{1,2}|/)') + '(?![A-Za-z0-9._-])', 'gi'), '<project>');
+  }
+  for (const [pattern, placeholder] of REDACTIONS) value = value.replace(pattern, placeholder);
+  return value;
+}
+
 // .env.example, .env.sample and .env.template document variable names. They
 // pass only when every non-comment, non-blank line is KEY= with an empty value
 // or an obvious placeholder; any other .env name stays refused by path.

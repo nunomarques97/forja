@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync, readdirSync, mkdirSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { doctor } from '../lib/core/doctor.mjs';
+import { doctor, doctorWithLocal, localRouteChecks } from '../lib/core/doctor.mjs';
 import { providerInstallation } from '../lib/core/providers.mjs';
 
 test('doctor checks a clean fork without writing project files or invoking a provider', t => {
@@ -64,4 +64,42 @@ test('doctor reports pre-existing privacy findings of the run base with file and
   const clean = doctor(root, { config: { delivery: { mode: 'commit' } }, inspectProvider }).checks.find(c => c.name === 'base_scan');
   assert.equal(clean.status, 'ok');
   assert.match(clean.detail, /found nothing in 3 tracked file\(s\)/);
+});
+test('doctor reports Ollama reachability and the models of configured local routes without invoking a model', async t => {
+  const root = mkdtempSync(join(tmpdir(), 'forja-doctor-local-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  const inspectProvider = name => ({ provider: name, installed: true, note: 'Synthetic inspection' });
+  const kilo = model => ({ provider: 'kilo', localProvider: 'ollama', model });
+  const config = { maxCloudSessions: 0, routes: { plan: kilo('coder:32k'), develop: kilo('coder:32k'), review: kilo('small:8b') } };
+  const server = ({ down = false, shows = {} } = {}) => {
+    const urls = [];
+    const request = async (url, init = {}) => {
+      urls.push(url);
+      if (down) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
+      const data = url.endsWith('/api/tags') ? { models: [{ name: 'coder:32k' }, { name: 'small:8b' }] } : shows[JSON.parse(init.body).model];
+      return { ok: true, status: 200, json: async () => data };
+    };
+    return { request, urls };
+  };
+  const ready = server({ shows: { 'coder:32k': { capabilities: ['tools'], parameters: 'num_ctx 32768' }, 'small:8b': { capabilities: ['tools'], parameters: 'temperature 0.6' } } });
+  const report = await doctorWithLocal(root, { provider: 'claude', config, inspectProvider, request: ready.request });
+  const check = name => report.checks.find(c => c.name === name);
+  assert.equal(check('ollama').status, 'ok');
+  assert.match(check('ollama').detail, /reachable at http:\/\/127\.0\.0\.1:11434 with 2 installed model/);
+  assert.equal(check('ollama:coder:32k').status, 'ok');
+  assert.match(check('ollama:coder:32k').detail, /^Routes plan, develop: .*num_ctx 32768\. Not loaded or invoked\./);
+  assert.equal(check('ollama:small:8b').status, 'error');
+  assert.match(check('ollama:small:8b').detail, /^Route review: .*num_ctx of at least 16384/);
+  assert.equal(report.ready, false);
+  assert.ok(ready.urls.every(url => /^http:\/\/127\.0\.0\.1:11434\/api\/(tags|show)$/.test(url)), 'only listing and metadata, never a model call');
+  const down = server({ down: true });
+  const offline = await doctorWithLocal(root, { config, inspectProvider, request: down.request });
+  assert.deepEqual(offline.checks.filter(c => c.name.startsWith('ollama')).map(c => c.status), ['error']);
+  assert.match(offline.checks.at(-1).detail, /unavailable .*ECONNREFUSED.*fall back to cloud/);
+  // Without local routes Ollama is not probed.
+  const cloud = server();
+  assert.deepEqual(await localRouteChecks({ routes: { develop: { provider: 'claude' } } }, { request: cloud.request }), []);
+  assert.equal((await doctorWithLocal(root, { config: { routes: { develop: { provider: 'claude' } } }, inspectProvider, request: cloud.request })).checks.some(c => c.name.startsWith('ollama')), false);
+  assert.deepEqual(cloud.urls, []);
 });

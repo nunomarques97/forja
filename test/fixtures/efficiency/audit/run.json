@@ -1,0 +1,68 @@
+{
+  "description": "One synthetic run folder for the efficiency audit parser: a plan, a develop session stopped at the context limit (usage only in its stream), a rejected review, a second attempt and an approval. Private-looking text marks what must never reach the report.",
+  "project": "secret-project-name",
+  "run_id": "F-1000000000000-aaaaaa",
+  "state": {
+    "version": 1, "run_id": "F-1000000000000-aaaaaa", "goal": "SECRET-GOAL-TEXT", "provider": "claude",
+    "status": "blocked", "stopCode": "Bad Code: D:/private", "created_at": "2026-10-01T10:00:00.000Z",
+    "tasks": [
+      { "id": "T1", "title": "PRIVATE-TITLE", "status": "done", "attempts": 2, "rotations": 1, "stalled_rotations": 0,
+        "provider_retries": { "attempt": 1, "used": 1, "total": 1 },
+        "validation": [{ "command": "node", "args": ["PRIVATE-ARG"], "code": 0, "duration_ms": 1500, "passed": true }] },
+      { "id": "T2", "title": "PRIVATE-TITLE-2", "status": "pending", "attempts": 0, "rotations": 0 }
+    ]
+  },
+  "usage": [
+    { "id": 1, "phase": "plan", "task": null, "attempt": 0, "provider": "claude", "result": "returned", "duration_ms": 1000,
+      "calls": 2, "calls_source": "unique assistant message IDs in provider stream", "prompt_characters": 1000,
+      "context_sources": [{ "source": "goal", "characters": 400 }, { "source": "D:\\private\\SECRET-SOURCE", "characters": 10 }],
+      "usage": { "input_tokens": 10, "cache_creation_input_tokens": 90, "cached_input_tokens": 900, "output_tokens": 50 },
+      "started_at": "2026-10-01T10:00:00.000Z", "at": "2026-10-01T10:00:10.000Z" },
+    { "id": 2, "phase": "develop", "task": "T1", "attempt": 1, "provider": "claude", "result": "error", "context_limit_reached": true,
+      "duration_ms": 5000, "calls": null, "calls_source": "not exposed", "prompt_characters": 2000,
+      "context_sources": [{ "source": "goal", "characters": 400 }, { "source": "repository_map", "characters": 600 }],
+      "usage": null, "started_at": "2026-10-01T10:00:15.000Z", "at": "2026-10-01T10:00:20.000Z" },
+    { "id": 3, "phase": "develop", "task": "T1", "attempt": 1, "provider": "claude", "result": "returned", "automatic_retry": { "reason": "output" },
+      "duration_ms": 2000, "calls": 1, "calls_source": "unique assistant message IDs in provider stream", "prompt_characters": 2000,
+      "usage": { "input_tokens": 500, "cache_creation_input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 20 },
+      "started_at": "2026-10-01T10:00:20.000Z", "at": "2026-10-01T10:00:22.000Z" },
+    { "id": 4, "phase": "review", "task": "T1", "attempt": 1, "provider": "claude", "result": "returned", "duration_ms": 1000,
+      "usage": { "input_tokens": 300, "cache_creation_input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 10 },
+      "started_at": "2026-10-01T10:20:22.000Z", "at": "2026-10-01T10:20:23.000Z" },
+    { "id": 5, "phase": "develop", "task": "T1", "attempt": 2, "provider": "claude", "result": "interrupted", "usage": null,
+      "started_at": "2026-10-01T10:20:24.000Z" },
+    { "id": 5, "phase": "develop", "task": "T1", "attempt": 2, "provider": "claude", "result": "returned", "duration_ms": 1000,
+      "usage": { "input_tokens": 700, "cache_creation_input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 30 },
+      "started_at": "2026-10-01T10:20:24.000Z", "at": "2026-10-01T10:20:25.000Z" },
+    { "id": 6, "phase": "review", "task": "T1", "attempt": 2, "provider": "claude", "result": "returned", "duration_ms": 1000,
+      "usage": { "input_tokens": 200, "cache_creation_input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 10 },
+      "started_at": "2026-10-01T10:20:26.000Z", "at": "2026-10-01T10:20:27.000Z" }
+  ],
+  "malformed_usage_line": "{not json PRIVATE-LINE",
+  "prompts": {
+    "1": "PRIVATE-RULES line one\nPRIVATE-INSTRUCTION plan\n{\"goal\":\"SECRET-GOAL-TEXT\",\"phase\":\"plan\"}",
+    "3": "PRIVATE-RULES line one\nPRIVATE-INSTRUCTION develop\n{\"goal\":\"SECRET-GOAL-TEXT\",\"phase\":\"develop\"}"
+  },
+  "results": {
+    "4": { "status": "reject", "summary": "PRIVATE-SUMMARY", "findings": ["PRIVATE-FINDING"] },
+    "6": { "status": "approve", "summary": "PRIVATE-SUMMARY", "findings": [] }
+  },
+  "streams": {
+    "2": [
+      { "type": "system", "subtype": "init", "cwd": "D:/work/secret-project-name" },
+      { "type": "assistant", "message": { "id": "m1", "usage": { "input_tokens": 10, "cache_creation_input_tokens": 990, "cache_read_input_tokens": 0 },
+        "content": [{ "type": "tool_use", "id": "u1", "name": "Read", "input": { "file_path": "D:\\work\\a.mjs" } }] } },
+      { "type": "user", "message": { "content": [{ "type": "tool_result", "tool_use_id": "u1", "content": "PRIVATE-FILE-CONTENT-0123456789" }] } },
+      { "type": "assistant", "message": { "id": "m2", "usage": { "input_tokens": 10, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 1990 },
+        "content": [{ "type": "tool_use", "id": "u2", "name": "Read", "input": { "file_path": "d:/work/a.mjs" } },
+                    { "type": "tool_use", "id": "u3", "name": "Bash", "input": { "command": "npm test PRIVATE" } }] } },
+      { "type": "assistant", "message": { "id": "m2", "usage": { "input_tokens": 10, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 1990 }, "content": [] } },
+      { "type": "user", "message": { "content": [{ "type": "tool_result", "tool_use_id": "u2", "content": [{ "type": "text", "text": "PRIVATE-FILE-CONTENT-0123456789" }] },
+                                                 { "type": "tool_result", "tool_use_id": "u3", "content": "ok" }] } },
+      { "type": "assistant", "parent_tool_use_id": "u9", "message": { "id": "s1", "usage": { "input_tokens": 1, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0 }, "content": [] } },
+      { "type": "assistant", "message": { "id": "m3", "usage": { "input_tokens": 10, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 2990 },
+        "content": [{ "type": "tool_use", "id": "u4", "name": "Bash", "input": { "command": "npm test PRIVATE" } }] } },
+      { "type": "user", "message": { "content": [{ "type": "tool_result", "tool_use_id": "u4", "content": "ok" }] } }
+    ]
+  }
+}

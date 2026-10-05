@@ -1,0 +1,251 @@
+{
+  "version": 1,
+  "lab": "C:\\Users\\User\\Desktop\\Externos\\forja-lab",
+  "wallClockMinutes": 660,
+  "categories": ["bug", "failing-tests", "regression", "ambiguous", "security", "multi-file-feature", "dependency-config", "windows-paths"],
+  "kinds": ["new-project", "unfamiliar-codebase"],
+  "gpu": { "busyUtilization": 40, "foreignMemoryMiB": 6144, "pollSeconds": 60, "maxWaitMinutes": 60 },
+  "defaults": { "budgets": { "runMinutes": 25, "maxSessions": 8, "maxAttempts": 2 } },
+  "scenarios": [
+    {
+      "id": "bug-csv-quoted",
+      "category": "bug",
+      "kind": "unfamiliar-codebase",
+      "template": "tallybook",
+      "overlays": [],
+      "goal": "Importing my bank's CSV export puts values in the wrong columns or fails with \"expected 4 columns\". The export quotes fields that contain commas, for example \"Coffee, beans\" or \"1,234.50\", writes a quote inside a quoted field as two quotes (\"Joe \"\"The Plumber\"\"\") and uses Windows line endings. Fix the CSV reading so these files import correctly, keep the existing behaviour for simple files and add tests. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/bug-csv-quoted.test.mjs"] },
+      "solution": "acceptance/solutions/bug-csv-quoted"
+    },
+    {
+      "id": "bug-lru-recency",
+      "category": "bug",
+      "kind": "unfamiliar-codebase",
+      "template": "routekit",
+      "overlays": [],
+      "goal": "The response cache throws away the entries we read all the time: our hottest URL gets evicted while URLs nobody asks for stay cached. The cache is supposed to evict the least recently used entry, where reading an entry or writing it again counts as a use. Fix it and add tests that would have caught it. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/bug-lru-recency.test.mjs"] },
+      "solution": "acceptance/solutions/bug-lru-recency"
+    },
+    {
+      "id": "bug-word-frequency",
+      "category": "bug",
+      "kind": "new-project",
+      "template": "wordfreq",
+      "overlays": [],
+      "goal": "topWords in src/wordfreq.mjs miscounts real text: words separated by newlines, tabs or several spaces are glued together or counted as an empty word, \"The\" and \"the\" are counted separately, and punctuation sticks to words (\"end.\" is not \"end\"). A word is a run of letters (accented letters included), digits and apostrophes inside a word (don't, it's). Compare words case-insensitively and return them in lower case. Ties are ordered alphabetically. Fix it and add tests. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/bug-word-frequency.test.mjs"] },
+      "solution": "acceptance/solutions/bug-word-frequency"
+    },
+    {
+      "id": "failing-month-math",
+      "category": "failing-tests",
+      "kind": "unfamiliar-codebase",
+      "template": "tallybook",
+      "overlays": [{ "dir": "failing-month-math", "commit": "test: cover month-end dates in addMonths (#41)" }],
+      "goal": "node --test fails since the month-end tests for addMonths were added. Fix the code so the whole test suite passes. Do not change, skip or delete the existing tests.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/failing-month-math.test.mjs"] },
+      "solution": "acceptance/solutions/failing-month-math"
+    },
+    {
+      "id": "failing-slugify",
+      "category": "failing-tests",
+      "kind": "new-project",
+      "template": "slugkit",
+      "overlays": [],
+      "goal": "The test suite of this project fails. Make node --test pass by fixing the code; the tests describe the intended behaviour, so do not change or delete them.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/failing-slugify.test.mjs"] },
+      "solution": "acceptance/solutions/failing-slugify"
+    },
+    {
+      "id": "failing-route-priority",
+      "category": "failing-tests",
+      "kind": "unfamiliar-codebase",
+      "template": "routekit",
+      "overlays": [{ "dir": "failing-route-priority", "commit": "test: static routes win over parameters; ignore a trailing slash" }],
+      "goal": "Two router tests added in the last commit fail. Fix the library so the whole suite passes without changing test/router.test.mjs. Existing routing behaviour that the other tests cover must keep working.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/failing-route-priority.test.mjs"] },
+      "solution": "acceptance/solutions/failing-route-priority"
+    },
+    {
+      "id": "regression-report-grouping",
+      "category": "regression",
+      "kind": "unfamiliar-codebase",
+      "template": "tallybook",
+      "overlays": [{ "dir": "regression-report-grouping", "commit": "refactor: simplify report grouping" }],
+      "goal": "Since the commit \"refactor: simplify report grouping\" the monthly report is wrong for ledgers that were edited by hand: the same category shows up on several rows when its spelling differs in case or spacing (\"Food\", \"food \"), and rows within a month are no longer in a stable order. It was right before that commit. Restore the correct behaviour and add a regression test. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/regression-report-grouping.test.mjs"] },
+      "solution": "acceptance/solutions/regression-report-grouping"
+    },
+    {
+      "id": "regression-query-repeat",
+      "category": "regression",
+      "kind": "unfamiliar-codebase",
+      "template": "routekit",
+      "overlays": [{ "dir": "regression-query-repeat", "commit": "perf: faster query parsing" }],
+      "goal": "After the commit \"perf: faster query parsing\", ?tag=a&tag=b only keeps \"b\" and q=hello+world is no longer read as \"hello world\". Everything parseQuery handled before that commit must work again, and simple query strings must stay fast. Add regression tests. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/regression-query-repeat.test.mjs"] },
+      "solution": "acceptance/solutions/regression-query-repeat"
+    },
+    {
+      "id": "regression-config-merge",
+      "category": "regression",
+      "kind": "new-project",
+      "template": "confload",
+      "overlays": [{ "dir": "regression-config-merge", "commit": "feat: environment overrides (APP_SERVER__PORT=8080)" }],
+      "goal": "Since environment overrides were added, a config file that sets only server.port loses server.host from the defaults, and APP_LOG__LEVEL=debug wipes the other log settings. Restore the merge behaviour described in README.md while keeping environment overrides (environment over file over defaults). Add regression tests. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/regression-config-merge.test.mjs"] },
+      "solution": "acceptance/solutions/regression-config-merge"
+    },
+    {
+      "id": "ambiguous-duration-style",
+      "category": "ambiguous",
+      "kind": "new-project",
+      "template": "jobtime",
+      "overlays": [],
+      "goal": "The job status output shows durations like \"took 3723000ms\", which nobody can read. Make the durations readable for people.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/ambiguous-duration-style.test.mjs"] },
+      "solution": "acceptance/solutions/ambiguous-duration-style"
+    },
+    {
+      "id": "ambiguous-entry-search",
+      "category": "ambiguous",
+      "kind": "unfamiliar-codebase",
+      "template": "tallybook",
+      "overlays": [],
+      "goal": "People want to find ledger entries by text. Add searchEntries(entries, query) in a new src/search.mjs and a \"search <text>\" command to the CLI that prints the matching entries. It should behave the way people expect a search box to behave.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/ambiguous-entry-search.test.mjs"] },
+      "solution": "acceptance/solutions/ambiguous-entry-search"
+    },
+    {
+      "id": "ambiguous-rate-limit",
+      "category": "ambiguous",
+      "kind": "new-project",
+      "template": "tinyapi",
+      "overlays": [],
+      "goal": "Some clients hammer this API. Add rate limiting to the handler in src/handler.mjs, configured through a rateLimit: { limit, windowMs } option of createHandler. Pick sensible defaults, tell rejected clients what happened and when to retry in the standard HTTP way, take time from the existing now option, and document the behaviour in README.md.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/ambiguous-rate-limit.test.mjs"] },
+      "solution": "acceptance/solutions/ambiguous-rate-limit"
+    },
+    {
+      "id": "security-cache-leak",
+      "category": "security",
+      "kind": "unfamiliar-codebase",
+      "template": "routekit",
+      "overlays": [],
+      "goal": "A customer opened their account page and saw another customer's name and card details. Our account handlers return cache: true like every other GET route. Make sure a response produced for one logged-in client (Authorization header or session cookie) can never be served to another client or to anonymous visitors, while public pages for anonymous visitors stay cached. Add tests for the leaks you prevent. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/security-cache-leak.test.mjs"] },
+      "solution": "acceptance/solutions/security-cache-leak"
+    },
+    {
+      "id": "security-static-traversal",
+      "category": "security",
+      "kind": "new-project",
+      "template": "filedrop",
+      "overlays": [],
+      "goal": "A security review found that filedrop can be made to send files from outside its public folder with crafted URLs. Make sure only files inside the configured root can ever be served, whatever the encoding or separators used in the URL, and that malformed URLs get an error response instead of crashing the handler. Normal files must keep working (sub-folders, spaces in names, index.html for folders). Add tests for the attacks you block. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/security-static-traversal.test.mjs"] },
+      "solution": "acceptance/solutions/security-static-traversal"
+    },
+    {
+      "id": "security-admin-key",
+      "category": "security",
+      "kind": "new-project",
+      "template": "tinyapi",
+      "overlays": [{ "dir": "security-admin-key", "commit": "feat: operator endpoints behind an admin key" }],
+      "goal": "On a fresh deployment the new /admin endpoints answer anyone. Admin access must require exactly the configured key (adminKey option or ADMIN_KEY); when no key is configured, or the key is empty, the admin endpoints must refuse every request. Never reveal the key in a response. Public routes keep working without a key. Add tests, including the requests that must be refused. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/security-admin-key.test.mjs"] },
+      "solution": "acceptance/solutions/security-admin-key"
+    },
+    {
+      "id": "feature-allow-methods",
+      "category": "multi-file-feature",
+      "kind": "unfamiliar-codebase",
+      "template": "routekit",
+      "overlays": [],
+      "goal": "Make routekit answer HTTP methods properly: a 405 response must carry an Allow header listing the methods the path supports; OPTIONS on a known path answers 204 with that Allow header unless a route handles OPTIONS itself; HEAD is answered by the path's GET route with the same status and headers but no body (also when the GET response is cached). Unknown paths stay 404. Keep the existing router API working and add tests. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/feature-allow-methods.test.mjs"] },
+      "solution": "acceptance/solutions/feature-allow-methods"
+    },
+    {
+      "id": "feature-category-budgets",
+      "category": "multi-file-feature",
+      "kind": "unfamiliar-codebase",
+      "template": "tallybook",
+      "overlays": [],
+      "goal": "Add monthly budgets per category. The Ledger gets setBudget(category, cents) (positive whole cents, category normalized like everywhere else, invalid values throw) and budgets() returning { category: cents }. Budgets are saved in tally.json with the entries; existing files without budgets keep loading. The CLI gets \"budget <category> <amount>\" (amount as text like 250.00; invalid input exits non-zero and changes nothing), and the report marks each month/category row whose spending exceeds its budget with OVER BUDGET. Add tests. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/feature-category-budgets.test.mjs"] },
+      "solution": "acceptance/solutions/feature-category-budgets"
+    },
+    {
+      "id": "feature-json-output",
+      "category": "multi-file-feature",
+      "kind": "new-project",
+      "template": "jobtime",
+      "overlays": [],
+      "goal": "Our dashboard needs machine-readable job status. Add two CLI options, accepted before or after the jobs file: --json prints one JSON document { jobs: [...], summary: { jobs, failed, totalMs } } instead of the text lines, and --failed shows only the failed jobs (in text and JSON; the summary still counts every job). Unknown options or a missing file exit with code 2 and a usage message on stderr. The plain text output stays as it is. Document the options in README.md and add tests. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/feature-json-output.test.mjs"] },
+      "solution": "acceptance/solutions/feature-json-output"
+    },
+    {
+      "id": "dep-remove-date-lib",
+      "category": "dependency-config",
+      "kind": "unfamiliar-codebase",
+      "template": "tallybook",
+      "overlays": [{ "dir": "dep-remove-date-lib", "commit": "refactor: month math with date-fns (clamps month ends)" }],
+      "goal": "Since the last commit node --test fails with ERR_MODULE_NOT_FOUND for date-fns. Our build machines have no network access and tallybook must stay free of dependencies, so installing it is not an option. Remove the dependency completely while keeping what the commit wanted: addMonths clamps to the last day of a shorter month. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/dep-remove-date-lib.test.mjs"] },
+      "solution": "acceptance/solutions/dep-remove-date-lib"
+    },
+    {
+      "id": "dep-exports-map",
+      "category": "dependency-config",
+      "kind": "unfamiliar-codebase",
+      "template": "routekit",
+      "overlays": [{ "dir": "dep-exports-map", "commit": "chore: publish with an exports map" }],
+      "goal": "Since the commit that added an exports map to package.json, projects that install routekit cannot import it: import { createApp } from 'routekit' fails and so do the entry points listed in README.md under \"Entry points\". Fix the package configuration so every documented entry point works for a consumer that installed the package. Keep the exports map: files that are not documented must stay private.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/dep-exports-map.test.mjs"] },
+      "solution": "acceptance/solutions/dep-exports-map"
+    },
+    {
+      "id": "dep-vendor-upgrade",
+      "category": "dependency-config",
+      "kind": "unfamiliar-codebase",
+      "template": "docpack",
+      "overlays": [{ "dir": "dep-vendor-upgrade", "commit": "chore: upgrade vendored frontmatter to 2.0.0" }],
+      "goal": "After upgrading the vendored front matter parser to 2.0.0, docpack crashes on start and the tests fail. Adapt docpack to the new version (see vendor/frontmatter/CHANGELOG.md); do not edit or downgrade the vendored copy. Every page must behave as before the upgrade (titles, drafts). node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/dep-vendor-upgrade.test.mjs"] },
+      "solution": "acceptance/solutions/dep-vendor-upgrade"
+    },
+    {
+      "id": "win-config-bom",
+      "category": "windows-paths",
+      "kind": "new-project",
+      "template": "confload",
+      "overlays": [],
+      "goal": "Our operators write config files on Windows with PowerShell, and confload then fails with \"Unexpected token\" although the JSON looks fine in Notepad. Make config files load whether they are UTF-8 with or without a byte order mark or UTF-16 LE with a byte order mark (what Windows PowerShell writes), with Windows line endings. A file that really is broken must still fail, with an error that names the file. Add tests. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/win-config-bom.test.mjs"] },
+      "solution": "acceptance/solutions/win-config-bom"
+    },
+    {
+      "id": "win-nav-backslashes",
+      "category": "windows-paths",
+      "kind": "unfamiliar-codebase",
+      "template": "docpack",
+      "overlays": [],
+      "goal": "Writers on Windows list pages in docpack.json the way Explorer shows them (guide\\install.md, .\\faq.md). On Linux the build then fails with \"page not found\"; on Windows it builds, but links contain backslashes and pages in sub-folders lose their stylesheet. Accept both separators in the nav and produce exactly the same site as with forward slashes, on every OS. Add tests. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/win-nav-backslashes.test.mjs"] },
+      "solution": "acceptance/solutions/win-nav-backslashes"
+    },
+    {
+      "id": "win-path-spaces",
+      "category": "windows-paths",
+      "kind": "unfamiliar-codebase",
+      "template": "docpack",
+      "overlays": [{ "dir": "win-path-spaces", "commit": "refactor: resolve theme files from the module URL" }],
+      "goal": "Since \"refactor: resolve theme files from the module URL\", npm run docs fails with ENOENT for theme/page.html on every Windows machine, and on Linux whenever the project sits in a folder with spaces or # in its name. Fix it so docpack works from any folder on any OS. node --test must pass.",
+      "acceptance": { "command": "node", "args": ["--test", "test/stress/acceptance/win-path-spaces.test.mjs"] },
+      "solution": "acceptance/solutions/win-path-spaces"
+    }
+  ]
+}

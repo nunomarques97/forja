@@ -134,3 +134,72 @@ test('Legacy-only discovery is safe, pluralized, and distinct from Core and filt
  assert.match(renderEmptyState(0,2),/No Core runs yet/);
  assert.match(renderEmptyState(1,2),/No projects in this view/);
 });
+const waitRecovery={code:'provider_limit',title:'Provider reported a usage limit',guidance:'Usage limit resets at 2026-10-04T05:00:00.000Z. resume with core resume (usageLimitResume false)',sessions:{used:3,limit:6},cloud_sessions:{used:3,limit:6},minutes_per_call:30,context_tokens:50000,context_note:'Note'};
+const waitingProject=(wait,{recovery=waitRecovery,name='Nightly'}={})=>{const p=project(name,'blocked',false);p.core.run.run_id='F-1791068167545-6aaf68';p.core.run.stop_code='provider_limit';p.core.run.usage_limit_wait=wait;p.core.recovery=recovery;return p;};
+const wait={reset_at:'2026-10-04T05:00:00.000Z',source:'provider',auto_resume:true,stop_requested:false,resumes:1,max_resumes:6};
+const before=Date.parse('2026-10-04T04:00:00Z'),after=Date.parse('2026-10-04T06:00:00Z');
+const primary=html=>html.slice(0,html.indexOf('<details')).replace(/<[^>]+>/g,' ');
+const localReset=new Date(wait.reset_at).toLocaleString('en',{dateStyle:'medium',timeStyle:'short'});
+test('Usage-limit wait shows a waiting card with the local reset time and automatic resume',()=>{
+ const p=waitingProject(wait),state=projectState(p),html=renderProject(p,before);
+ assert.deepEqual(state,{group:'running',key:'waiting',label:'Waiting for usage limit'});
+ assert.match(html,/<span class="status waiting"><span aria-hidden="true"><\/span>Waiting for usage limit<\/span>/);
+ assert.doesNotMatch(html,/>Blocked</);assert.doesNotMatch(html,/needs-attention/);
+ assert.match(html,/Paused until the provider usage limit resets/);
+ assert.ok(html.includes(`<time datetime="2026-10-04T05:00:00.000Z">${localReset}</time> (your local time).`));
+ assert.match(html,/It resumes automatically about a minute after that\./);
+ assert.doesNotMatch(html,/Check the tasks and review before resuming/);
+ const text=primary(html);
+ assert.doesNotMatch(text,/F-\d|provider_limit|usageLimitResume|core resume|--|2026-10-04T05/);
+ assert.match(text,/Provider usage limit reached/);assert.match(html,/Execution limits/);
+ assert.match(html,/<aside class="recovery-note waiting"/);
+ assert.match(renderProject(p,after),/The usage limit reset at/);
+ assert.match(renderProject(waitingProject({...wait,source:'default'}),before),/an estimate because the provider gave no reset time/);
+ assert.equal(selectProjects([project('Done','done'),p,project('Stuck','blocked')]).map(x=>x.name).join(),'Stuck,Nightly,Done');
+ assert.match(renderOverview([p]),/In progress<\/span><strong>1</);
+ assert.match(renderProject(waitingProject(wait,{recovery:null}),before),/It resumes automatically/);
+});
+test('Usage-limit wait without automatic resume needs attention and names a manual terminal resume',()=>{
+ const cases=[[{...wait,auto_resume:false},/Automatic resume is turned off for this run\./],
+  [{...wait,auto_resume:false,resumes:6},/already used all 6 automatic resumes\./],
+  [{...wait,auto_resume:false,stop_requested:true},/A stop was requested for this run/]];
+ for(const [w,reason] of cases){
+  const p=waitingProject(w),html=renderProject(p,before);
+  assert.deepEqual(projectState(p),{group:'attention',key:'waiting',label:'Waiting for usage limit'});
+  assert.match(html,/class="project needs-attention"/);assert.match(html,reason);
+  assert.match(html,/Resume it in the terminal after that time\./);assert.match(html,/<aside class="recovery-note" /);assert.doesNotMatch(html,/resumes automatically/);
+  assert.doesNotMatch(primary(html),/core resume|usageLimitResume|provider_limit|F-\d/);
+ }
+});
+test('Malformed or missing usage-limit waits fall back to the blocked card without throwing',()=>{
+ const blocked=renderProject(waitingProject(undefined));
+ assert.match(blocked,/>Blocked</);assert.match(blocked,/Check the tasks and review before resuming in the terminal\./);
+ for(const w of [undefined,null,'soon',[],5,{},{...wait,reset_at:'soon'},{...wait,reset_at:5},{...wait,auto_resume:'yes'},{...wait,source:'guess'},
+  {...wait,reset_at:'<img src=x onerror=alert(1)>'},Object.assign([],wait)]){
+  const p=waitingProject(w),html=renderProject(p,before);
+  assert.deepEqual(projectState(p),{group:'attention',key:'blocked',label:'Blocked'},JSON.stringify(w));
+  assert.equal(html,blocked,JSON.stringify(w));assert.ok(!html.includes('<img'));
+ }
+ // A wait on a run that is not blocked, or behind a pending decision, is ignored.
+ const done=project('Done','done');done.core.run.usage_limit_wait=wait;assert.equal(projectState(done).key,'done');assert.doesNotMatch(renderProject(done),/waiting|usage limit/i);
+ const decision=waitingProject(wait);decision.core.technology=[{id:'D1',capability:'Store',constraints:'c',recommended:'a',rationale:'r',options:[{id:'a',name:'A',cost:'free',cost_basis:'b',tradeoffs:'t'}]}];
+ assert.equal(projectState(decision).label,'Needs you');assert.doesNotMatch(renderProject(decision),/status waiting/);
+});
+test('Non-wait blocked, interrupted and done cards render as before',()=>{
+ const timeout=project('Slow','blocked',false);timeout.core.recovery={...waitRecovery,code:'timeout',title:'Time limit reached',guidance:'Raise the cap with core resume --minutes 30.'};
+ const html=renderProject(timeout);
+ assert.deepEqual(projectState(timeout),{group:'attention',key:'blocked',label:'Blocked'});
+ assert.match(html,/<p class="muted">Check the tasks and review before resuming in the terminal\.<\/p>/);
+ assert.match(html,/<strong>Time limit reached<\/strong><p>Raise the cap with core resume --minutes 30\.<\/p><p class="hint">Recovery is performed/);
+ assert.doesNotMatch(html,/waiting|wait-note|<time/);
+ assert.deepEqual(projectState(project('Stopped','running',false)),{group:'attention',key:'blocked',label:'Interrupted'});
+ assert.match(renderProject(project('Final','done')),/<p class="muted">0 sessions started<\/p>/);
+ assert.deepEqual(projectState(project('Failed','failed')),{group:'attention',key:'failed',label:'Failed'});
+});
+test('Waiting styles use the design tokens and keep the reset time readable',()=>{
+ const css=readFileSync(new URL('../viewer/assets/core.css',import.meta.url),'utf8');
+ assert.match(css,/\.status\.waiting \{\s*color:var\(--text\);\s*background:var\(--soft\);/);
+ assert.match(css,/\.wait-note \{[^}]*color:var\(--text\);/);
+ assert.match(css,/\.recovery-note\.waiting \{ border-color: var\(--border\); background: var\(--soft\); \}/);
+ assert.doesNotMatch(css.match(/\.wait-note[^{]*\{[^}]*\}/g).join(''),/overflow:hidden|text-overflow|display:none/);
+});

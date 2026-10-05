@@ -1,0 +1,14 @@
+{
+  "maxSessions": 8,
+  "maxCloudSessions": 0,
+  "maxAttempts": 2,
+  "maxMinutes": 15,
+  "maxRotations": 1,
+  "providerRetries": 1,
+  "checkTimeoutMinutes": 5,
+  "routes": {
+    "plan": { "provider": "kilo", "localProvider": "ollama", "model": "qwen3-coder:30b-32k", "maxMinutes": 8 },
+    "develop": { "provider": "kilo", "localProvider": "ollama", "model": "qwen3-coder:30b-32k", "maxMinutes": 15 },
+    "review": { "provider": "kilo", "localProvider": "ollama", "model": "qwen3-coder:30b-32k", "maxMinutes": 8 }
+  }
+}

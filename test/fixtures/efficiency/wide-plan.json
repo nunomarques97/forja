@@ -1,0 +1,20 @@
+{
+  "name": "wide-plan",
+  "description": "Ten tasks in one shared directory with long criteria, a long goal, many decisions and a large knowledge base; stresses task_scope, knowledge selection, the repository map and packet trimming.",
+  "goal": { "words": 900, "seed": 21, "extra": "Refactor every module under lib so each exports done flags and keeps the shared registry consistent." },
+  "files": {
+    "package.json": "{\n  \"name\": \"bench-wide\",\n  \"private\": true,\n  \"type\": \"module\"\n}\n"
+  },
+  "generate": {
+    "modules": 10,
+    "padFiles": 40,
+    "criteria": 4,
+    "criterionWords": 45,
+    "notes": 14,
+    "noteWords": 800,
+    "decisions": 8,
+    "decisionWords": 60,
+    "seed": 22
+  },
+  "scenarios": ["happy", "review_reject_once"]
+}

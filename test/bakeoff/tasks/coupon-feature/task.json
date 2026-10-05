@@ -1,0 +1,20 @@
+{
+  "id": "coupon-feature",
+  "kind": "multi-file feature",
+  "stage": "full",
+  "goal": "Add coupon support to the cart. total(items, { coupon }) in src/cart.mjs applies a coupon whose rules live in a new module src/coupons.mjs. SAVE10 takes 10% off the subtotal, with the discount rounded down to whole cents (a 899-cent subtotal becomes 810). FLAT500 takes 500 cents off, but the total never goes below 0. Coupon codes are case-insensitive. An unknown coupon throws an Error whose message contains the code. Without a coupon (or with an empty options object) the total is unchanged. Add tests to test/cart.test.mjs. node --test must pass.",
+  "plan": {
+    "decisions": [],
+    "tasks": [{
+      "id": "T1", "title": "Coupons for the cart total",
+      "criteria": [
+        "src/coupons.mjs holds the coupon rules; total(items, { coupon }) in src/cart.mjs applies them; without a coupon or with {} the total is unchanged.",
+        "SAVE10 takes 10% off with the discount rounded down to whole cents (899 becomes 810); FLAT500 takes 500 cents off and never goes below 0.",
+        "Codes are case-insensitive; an unknown code throws an Error whose message contains the code.",
+        "test/cart.test.mjs covers both coupons, case-insensitivity, the floor at 0 and unknown codes."
+      ],
+      "files": ["src/cart.mjs", "src/coupons.mjs", "test/cart.test.mjs"], "risks": [], "complexity": "medium", "after": [],
+      "checks": [{ "command": "node", "args": ["--test"] }]
+    }]
+  }
+}

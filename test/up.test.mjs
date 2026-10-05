@@ -189,18 +189,39 @@ describe('autostart install/remove via the CLI (temp APPDATA + temp data dir)', 
 });
 
 describe('killTree (Windows: the child tree dies, live Core controllers in it do not)', () => {
-  test('kills the whole tree: the child node and the grandchild node it started are both gone', async () => {
-    const child = spawn(process.execPath, ['-e', "require('node:child_process').spawn(process.execPath, ['-e', 'setTimeout(function(){},60000)'], { stdio: 'ignore' }); setTimeout(function(){}, 60000)"], { stdio: 'ignore', windowsHide: true });
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
-    await sleep(1500);
-    const grand = () => spawnSync('powershell.exe', ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ParentProcessId=${child.pid} AND Name='node.exe'").ProcessId`], { encoding: 'utf8' }).stdout.trim();
-    const gpid = grand();
-    assert.match(gpid, /^\d+$/, 'the child started a node grandchild');
-    killTree(child);
-    await sleep(800);
-    const alive = pid => spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH'], { encoding: 'utf8' }).stdout.includes(` ${pid} `);
-    assert.equal(alive(String(child.pid)), false, 'child gone');
-    assert.equal(alive(gpid), false, 'grandchild gone');
+  test('kills the whole tree: the child node and the grandchild node it started are both gone', { timeout: 300_000 }, async t => {
+    // The grandchild inherits the child's stdout pipe, so that pipe closes only
+    // once both processes have exited. The test waits on those events (the
+    // grandchild's PID line, the child's exit, the pipe's close), never on a
+    // pause or deadline tuned to a fast machine. Both sleep until killed.
+    // The grandchild is detached: otherwise Node's Windows job object ends it
+    // with the child, and a kill that missed it would still pass.
+    // The hang guard only turns a missed process into a failure that names it
+    // (instead of a run that never ends); it never decides a correct kill.
+    const forever = 'setInterval(function(){}, 1000)';
+    const child = spawn(process.execPath, ['-e', `const g = require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(forever)}], { stdio: ['ignore', 'inherit', 'ignore'], windowsHide: true, detached: true }); console.log('GRANDCHILD ' + g.pid); ${forever}`], { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
+    let finished = false; let gpid = null;
+    t.after(() => { if (!finished) for (const pid of [child.pid, gpid]) if (pid) try { process.kill(pid, 'SIGKILL'); } catch {} });
+    const exited = new Promise(resolve => child.once('exit', resolve));
+    const closed = new Promise(resolve => child.stdout.once('close', resolve));
+    let out = '';
+    child.stdout.setEncoding('utf8');
+    gpid = await new Promise((resolve, reject) => {
+      child.stdout.on('data', d => { out += d; const m = /GRANDCHILD (\d+)/.exec(out); if (m) resolve(Number(m[1])); });
+      child.once('exit', () => reject(new Error(`the child exited before starting a grandchild: ${out}`)));
+    });
+    assert.ok(Number.isSafeInteger(gpid), 'the child started a node grandchild');
+    assert.equal(killTree(child).ok, true);
+    let stage = `child ${child.pid}`;
+    const gone = (async () => {
+      await exited;  // child gone
+      stage = `grandchild ${gpid} (the inherited stdout pipe is still open)`;
+      await closed;  // every holder of the pipe, the grandchild included, is gone
+    })();
+    let guard;
+    const hang = new Promise((_, reject) => { guard = setTimeout(() => reject(new Error(`killTree left the ${stage} alive`)), 120_000); });
+    try { await Promise.race([gone, hang]); } finally { clearTimeout(guard); }
+    finished = true;
   });
 
   // The 17 set 2026 incident: a `down` that killed the viewer's tree killed two

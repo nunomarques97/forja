@@ -64,6 +64,7 @@ const usage = `FORJA core (docs/CORE-RUNBOOK.md)
     (--goal-file reads the goal as UTF-8 from a path relative to the current folder; use it for long goals or goals with double quotes, which Windows PowerShell 5.1 cuts)
   core init | core doctor [--provider claude|codex|kilo] [--config file] | core resume | core status | core usage [--details]
   core deliver [--retry | --approve-production <reviewed-commit-sha>]
+  core status --all [--json]  (read-only, from any folder: one line per registered project with a Core run: status, tasks done/total, current task and phase, last update, block reason, queue length; never takes a lock or writes; --json for scripts)
   core diagnose [--invocation ID] [--phase plan|develop|review]  (read-only execution metadata; no provider calls; ID 1..200; filters combine with AND)
   core evidence [--run ID]  (read-only model/effort evidence for the current or an archived run; no model ranking or automatic changes)
   core evaluation-plan --runs ID,ID  (read-only triage of 1..10 explicit archived runs; prepares a comparison protocol, never executes it)
@@ -76,10 +77,15 @@ const usage = `FORJA core (docs/CORE-RUNBOOK.md)
     (replace the checks of an unfinished task, for example one that writes project files, with read-only checks: a UTF-8 JSON array of {"command","args"}; validated like a new plan; final checks stay; old and new checks go to recovery.jsonl)
   core abandon --why "..."
   core stop [--after-task]  (asks the running controller to stop at the next invocation boundary, or after the current task; never kills a live worker; core resume continues)
+  core queue add --goal-file <path> [--config <json>] [--provider claude|codex|kilo|custom] [budget flags] | core queue list | core queue remove <id>
+    (per-project goal queue in .forja/queue.json: when a run ends done, and delivered when delivery is configured, the next goal starts as a new run with the same checks as start; a blocked or failed run never starts it; a queued goal always needs a clean tree, so --allow-dirty and allowDirty are refused; the guard also starts it for a finished project without a live controller)
+  core lessons list | show --id L-... | forget --id L-... | clear
+    (lessons from earlier finished runs, off by default: enable per run with {"lessons": true} in the start --config file; the run then ingests finished runs at start and sends a few bounded lessons in plan, develop and review packets, listed by core status)
+    (the store is private: .forja/lessons/store.json, never committed and never sent anywhere except this project's own packets; list and show only read; forget and clear take the project lock and refuse while a controller is alive; a forgotten lesson is never re-created; clear keeps the ingested-run record, so only runs finished later teach again)
   Budgets: --max-sessions 30 --max-cloud-sessions N --max-attempts 2 --max-minutes 30 --max-rotations 2 --max-context-tokens 120000 --provider-retries 1 --check-timeout-minutes N
     (--provider-retries 0|1: automatic fresh develop sessions per implementation attempt after a provider output-budget failure; 0 blocks at once)
     (--check-timeout-minutes 1..180: per-check timeout; default the smaller of --max-minutes and 10; a check killed by it blocks with check_timeout, spends no attempt, and core resume --check-timeout-minutes N runs the checks again)
-  --help or -h on start and any core command prints this text and changes nothing. start, resume, retry, abandon, stop, deliver, decide and init refuse unknown flags and extra arguments before any effect.
+  --help or -h on start and any core command prints this text and changes nothing. start, resume, retry, abandon, stop, deliver, decide, init, queue and lessons refuse unknown flags and extra arguments before any effect.
 
 Monitoring:
   serve | up [--port N] [--no-tunnel] | down | token rotate | autostart install|remove

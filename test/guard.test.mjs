@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   GUARD_DEAD_GRACE_MS, GUARD_HEALTHY_MS, GUARD_MAX_ATTEMPTS, GUARD_MIN_POLL_MS, GUARD_POLL_MS, GUARD_RETRY_MS, GUARD_CMD_RE, GUARD_WRAPPER_RETRY_S,
-  EMPTY_STATE, appendGuardLog, checkedPollMs, gaveUpMessage, guardAlive, guardLauncherFiles, guardLoop, guardPaths, guardPlan, guardStartupPaths,
+  EMPTY_STATE, appendGuardLog, checkedPollMs, gaveUpMessage, queueGaveUpMessage, guardAlive, guardLauncherFiles, guardLoop, guardPaths, guardPlan, guardStartupPaths,
   readGuardState, relaunchMessage, runGuardOnce, validRunId, writeGuardState,
 } from '../lib/guard.mjs';
 import { launchCore } from '../lib/spawn-runner.mjs';
@@ -1094,5 +1094,199 @@ describe('appendGuardLog', () => {
     assert.match(lines[0], /^\d{4}-\d{2}-\d{2}T[\d:.]+Z linha um$/);
     assert.match(lines[1], /linha com quebras$/);
     assert.ok(statSync(path).size > 0);
+  });
+});
+
+// Core runs waiting for the provider usage limit (lib/core/recovery.mjs): the
+// one kind of blocked run the guard resumes, only after the reset time.
+describe('a espera pelo limite de uso do fornecedor (Core)', () => {
+  const CORE_ID = 'F-1791068167545-6aaf68';
+  const wait = (over = {}) => ({ reset_at: new Date(T0 - 2 * MIN).toISOString(), source: 'provider', auto_resume: true, resumes: 0, max_resumes: 6, ...over });
+  const waiting = (over = {}, run = {}) => proj({ run: { run_id: CORE_ID, status: 'blocked', driver: 'core', stop_code: 'provider_limit', usage_limit_wait: wait(over), ...run } });
+
+  test('antes da hora de reposição não faz nada; depois dela (mais a margem) retoma o run Core com a razão', () => {
+    const early = guardPlan([waiting({ reset_at: new Date(T0 + 30 * MIN).toISOString() })], EMPTY_STATE(), T0);
+    assert.deepEqual(early.actions, []);
+    assert.match(early.skips[0].why, /à espera do limite de uso do fornecedor até 2026-09-17T18:30:00.000Z/);
+    // Within the 60 s margin after the reset: still waiting.
+    assert.deepEqual(guardPlan([waiting({ reset_at: new Date(T0 - 30_000).toISOString() })], EMPTY_STATE(), T0).actions, []);
+    const due = guardPlan([waiting()], EMPTY_STATE(), T0);
+    assert.equal(due.actions.length, 1);
+    const [a] = due.actions;
+    assert.deepEqual({ ...a, why: undefined }, { name: 'velora', path: join(root, 'velora'), attempt: 1, driver: 'core', runId: CORE_ID, why: undefined });
+    assert.match(a.why, /limite de uso do fornecedor reposto .* retomo o run Core \(retoma automática 1 de 6\)/);
+    assert.deepEqual(due.giveUps, []);
+  });
+
+  test('opt-out, teto de retomas, controlador vivo e espera ilegível: nunca retoma', () => {
+    for (const [p, why] of [
+      [waiting({ auto_resume: false }), /retoma automática desligada neste run \(usageLimitResume false\)/],
+      [waiting({ auto_resume: false, resumes: 6 }), /já usou as 6 retomas automáticas/],
+      [waiting({ auto_resume: false, stop_requested: true }), /pedido de paragem do operador pendente, precisa de core resume/],
+      [waiting({ resumes: 6 }), /à espera do limite|não retomo/],
+      [{ ...waiting(), runnerAlive: true }, /controlador Core ainda está vivo/],
+      [waiting({ reset_at: 'logo' }), /sem hora de reposição legível/],
+    ]) {
+      const plan = guardPlan([p], EMPTY_STATE(), T0);
+      assert.deepEqual(plan.actions, [], JSON.stringify(p.run.usage_limit_wait));
+      assert.match(plan.skips[0].why, why);
+    }
+  });
+
+  test('qualquer outro bloqueio continua a nunca ser retomado, mesmo com uma espera forjada', () => {
+    for (const run of [
+      { stop_code: 'timeout' }, { stop_code: 'inspect' }, { stop_code: 'operator_stop' }, { stop_code: 'check_writes' }, { stop_code: undefined },
+      { usage_limit_wait: null }, { usage_limit_wait: 'due' }, { driver: 'runner' }, { driver: 'interactive' }, { status: 'done' }, { status: 'failed' },
+    ]) {
+      const plan = guardPlan([waiting({}, run)], EMPTY_STATE(), T0 + 10 * GUARD_RETRY_MS);
+      assert.deepEqual(plan.actions, [], JSON.stringify(run));
+      assert.deepEqual(plan.giveUps, []);
+    }
+  });
+
+  test('o espaçamento e o teto de tentativas valem durante a espera e o contador não é zerado por ela', () => {
+    const spaced = guardPlan([waiting()], roundTrip(stateOf({ run_id: CORE_ID, attempts: 1, last_attempt_at: new Date(T0 - 5 * MIN).toISOString() })), T0);
+    assert.deepEqual(spaced.actions, []);
+    assert.match(spaced.skips[0].why, /espero 15 min entre tentativas/);
+    assert.equal(spaced.state.projects.velora.attempts, 1, 'a espera não zera o contador');
+    const second = guardPlan([waiting({ resumes: 1 })], roundTrip(spaced.state), T0 + GUARD_RETRY_MS);
+    assert.equal(second.actions[0].attempt, 2);
+    const capped = guardPlan([waiting({ resumes: 3 })], roundTrip(stateOf({ run_id: CORE_ID, attempts: GUARD_MAX_ATTEMPTS, last_attempt_at: new Date(T0 - GUARD_RETRY_MS).toISOString() })), T0);
+    assert.deepEqual(capped.actions, []);
+    assert.deepEqual(capped.giveUps, [{ name: 'velora', attempts: GUARD_MAX_ATTEMPTS }]);
+    const again = guardPlan([waiting({ resumes: 3 })], roundTrip(capped.state), T0 + GUARD_RETRY_MS);
+    assert.deepEqual(again.giveUps, []);
+    assert.match(again.skips[0].why, /já desisti deste run/);
+  });
+
+  test('runGuardOnce retoma pelo caminho Core, sem objetivo, e escreve a razão no log', async () => {
+    const dir = fresh('espera'); const path = projectFolder('velora-espera');
+    const f = fakes(); const core = [];
+    const r = await runGuardOnce({ dataDir: dir, forjaRoot: 'C:\\forja', list: () => [{ ...waiting(), path }],
+      spawn: opts => { core.push(opts); return 5151; }, spawnQueue: opts => { f.spawned.push(opts); return 6161; }, notify: f.notify, log: f.log, now: T0 });
+    assert.equal(f.spawned.length, 0, 'never the queue launcher');
+    assert.equal(core.length, 1);
+    assert.deepEqual(core[0].project, { name: 'velora', path, runId: CORE_ID });
+    assert.equal('goal' in core[0], false, 'never a goal');
+    assert.equal(core[0].now, T0);
+    assert.equal(r.launched[0].pid, 5151);
+    assert.match(f.lines.at(-1), /velora: retomado depois do limite de uso \(tentativa 1 de 3, pid 5151\)/);
+    assert.equal(readGuardState(guardPaths(dir).state).projects.velora.attempts, 1);
+    assert.equal(f.sent.length, 0, 'nothing waits on the Sponsor');
+  });
+
+  test('`forja guard status` mostra a decisão simulada com a razão e não lança nada', () => {
+    const dir = fresh('cli-espera');
+    const project = join(root, 'projetos', 'cli-espera');
+    mkdirSync(join(project, '.forja'), { recursive: true });
+    writeFileSync(join(dir, 'projects.json'), JSON.stringify({ version: 1, projects: [{ name: 'cli-espera', path: project, bootstrappedAt: null }] }, null, 2));
+    const run = { version: 1, run_id: CORE_ID, status: 'blocked', provider: 'claude', goal: 'objetivo secreto', tasks: [], invocations: 1,
+      stopCode: 'provider_limit', failure: 'PRIVATE provider text', config: {}, usageLimitWait: { reset_at: new Date(Date.now() - 5 * MIN).toISOString(), source: 'provider', recorded_at: new Date(Date.now() - 65 * MIN).toISOString(), resumes: 0 } };
+    writeFileSync(join(project, '.forja', 'current.json'), JSON.stringify(run));
+    const before = readFileSync(join(project, '.forja', 'current.json'), 'utf8');
+    const r = spawnSync(process.execPath, [cli, 'guard', 'status'], { env: { ...process.env, FORJA_DATA_DIR: dir, FORJA_NTFY_SERVER: 'http://127.0.0.1:9' }, encoding: 'utf8', timeout: 120_000, windowsHide: true });
+    assert.equal(r.status, 0, r.stderr);
+    const json = JSON.parse(r.stdout);
+    assert.equal(json.plan.actions.length, 1);
+    assert.match(json.plan.actions[0].why, /limite de uso do fornecedor reposto/);
+    assert.doesNotMatch(r.stdout, /PRIVATE|objetivo secreto/);
+    assert.equal(existsSync(guardPaths(dir).state), false, 'o status não escreve o estado');
+    assert.equal(existsSync(join(dir, 'core')), false, 'e não lança nada');
+    assert.equal(readFileSync(join(project, '.forja', 'current.json'), 'utf8'), before);
+  });
+});
+
+describe('a fila de objetivos de um projeto Core (core queue)', () => {
+  const CORE_ID = 'F-1791068167545-6aaf68';
+  const finished = (run = {}, over = {}) => proj({ run: { run_id: CORE_ID, status: 'done', driver: 'core', stop_code: null, usage_limit_wait: null, queue_length: 2, queue_unreadable: false, queue_held: false, delivered: true, ...run }, ...over });
+  const idle = (n = 0) => roundTrip(stateOf({ run_id: CORE_ID, dead_since: new Date(T0 - GUARD_DEAD_GRACE_MS - n).toISOString() }));
+
+  test('um run Core terminado (done) com fila e sem controlador: espera a graça e depois inicia o objetivo seguinte', () => {
+    const first = guardPlan([finished()], EMPTY_STATE(), T0);
+    assert.deepEqual(first.actions, []);
+    assert.match(first.skips[0].why, /run terminado com 2 objetivo\(s\) na fila há 0s — dentro da graça/);
+    const due = guardPlan([finished()], roundTrip(first.state), T0 + GUARD_DEAD_GRACE_MS);
+    assert.equal(due.actions.length, 1);
+    const [a] = due.actions;
+    assert.deepEqual({ ...a, why: undefined }, { name: 'velora', path: join(root, 'velora'), attempt: 1, driver: 'core', runId: CORE_ID, queue: true, why: undefined });
+    assert.match(a.why, /inicio o objetivo seguinte da fila \(2 na fila\)/);
+    assert.doesNotMatch(JSON.stringify(due), /objetivo secreto/);
+  });
+
+  test('bloqueado, falhado, a correr, fila vazia, fila ilegível, controlador vivo ou run legado: nunca inicia a fila', () => {
+    for (const [label, p] of [
+      ['blocked', finished({ status: 'blocked', stop_code: 'inspect' })],
+      ['blocked by the usage limit, not due', finished({ status: 'blocked', stop_code: 'provider_limit', usage_limit_wait: { reset_at: new Date(T0 + 30 * MIN).toISOString(), auto_resume: true, resumes: 0, max_resumes: 6 } })],
+      ['failed', finished({ status: 'failed' })],
+      ['running and alive', finished({ status: 'running' }, { runnerAlive: true })],
+      ['empty queue', finished({ queue_length: 0 })],
+      ['unreadable queue', finished({ queue_length: null, queue_unreadable: true })],
+      ['live controller', finished({}, { runnerAlive: true })],
+      ['legacy runner driver', finished({ driver: 'runner' })],
+      ['interactive driver', finished({ driver: 'interactive' })],
+      ['forged string length', finished({ queue_length: '3' })],
+      ['held by an operator stop', finished({ queue_held: true })],
+      ['hold missing from the observation', finished({ queue_held: undefined })],
+      ['configured delivery not completed', finished({ delivered: false })],
+      ['delivery missing from the observation', finished({ delivered: undefined })],
+    ]) {
+      const plan = guardPlan([p], idle(10 * GUARD_RETRY_MS), T0 + 10 * GUARD_RETRY_MS);
+      assert.deepEqual(plan.actions.filter(a => a.queue), [], label);
+      assert.deepEqual(plan.giveUps, [], label);
+    }
+    assert.match(guardPlan([finished({ queue_length: null, queue_unreadable: true })], EMPTY_STATE(), T0).skips[0].why, /fila de objetivos ilegível/);
+    assert.match(guardPlan([finished({}, { runnerAlive: true })], EMPTY_STATE(), T0).skips[0].why, /controlador Core ainda está vivo/);
+    assert.match(guardPlan([finished({ queue_held: true })], EMPTY_STATE(), T0).skips[0].why, /pediu stop antes de o run terminar/);
+    assert.match(guardPlan([finished({ delivered: false })], EMPTY_STATE(), T0).skips[0].why, /entrega configurada concluída/);
+  });
+
+  test('o espaçamento e o teto de tentativas valem para a fila, com uma desistência própria anunciada uma vez', () => {
+    const spaced = guardPlan([finished()], roundTrip(stateOf({ run_id: CORE_ID, attempts: 1, dead_since: new Date(T0 - 20 * MIN).toISOString(), last_attempt_at: new Date(T0 - 5 * MIN).toISOString() })), T0);
+    assert.deepEqual(spaced.actions, []);
+    assert.match(spaced.skips[0].why, /espero 15 min entre tentativas/);
+    const second = guardPlan([finished()], roundTrip(spaced.state), T0 + GUARD_RETRY_MS);
+    assert.equal(second.actions[0].attempt, 2);
+    const capped = guardPlan([finished()], roundTrip(stateOf({ run_id: CORE_ID, attempts: GUARD_MAX_ATTEMPTS, dead_since: new Date(T0 - GUARD_RETRY_MS).toISOString(), last_attempt_at: new Date(T0 - GUARD_RETRY_MS).toISOString() })), T0);
+    assert.deepEqual(capped.actions, []);
+    assert.deepEqual(capped.giveUps, [{ name: 'velora', attempts: GUARD_MAX_ATTEMPTS, queue: true }]);
+    const again = guardPlan([finished()], roundTrip(capped.state), T0 + GUARD_RETRY_MS);
+    assert.deepEqual(again.giveUps, []);
+    assert.match(again.skips[0].why, /já desisti de iniciar a fila deste projeto/);
+    // A new run (the queued goal started some other way) resets the counter.
+    const fresh = guardPlan([finished({ run_id: 'F-1791068167999-abcdef', status: 'running' }, { runnerAlive: true })], roundTrip(capped.state), T0 + GUARD_RETRY_MS);
+    assert.equal(fresh.state.projects.velora.attempts, 0);
+  });
+
+  test('runGuardOnce inicia a fila pelo caminho próprio, sem objetivo, e a desistência usa a mensagem da fila', async () => {
+    const dir = fresh('fila'); const path = projectFolder('velora-fila');
+    const f = fakes(); const core = []; const queue = [];
+    const r = await runGuardOnce({ dataDir: dir, forjaRoot: 'C:\forja', list: () => [{ ...finished(), path }],
+      spawn: opts => { core.push(opts); return 5151; }, spawnQueue: opts => { queue.push(opts); return 6161; },
+      notify: f.notify, log: f.log, now: T0 + GUARD_DEAD_GRACE_MS });
+    // First tick only stamps the idle clock.
+    assert.equal(queue.length, 0);
+    assert.equal(r.launched.length, 0);
+    const r2 = await runGuardOnce({ dataDir: dir, forjaRoot: 'C:\forja', list: () => [{ ...finished(), path }],
+      spawn: opts => { core.push(opts); return 5151; }, spawnQueue: opts => { queue.push(opts); return 6161; },
+      notify: f.notify, log: f.log, now: T0 + 2 * GUARD_DEAD_GRACE_MS });
+    assert.equal(core.length, 0, 'never a resume');
+    assert.equal(queue.length, 1);
+    assert.deepEqual(queue[0].project, { name: 'velora', path, runId: CORE_ID });
+    assert.equal('goal' in queue[0], false, 'never a goal: the child reads it from disk');
+    assert.equal(queue[0].action, 'queue');
+    assert.equal(r2.launched[0].pid, 6161);
+    assert.match(f.lines.at(-1), /velora: objetivo seguinte da fila iniciado \(tentativa 1 de 3, pid 6161\)/);
+    assert.equal(readGuardState(guardPaths(dir).state).projects.velora.attempts, 1);
+    assert.equal(f.sent.length, 0);
+
+    writeGuardState(guardPaths(dir).state, stateOf({ run_id: CORE_ID, attempts: GUARD_MAX_ATTEMPTS, dead_since: new Date(T0 - GUARD_RETRY_MS).toISOString(), last_attempt_at: new Date(T0 - GUARD_RETRY_MS).toISOString() }));
+    const gave = await runGuardOnce({ dataDir: dir, forjaRoot: 'C:\forja', list: () => [{ ...finished(), path }], spawn: f.spawn,
+      spawnQueue: opts => { queue.push(opts); return 6161; }, notify: f.notify, log: f.log, now: T0 });
+    assert.equal(gave.launched.length, 0);
+    assert.equal(f.sent.length, 1);
+    assert.equal(f.sent[0].message, queueGaveUpMessage('velora'));
+    assert.match(f.sent[0].message, /desisti de iniciar o objetivo seguinte da fila de velora/);
+    assert.doesNotMatch(f.sent[0].message, /[\/]|F-\d/);
+    assert.match(f.lines.at(-1), /velora: desisti de iniciar a fila depois de 3 tentativas/);
   });
 });

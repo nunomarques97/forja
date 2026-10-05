@@ -1,0 +1,20 @@
+{
+  "name": "wide-repo",
+  "description": "Packets only: four small tasks in a repository of 200 source files, so the repository map is filled to its budget; measures the map and knowledge in develop and review packets.",
+  "goal": { "words": 120, "seed": 31, "extra": "Mark the four modules done without changing the helpers." },
+  "files": {
+    "package.json": "{\n  \"name\": \"bench-repo\",\n  \"private\": true,\n  \"type\": \"module\"\n}\n"
+  },
+  "generate": {
+    "modules": 4,
+    "padFiles": 200,
+    "criteria": 2,
+    "criterionWords": 20,
+    "notes": 6,
+    "noteWords": 400,
+    "decisions": 2,
+    "decisionWords": 30,
+    "seed": 32
+  },
+  "scenarios": []
+}

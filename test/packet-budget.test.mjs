@@ -141,7 +141,7 @@ test('degradation stops at the first step that fits', (t) => {
   const root = repo(t);
   const run = longPlan();
   const changes = { files: Array.from({ length: 60 }, (_, i) => `lib/billing/invoice-ledger-reconciliation-module-${String(i).padStart(3, '0')}.mjs`) };
-  const ctx = packet({ root, run, task: run.tasks[0], phase: 'review', feedback: { status: 'rejected', summary: 'x'.repeat(22000), findings: [] }, changes });
+  const ctx = packet({ root, run, task: run.tasks[0], phase: 'review', feedback: { status: 'rejected', summary: 'x'.repeat(25000), findings: [] }, changes });
   assert.deepEqual(trims(ctx), ['trimmed task_scope.remaining_tasks criteria']);
   const data = JSON.parse(ctx.text);
   assert.ok(data.knowledge.selected.some(k => !k.required && k.text));

@@ -118,8 +118,10 @@ test('a task check killed by the timeout blocks without spending an attempt, and
 
 test('a final-regression check killed by the timeout blocks without reopening the task', async t => {
   const root = fixture(t);
+  // T2 has its own check: an identical check already passed on the final tree
+  // by T2's validation would be reused instead of running again.
   createRun(root, { goal: 'Accept both', config: { checkTimeoutMinutes: 15 },
-    plan: { decisions: [], tasks: [task('T1'), task('T2', { files: ['T2.txt'], after: ['T1'] })] } });
+    plan: { decisions: [], tasks: [task('T1'), task('T2', { files: ['T2.txt'], after: ['T1'], checks: [check('process.exitCode = 0')] })] } });
   const phases = [];
   // T1 validation, T2 validation, then the final regression of T1 times out.
   const first = checks([3]);

@@ -1,0 +1,19 @@
+{
+  "id": "paginate-regression",
+  "kind": "regression with failing tests",
+  "stage": "full",
+  "goal": "test/paginate.test.mjs fails after a refactor of src/paginate.mjs. Fix paginate(items, page, size) without changing the existing assertions: pages are numbered from 1, pages is the number of pages needed to show every item (0 for an empty list), a page past the end returns no items, and a page or size that is not a positive integer throws a RangeError. Add tests for the empty list, the page past the end and the invalid arguments. node --test must pass.",
+  "plan": {
+    "decisions": [],
+    "tasks": [{
+      "id": "T1", "title": "Fix paginate numbering and validation",
+      "criteria": [
+        "Pages are numbered from 1; pages is the number of pages needed for every item (0 for an empty list); a page past the end returns no items.",
+        "A page or size that is not a positive integer throws a RangeError.",
+        "The existing assertions in test/paginate.test.mjs are unchanged; new tests cover the empty list, a page past the end and invalid arguments."
+      ],
+      "files": ["src/paginate.mjs", "test/paginate.test.mjs"], "risks": [], "complexity": "easy", "after": [],
+      "checks": [{ "command": "node", "args": ["--test"] }]
+    }]
+  }
+}

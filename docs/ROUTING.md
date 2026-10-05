@@ -29,7 +29,7 @@ Each route has `provider` and optional `model`, `effort`, `maxMinutes` and `loca
 
 `maxSessions` limits all native invocations; `maxCloudSessions` additionally limits nonlocal invocations. `0` permits only local routes. Both counters persist across recovery and count started attempts, including failures. One invocation can contain many model calls: neither limit is a token, euro or subscription-percentage ceiling. Older runs conservatively count previous invocations as cloud. `maxMinutes` (`--max-minutes`, 1..180, default 30) is the per-call provider timeout; `core resume --max-minutes N` can only raise it. A route's `maxMinutes` can shorten it for that route; it cannot extend it, and it stays fixed for the run. `core status` shows the effective value, the routes that lower it and, after a timeout, the limit reached with its invocation (`provider_timeout`). There is no built-in whole-run wall-clock limit.
 
-Authentication, availability, timeout, schema and local preflight failures block the run without an automatic provider fallback. The one exception is the same-provider automatic retry (`providerRetries`, 0..1, default 1): a develop session that ends on the output budget or on the per-call timeout gets one fresh session per implementation attempt in total, on the same route, keeping the work on disk and the progress notes and spending no attempt. A second such failure in the attempt, or a plan or review timeout, blocks with the `timeout` or `output` recovery code; a timeout message names the minutes reached and how to raise them. A rejected implementation or failed check can trigger another development attempt within budget: that retry selects `strong`, which **is a cloud route in the hybrid preset**. Review and planning also use cloud. To prohibit all cloud use, set `maxCloudSessions: 0` and explicitly configure every phase that will execute as local. Do not use the hybrid preset expecting an offline workflow.
+Authentication, availability, timeout, schema and local preflight failures block the run without an automatic provider fallback. The one exception is the same-provider automatic retry (`providerRetries`, 0..1, default 1): a develop session that ends on the output budget or on the per-call timeout gets one fresh session per implementation attempt in total, on the same route, keeping the work on disk and the progress notes and spending no attempt. On a local route the same retry also covers a develop session that fails without a result or returns no valid result JSON, and a local plan or review session that returns no usable plan or verdict (a status outside its phase, no JSON, a Kilo failure or a per-call timeout without a result) gets one fresh session of its phase: planning once per controller start, review once per validated tree, both disabled by `providerRetries: 0`; before that, a local Kilo session whose final JSON is not a result of its phase gets one same-session reminder naming the problem, and local schemas list only the statuses of their phase. A local plan with more than one task that cannot finish within the remaining sessions (`2 × tasks > remaining − 1`: one develop and one review session per task plus one spare) is merged by the controller into one task in dependency order (`merged_from` in task state). Cloud routes keep the immediate stop for those cases. A second such failure in the attempt, or a cloud plan or review timeout, blocks with the `timeout` or `output` recovery code; a timeout message names the minutes reached and how to raise them. A rejected implementation or failed check can trigger another development attempt within budget: that retry selects `strong`, which **is a cloud route in the hybrid preset**. Review and planning also use cloud. To prohibit all cloud use, set `maxCloudSessions: 0` and explicitly configure every phase that will execute as local. Do not use the hybrid preset expecting an offline workflow.
 
 The usage ledger records requested model, effort, route, provider, backend and local flag; `core usage` aggregates by provider and backend. Missing cost/token observations remain unknown. A local route describes the configured inference backend, not a guarantee of network isolation for all CLI features or custom executables.
 
@@ -95,6 +95,74 @@ Add commands to the configuration passed with `--config`:
 The scheduler appends these to the last remaining task's checks before review. Intermediate tasks can finish without satisfying the complete goal. Failed final checks return to development within the original attempt budget. Later final regression repairs revalidate integration. Logs identify the executed commands and results; reviewer approval cannot replace a failing command.
 
 Commands are trusted caller configuration, executed in the project root with the scheduler's permissions. Use independently maintained acceptance tests; keep authoritative oracles outside the developer's writable scope where practical. Do not let a worker weaken them to pass. Core state protection is not a sandbox for arbitrary check commands. The quality prompts direct attention to stale responses, failure/retry transitions, empty-state loading and keyboard focus; prompts alone do not prove coverage.
+
+## Local Ollama routes through Kilo
+
+Where Codex is not installed, the Kilo CLI drives a local Ollama model for any phase. A route names Kilo, the local provider and the plain Ollama tag:
+
+```json
+{
+  "maxCloudSessions": 0,
+  "routes": {
+    "plan": { "provider": "kilo", "localProvider": "ollama", "model": "qwen3-coder:30b-32k", "maxMinutes": 8 },
+    "develop": { "provider": "kilo", "localProvider": "ollama", "model": "qwen3-coder:30b-32k" },
+    "review": { "provider": "kilo", "localProvider": "ollama", "model": "qwen3-coder:30b-32k", "maxMinutes": 8 }
+  }
+}
+```
+
+Routes can be mixed with cloud routes per phase or tier, as in the Codex pilot below. With `maxCloudSessions: 0` and every phase local, the run uses no cloud session; any phase left without a local route blocks before launch with the cloud budget message.
+
+Requirements: Kilo CLI (7.8.1 tested; bundled or on PATH, as for the gateway provider above), Ollama running at `127.0.0.1:11434`, and an installed model with tool support whose Modelfile sets `num_ctx` to at least 16,384. Ollama otherwise loads the model with its server default (4,096 tokens on 0.35.0) and silently cuts the prompt: Kilo's own system prompt and tools are about 8,100 tokens before the FORJA packet. Create a larger-context variant of an installed model as for the pilot below (`PARAMETER num_ctx 32768`). FORJA does not pull or create models.
+
+Before each local call FORJA reads `/api/tags` and `/api/show` on the fixed loopback endpoint (nothing is loaded) and refuses, with the cause in the message, when the server is unreachable or does not answer within 5 seconds, the model is not installed, is a remote/cloud model, has no tool support, or declares no or too small a context. There is no fallback to cloud: the run blocks with the `provider` recovery code. `core doctor --config <profile>` runs the same checks for every model of the profile's local routes (one `ollama:<model>` line naming its routes) without invoking a model; profiles without local routes do not probe Ollama.
+
+The invocation is the gateway Kilo invocation with three additions to its inline config: only the `ollama` provider is defined (OpenAI-compatible, base URL `http://127.0.0.1:11434/v1`), `enabled_providers` is `["ollama"]`, and both `model` and `small_model` are the route model, so neither the task nor Kilo's auxiliary title call can select another provider. The model's declared context is passed as its Kilo context limit. FORJA's per-phase permission policy, empty config home, disabled project config, empty MCP and disabled sharing are unchanged; `OLLAMA_HOST` is set to the loopback endpoint. Route `maxMinutes` is the per-call timeout, the ledger records `provider: kilo`, `backend: ollama`, `local: true`, and local calls do not count against `maxCloudSessions`. Kilo can still contact its own services for non-inference features (for example its model catalogue); this is not network isolation.
+
+Local models often do the work but, after long tool use, end with prose instead of the result JSON appended to the prompt. When a local Kilo call exits cleanly without one and at least 15 seconds of its call time remain, FORJA sends one short reminder in the same Kilo session (`--session`, same permissions, remaining time) asking only for the JSON; usage and calls of both processes are summed and the ledger records `result_follow_up`. There is no second reminder, and gateway Kilo routes do not get one.
+
+Smoke results on Windows 11 (RTX 5060 Ti 16 GB, Ollama 0.35.0, Kilo 7.8.1, 2026-10-05), all in scratch projects outside the repository:
+
+- Direct Kilo call with `qwen3-coder:30b-32k`: read, edit, ran `node -e` and returned the JSON result in 48 s. With `qwen3:8b` (no `num_ctx`) the prompt was truncated to the 4,096-token default and the model never saw the task, which is why the context preflight exists.
+- FORJA run, every phase `qwen3-coder:30b-32k`, `maxCloudSessions: 0`, small slug-fixing goal: plan 85 s, develop 105 s (correct fix and tests; controller `npm test` passed), review 40 s; 3 local invocations, 0 cloud. The run blocked because the local reviewer answered `done` instead of `approve`/`reject`, a model limitation already seen with a free gateway reviewer. In an earlier run the plan was only accepted thanks to the follow-up above (56 s).
+- Before the follow-up existed, `qwen3-coder:30b-32k` (plan, develop) and `forja-gpt-oss:20b-32k` (plan) ended without a result JSON; both tried to edit during planning and the read-only policy denied it.
+
+This establishes that the local route works for every phase on this host. It does not establish that local models complete tasks unattended.
+
+### Recommended local profile
+
+[`config/core-local.json`](../config/core-local.json) is the local-only preset chosen by the [local model bake-off](research/local-models-2026-10-04.md) on this PC: `qwen3-coder:30b-32k` for plan, develop and review, `maxCloudSessions: 0`, no escalation, 8 sessions, 2 attempts, per-call 8/15/8 minutes. Nine models ran the same small coding tasks through FORJA; `devstral-small-2` (24B) was the most correct developer by one task but about twice as slow and over the 16 GB card at 32k context, `gpt-oss:20b` the fastest but failed most plans. No local reviewer rejected a failing change, so the project's checks are the real gate in a local-only run.
+
+```powershell
+node bin/forja.mjs core doctor --config config/core-local.json
+node bin/forja.mjs start --provider kilo --config config/core-local.json --goal "..."
+```
+
+`node tools/local-bakeoff.mjs plan|run --detach|status|report|stop|cleanup` reruns the bake-off (see the report for caps and method).
+
+## Escalation of local develop tasks to Claude (opt-in)
+
+A profile with local develop routes can name one Claude CLI route that takes over a task the local model cannot finish. It is off unless the profile has an `escalation` object:
+
+```json
+{
+  "maxCloudSessions": 4,
+  "routes": {
+    "plan": { "provider": "kilo", "localProvider": "ollama", "model": "qwen3-coder:30b-32k" },
+    "develop": { "provider": "kilo", "localProvider": "ollama", "model": "qwen3-coder:30b-32k" },
+    "review": { "provider": "kilo", "localProvider": "ollama", "model": "qwen3-coder:30b-32k" }
+  },
+  "escalation": { "route": { "provider": "claude", "model": "sonnet", "effort": "high" }, "maxEscalations": 1, "attempts": 1 }
+}
+```
+
+- **When.** A develop task on a local route escalates when it uses all its implementation attempts without approval (`attempts`), or when a develop session ends without a usable result after its automatic provider retry: per-call timeout (`timeout`), output budget (`output`), provider failure (`provider`), or no valid result JSON (`invalid_result`). Plan and review routes never escalate; the escalated task is still checked and reviewed by its configured review route. Provider usage limits, context rotations and `blocked` results do not escalate.
+- **What happens.** The task's develop sessions from then on use the escalation route (selector `escalation`), with exactly its own `attempts` (1–5, default 1) after the attempts already spent, even when the run's `maxAttempts` had attempts left (a stuck session at attempt 1 of 3 with `attempts: 1` gets one Claude attempt). Only a later `core retry --max-attempts N` above the run limit at escalation time adds attempts, by the difference; `core status` shows the limit in effect as `tasks[].escalated.attempt_limit`. Work on disk and progress notes stay; the first Claude session gets feedback naming the reason and the earlier feedback. Each task escalates at most once.
+- **Validation.** `route.provider` must be `claude` (the subscription CLI): no `localProvider`, `command` or other provider; `model`, `effort` and `maxMinutes` as for routes. `maxEscalations` is 1–10 (default 1) per run. The profile must have a local develop route, and `maxCloudSessions: 0` forbids escalation (start and `core doctor` refuse the profile).
+- **Budgets.** Escalated sessions count against `maxSessions` and `maxCloudSessions` like any cloud session. When the escalation budget, the session or cloud budget is exhausted, or `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` or `ANTHROPIC_BASE_URL` is set (which would make the CLI a paid API client), the run blocks exactly as without escalation and the message ends with `Escalation to the Claude route was not started: <reason>.` The environment rule is checked again before every launch on the escalation route, including after `core resume` or `core retry` from another environment: with one of those variables set the run blocks with stop code `provider` before the launch, names the variable (never its value) and spends no attempt; unset it and resume. A `providers.claude.command` in the profile still selects the Claude executable for escalated sessions, as for any Claude route.
+- **Evidence.** The ledger row of the first escalated session (`usage.jsonl`, route `escalation`) has an `escalation` object with `task`, `reason`, `attempt`, `after_invocation` (for a stuck session), `from_route`, `from_backend`, `from_model`, `to_route`, `to_provider`, `to_model` and `invocation`. `core status` shows `escalation` (`max`, `used`, the route and every escalation) and `tasks[].escalated`. The record is part of the run state, so a resume continues on the Claude route and never escalates the same task again.
+
+Escalation is tested with mock executors only (`test/escalation.test.mjs`); no real Claude call was made to validate it.
 
 ## Optional Ollama pilot
 

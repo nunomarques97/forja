@@ -46,7 +46,12 @@ test('kilo permissions follow the phase and write policy', () => {
   assert.equal(kiloPermissions({ readOnly: true, research: true }).webfetch, 'allow');
   const develop = kiloPermissions({});
   assert.equal(develop.edit, 'allow');
-  assert.equal(develop.bash, 'allow');
+  // Bash stays available, except Git subcommands that move HEAD, refs, the stash or a remote.
+  assert.equal(develop.bash['*'], 'allow');
+  assert.equal(Object.keys(develop.bash)[0], '*', 'the denials follow the allow, the order verified with Kilo 7.8.1');
+  for (const sub of ['commit', 'push', 'reset', 'stash', 'checkout', 'rebase', 'merge', 'tag', 'branch'])
+    for (const pattern of [`git ${sub}*`, `git * ${sub}*`]) assert.equal(develop.bash[pattern], 'deny', pattern);
+  for (const allowed of ['git status*', 'git diff*', 'git log*', 'git add*', 'git rm*', 'git show*']) assert.equal(develop.bash[allowed], undefined, allowed);
   assert.equal(develop.external_directory, 'allow');
   const restricted = kiloPermissions({ restricted: true });
   assert.equal(restricted.edit, 'allow');

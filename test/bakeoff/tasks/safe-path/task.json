@@ -1,0 +1,19 @@
+{
+  "id": "safe-path",
+  "kind": "security fix",
+  "stage": "full",
+  "goal": "resolveInside(root, requestPath) in src/static.mjs is used by a static file server and allows path traversal. Make it return the absolute path of the requested file only when that path is inside root; otherwise throw an Error whose code property is 'EOUTSIDE'. requestPath is URL-encoded and may use / or \\ separators. Reject '..' segments that leave root (also when encoded as %2e%2e, %2F or %5C), absolute paths or drive letters that would point outside root, sibling directories whose name starts with root's name (root /srv/app must not allow /srv/app-evil), and malformed URL encoding. Add tests to test/static.test.mjs. node --test must pass.",
+  "plan": {
+    "decisions": [],
+    "tasks": [{
+      "id": "T1", "title": "Confine resolveInside to the public root",
+      "criteria": [
+        "resolveInside returns the absolute path of a request inside root and throws an Error with code 'EOUTSIDE' otherwise.",
+        "Rejected: '..' segments leaving root, also encoded as %2e%2e, %2F or %5C and with \\ separators; absolute paths or drive letters pointing outside root; sibling directories with root's name as prefix (/srv/app-evil for /srv/app); malformed URL encoding.",
+        "test/static.test.mjs covers each rejected case and a valid nested path."
+      ],
+      "files": ["src/static.mjs", "test/static.test.mjs"], "risks": ["security"], "complexity": "medium", "after": [],
+      "checks": [{ "command": "node", "args": ["--test"] }]
+    }]
+  }
+}

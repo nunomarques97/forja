@@ -1,0 +1,19 @@
+{
+  "id": "duration-fix",
+  "kind": "bug fix",
+  "stage": "screening",
+  "goal": "Fix parseDuration in src/duration.mjs. A duration is one or more groups of a whole number followed by a unit h, m or s, with nothing else: \"1h30m\" is 5400 seconds, \"2m5s\" is 125, \"45s\" is 45. Any other input (empty string, \"abc\", \"5x\", \"10\", \"1h30\", \"1.5h\") must throw a RangeError. Add tests for these cases to test/duration.test.mjs. node --test must pass.",
+  "plan": {
+    "decisions": [],
+    "tasks": [{
+      "id": "T1", "title": "Fix parseDuration and test it",
+      "criteria": [
+        "parseDuration sums one or more <whole number><h|m|s> groups: \"1h30m\" is 5400, \"2m5s\" is 125, \"45s\" is 45.",
+        "Any other input (\"\", \"abc\", \"5x\", \"10\", \"1h30\", \"1.5h\") throws a RangeError.",
+        "test/duration.test.mjs covers combined groups and the invalid inputs."
+      ],
+      "files": ["src/duration.mjs", "test/duration.test.mjs"], "risks": [], "complexity": "easy", "after": [],
+      "checks": [{ "command": "node", "args": ["--test"] }]
+    }]
+  }
+}

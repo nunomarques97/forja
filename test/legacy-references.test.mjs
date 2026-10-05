@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { coreInstructions } from '../lib/core/instructions.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -52,6 +53,14 @@ const ALLOWED_FILES = new Set([
 ]);
 const ALLOWED_PREFIXES = ['lib/core/'];
 const ALLOWED_FIXTURE = /^test\/fixtures\/[^/]+\.jsonl$/;
+// The managed block `core init` writes into a project's AGENTS.md/CLAUDE.md.
+// Its source, lib/core/instructions.mjs, is allowlisted (a documented 0.22.0
+// residual), so inside the block only lines identical to the current generator
+// output are exempt; any other line there is scanned like the rest of the file.
+const MANAGED_BEGIN = '<!-- forja-core:begin -->';
+const MANAGED_END = '<!-- forja-core:end -->';
+const MANAGED_LINES = new Set(coreInstructions().split('\n'));
+
 // Only the refusal regions between these markers are allowed in these files.
 const REGION_FILES = new Set(['bin/forja.mjs', 'lib/bootstrap.mjs']);
 const BEGIN = 'legacy-references:' + 'allow-begin';
@@ -66,7 +75,11 @@ export function scanText(path, text) {
   if (allowedFile(path)) return [];
   const found = [];
   let inRegion = false;
+  let inManaged = false;
   text.split(/\r?\n/).forEach((line, index) => {
+    if (line.trim() === MANAGED_BEGIN) { inManaged = true; return; }
+    if (line.trim() === MANAGED_END) { inManaged = false; return; }
+    if (inManaged && MANAGED_LINES.has(line)) return;
     if (REGION_FILES.has(path)) {
       if (line.includes(BEGIN)) { inRegion = true; return; }
       if (line.includes(END)) { inRegion = false; return; }
@@ -167,6 +180,17 @@ test('the scan fails on a seeded violation for every pattern', () => {
   const region = ['// ' + BEGIN, "const removed = ['runner'];", '// ' + END, "console.log('forja runner');"].join('\n');
   assert.deepEqual(scanText('bin/forja.mjs', region).map(v => [v.line, v.id]), [[4, 'P1']]);
   assert.equal(scanText('lib/guard.mjs', region).length, 1);
+});
+
+test('inside the managed forja-core block only exact generator lines are exempt', () => {
+  const block = ['# Project', MANAGED_BEGIN, coreInstructions(), MANAGED_END, ''].join('\n');
+  assert.deepEqual(scanText('AGENTS.md', block), []);
+  assert.deepEqual(scanText('CLAUDE.md', block.split('\n').join('\r\n')), []);
+  // An edited line inside the block, or a generator line outside it, is still reported.
+  const edited = block.replace('Legacy `runner` and `run start` are compatibility', 'Use `run start` and `runner`; they are compatibility');
+  assert.deepEqual(scanText('AGENTS.md', edited).map(v => v.id), ['P2']);
+  const outside = ['# Project', coreInstructions()].join('\n');
+  assert.ok(scanText('AGENTS.md', outside).length >= 2);
 });
 
 test('Core names and temporary prefixes are not legacy references', () => {

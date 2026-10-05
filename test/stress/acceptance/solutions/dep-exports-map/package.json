@@ -1,0 +1,15 @@
+{
+  "name": "routekit",
+  "version": "2.2.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./router": "./src/router.mjs",
+    "./query": "./src/query.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": ["src"],
+  "scripts": { "test": "node --test" }
+}

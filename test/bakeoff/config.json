@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "lab": "C:\\Users\\User\\Desktop\\Externos\\forja-lab",
+  "wallClockMinutes": 180,
+  "runMinutes": { "screening": 20, "full": 25 },
+  "fullCandidates": 3,
+  "contextTokens": 32768,
+  "maxModelGB": 16,
+  "profile": {
+    "maxSessions": 6,
+    "maxCloudSessions": 0,
+    "maxAttempts": 2,
+    "maxMinutes": 10,
+    "maxRotations": 1,
+    "providerRetries": 0,
+    "checkTimeoutMinutes": 3,
+    "routeMinutes": { "plan": 6, "develop": 10, "review": 6 }
+  },
+  "gpu": { "busyUtilization": 40, "foreignMemoryMiB": 6144, "pollSeconds": 60, "maxWaitMinutes": 60 },
+  "keep": ["devstral-small-2:24b", "forja-bk-devstral-small-2-24b:32k"],
+  "candidates": [
+    { "model": "qwen3-coder:30b-32k", "note": "installed 32k variant of qwen3-coder:30b (MoE, 18 GB, partly offloaded)" },
+    { "model": "forja-gpt-oss:20b-32k", "note": "installed 32k variant of gpt-oss:20b" },
+    { "base": "qwen3:14b" },
+    { "base": "devstral-small-2:24b", "pull": true, "sizeGB": 15, "license": "Apache-2.0", "note": "Mistral agentic coding model; weights fit 16 GB, part of the 32k cache offloads" },
+    { "base": "qwen2.5-coder:14b", "pull": true, "sizeGB": 9, "license": "Apache-2.0", "note": "Qwen code model with tool support" },
+    { "base": "qwen3:8b" },
+    { "base": "rnj-1:8b", "pull": true, "sizeGB": 5.1, "license": "Apache-2.0", "note": "Essential AI 8B coding/STEM model with tool support" },
+    { "base": "qwen3:4b" },
+    { "base": "llama3.2:latest" }
+  ]
+}
