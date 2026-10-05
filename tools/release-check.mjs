@@ -112,7 +112,7 @@ export function fileFindings(path, bytes) {
 export const findingLabel = finding => `${finding.path}${finding.line ? ':' + finding.line : ''} ${finding.reason}`;
 
 export function inspectIndex(root, { tree = false } = {}) {
-  const git = args => execFileSync('git', args, { cwd: root, maxBuffer: 32 * 1024 * 1024 });
+  const git = args => execFileSync('git', args, { cwd: root, windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
   const names = git(tree ? ['ls-files', '-z'] : ['diff', '--cached', '--name-only', '--diff-filter=ACMRT', '-z'])
     .toString('utf8').split('\0').filter(Boolean);
   const findings = [];

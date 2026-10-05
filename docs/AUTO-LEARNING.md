@@ -1,6 +1,6 @@
 # Auto-learning (experimental)
 
-**Status: experimental, branch `feat/auto-learning` only.** It is merged only if the measurement shows a benefit (Sponsor decision 2026-10-03). Nothing is released from this branch and `package.json` keeps its version.
+**Status: experimental, off by default.** Released in 0.23.0 behind the `lessons` configuration flag (Sponsor decision 2026-10-05), with the live A/B still pending. Until that A/B gives a verdict of `benefit`, leave the flag off for runs whose cost or outcome matters.
 
 Core learns from earlier finished runs of the same project. A deterministic extractor turns run history into a private lessons store; a later run with the `lessons` configuration flag receives a short, bounded, source-referenced lessons section in its planner, developer and reviewer packets. Lessons are data, never instructions: they never override the goal, task, decisions or project rules. With the flag off nothing changes.
 
@@ -146,7 +146,7 @@ The first prints the schedule and the maximum session count and writes nothing. 
 
 ### Current verdict
 
-**inconclusive (live A/B not yet executed).** The harness, the verdict rule and the simulated end-to-end run are tested; the 48-session live A/B is run by the operator with the command above, and this section is then updated with the results file summary and its verdict. Until a live verdict of `benefit`, the branch is not merged.
+**inconclusive (live A/B not yet executed).** The harness, the verdict rule and the simulated end-to-end run are tested; the 48-session live A/B is run by the operator with the command above, and this section is then updated with the results file summary and its verdict. The feature was released in 0.23.0 with the flag off by default before this verdict (decision log, 2026-10-05).
 
 ## Decision log
 
@@ -165,3 +165,4 @@ The first prints the schedule and the maximum session count and writes nothing. 
 | 2026-10-04 | A/B harness separate from `runBenchmark`, with fixed plans, seeded synthetic history and an alternating schedule. | `runBenchmark` compares single model calls; fixed plans cut variance and sessions. Planner-packet lessons are covered by unit tests only. |
 | 2026-10-04 | Pre-registered verdict thresholds; any gap, error or missing lessons gives inconclusive. | Avoids reading a benefit into incomplete or contaminated evidence from a small sample. |
 | 2026-10-04 | Workers do not run the live A/B; the operator runs the documented command. | It launches up to 48 provider sessions, outside a worker's mandate. |
+| 2026-10-05 | Merged into main and released in 0.23.0 as an experimental, off-by-default flag, before the live A/B verdict. Supersedes the 2026-10-03 merge condition. | Sponsor decision; with the flag off packets and behaviour are unchanged, so the release adds no risk to existing runs. |

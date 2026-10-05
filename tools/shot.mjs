@@ -62,7 +62,7 @@ async function main() {
     '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
     '--disable-extensions', '--disable-background-networking', `--user-data-dir=${profile}`,
     `--remote-debugging-port=${port}`, `--window-size=${opts.width},${opts.height}`, 'about:blank',
-  ], { stdio: 'ignore' });
+  ], { stdio: 'ignore', windowsHide: true });
   try {
     // Wait for the DevTools endpoint.
     let targets = null;

@@ -7,7 +7,7 @@
 <p align="center">A small controller that turns a goal into code changes, executed checks and an independent review.<br>Claude Code and Codex do the engineering. FORJA owns the state, the limits and the definition of done.</p>
 
 <p align="center">
-  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.22.0"><img src="https://img.shields.io/badge/version-0.22.0-ff9955" alt="Version 0.22.0"></a>
+  <a href="https://github.com/nunomarques97/forja/releases/tag/v0.23.0"><img src="https://img.shields.io/badge/version-0.23.0-ff9955" alt="Version 0.23.0"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Node.js-24-339933" alt="Node.js 24"></a>
   <a href="package.json"><img src="https://img.shields.io/badge/runtime_dependencies-0-9ce0bd" alt="Zero runtime dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -58,7 +58,7 @@ flowchart LR
 4. **Review.** A different session inspects the source, the criteria and the check logs. It must not edit files. A rejection sends concrete findings back to development, within the attempt budget.
 5. **Deliver (opt-in).** With `delivery` configured, the final reviewer also approves the exact snapshot to be committed, either as one commit per run or one reviewed commit per task. The controller performs the Git operations. Push requires an explicit deployment contract per project. Workers never commit.
 
-**Budgets are hard limits.** Defaults from [`lib/core/budgets.mjs`](lib/core/budgets.mjs): 30 sessions, 2 implementation attempts per task, 30 minutes per invocation, 2 context rotations and a 120,000-token context limit (measured on each Claude request's input), all configurable within fixed bounds. A failed session that has started still uses up its allowance. FORJA never switches providers automatically and never silently falls back to a paid route.
+**Budgets are hard limits.** Defaults from [`lib/core/budgets.mjs`](lib/core/budgets.mjs): 30 sessions, 2 implementation attempts per task, 30 minutes per invocation, 2 context rotations and a 120,000-token context limit (measured on each Claude request's input), all configurable within fixed bounds. A failed session that has started still uses up its allowance. FORJA never switches providers on its own and never silently falls back to a paid route; the only hand-off is an explicit, budgeted `escalation` that a local profile opts in to.
 
 **Recovery is explicit.** State lives in `.forja/runs/<id>/state.json`, next to prompts, results, patches, check logs and a `usage.jsonl` ledger. Only one writer runs per project: a lock records the controller and its subprocess, and resume refuses to start while either is alive. A recorded developer handoff survives controller death. On recovery, FORJA verifies source and `HEAD`, re-runs the checks and requires a fresh review. If source changed after an approval, that approval no longer counts. Every stopped run reports a fixed `recovery.code` (see [Troubleshooting](#troubleshooting)).
 
@@ -129,7 +129,7 @@ Caller-owned acceptance, passed with `--config acceptance.json`:
 }
 ```
 
-Other opt-in profiles: [`config/core-restricted-claude.json`](config/core-restricted-claude.json) gives Claude workers file tools only, with no shell, no Git and no MCP. [`config/core-full-access.json`](config/core-full-access.json) gives both providers full access in every phase. [Routing](docs/ROUTING.md) covers explicit model and effort per phase, and [delivery](docs/CONTROLLER-DELIVERY.md) covers isolated checks and reviewer-approved commit/push.
+Other opt-in profiles: [`config/core-restricted-claude.json`](config/core-restricted-claude.json) gives Claude workers file tools only, with no shell, no Git and no MCP. [`config/core-full-access.json`](config/core-full-access.json) gives both providers full access in every phase. [`config/core-local.json`](config/core-local.json) runs every phase on a local Ollama model through Kilo (experimental; see [Status](#status)). [Routing](docs/ROUTING.md) covers explicit model and effort per phase, and [delivery](docs/CONTROLLER-DELIVERY.md) covers isolated checks and reviewer-approved commit/push.
 
 ### Viewer
 
@@ -155,7 +155,7 @@ Start with `node $forja core status`. A stopped run reports a fixed `recovery.co
 | `context`, `rotations` | Inspect the checkpoint, then `core resume --max-rotations N`. |
 | `no_progress_between_rotations`, `repeated_context_limit` | The task is too broad. `core abandon --why "..."` and start again with narrower tasks, or explicitly raise the context budget. |
 | `attempts`, `sessions`, `cloud_sessions`, `timeout` | Raise the matching limit with `core resume`, or `core retry --task T1 --why "..."`. If the implementation is already complete, add `--validate-only`. Add `--reopen` for an approved task that turned out to be defective. |
-| `provider`, `provider_limit` | Fix authentication or quota in the provider CLI, then `core resume`. FORJA does not switch providers. |
+| `provider`, `provider_limit` | Fix authentication or quota in the provider CLI, then `core resume`. A Claude usage limit is a wait: `core status` shows its reset time and the guard resumes the run after it (opt out with `usageLimitResume: false`). FORJA does not switch providers unless the profile opts in to escalation. |
 | `interrupted` | The controller ended or Ctrl+C stopped it. An interrupted check spends no attempt. Run `core resume`. |
 | `check_targets` | A check has a placeholder, a missing executable or a Windows `.cmd` shim. Start a new run with concrete commands, for example `node node_modules/typescript/bin/tsc`. |
 | `plan_packet`, `task_packet` | A task's packet exceeds its budget (planning) or the 48,000-character limit (execution); the guidance names the task and its size. For `plan_packet`, `core resume` plans again with those sizes. Otherwise `core abandon --why "..."` and start again with smaller tasks or a shorter goal. |
@@ -167,9 +167,9 @@ Start with `node $forja core status`. A stopped run reports a fixed `recovery.co
 
 | Available now | Experimental or proposed |
 |---|---|
-| Sequential Core workflow, separate review, controller-run checks, protected acceptance, context rotation, crash recovery, explicit routing, isolated checks, reviewer-approved delivery, viewer and diagnostics. | Economy/Ollama presets are opt-in experiments. Dynamic specialist allocation, parallel writers in one project and adaptive replanning are **not implemented**. |
+| Sequential Core workflow, separate review, controller-run checks, protected acceptance, context rotation, crash recovery, explicit routing, isolated checks, reviewer-approved delivery, viewer and diagnostics. Night mode: usage-limit wait and automatic resume, a per-project goal queue (`core queue`) and `core status --all` across projects. | The local Kilo/Ollama profile ([`config/core-local.json`](config/core-local.json)) and opt-in escalation to Claude: its stress baseline completed 0 of 24 scenarios and local reviewers approved failing changes ([bake-off](docs/research/local-models-2026-10-04.md), [stress suite](docs/research/stress-2026-10-04.md)). Auto-learning (`lessons`, off by default, [not yet measured live](docs/AUTO-LEARNING.md)). Economy presets. Dynamic specialist allocation, parallel writers in one project and adaptive replanning are **not implemented**. |
 
-**Current release: [v0.22.0](https://github.com/nunomarques97/forja/releases/tag/v0.22.0).** Core is the only workflow: the legacy crew workflow, its commands, crew agents and skills were removed ([what changed and what to use instead](docs/LEGACY-REMOVAL.md#removed-cli-commands-and-core-replacements-migration-note)). Builds on 0.21, which adds the Kilo CLI provider, stops binary files from counting toward the delivery review limit and stops Git configuration of sibling worktrees from voiding delivery approvals. Earlier releases are listed in the [changelog](CHANGELOG.md) and the [tags](https://github.com/nunomarques97/forja/tags).
+**Current release: [v0.23.0](https://github.com/nunomarques97/forja/releases/tag/v0.23.0).** Night mode for unattended runs ([runbook](docs/CORE-RUNBOOK.md#operação-noturna)), the fix for staged worker changes blocking delivery (#36), two efficiency changes kept on measured evidence (a smaller task-packet repository map, about 0.65% of input; no repeated final-regression checks on an unchanged tree, about two thirds of final regression time; see [efficiency](docs/EFFICIENCY.md)), experimental auto-learning and an experimental local model profile. Builds on 0.22, where Core became the only workflow ([what changed and what to use instead](docs/LEGACY-REMOVAL.md#removed-cli-commands-and-core-replacements-migration-note)). Earlier releases are listed in the [changelog](CHANGELOG.md) and the [tags](https://github.com/nunomarques97/forja/tags).
 
 For development, run `npm test`, `npm run check` and `npm run release:check`. The release guard scans Git's index for credential-shaped values and private run material before any commit. Read the [publication rules](docs/RELEASE.md) before you stage evidence.
 
@@ -181,6 +181,7 @@ For development, run `npm test`, `npm run check` and `npm run release:check`. Th
 | [Routing, models and presets](docs/ROUTING.md) | [Scheduler](lib/core/engine.mjs) · [Adapters](lib/core/providers.mjs) · [Budgets](lib/core/budgets.mjs) |
 | [Isolated checks and delivery](docs/CONTROLLER-DELIVERY.md) | [Specialist methods](docs/CORE-SPECIALISTS.md) |
 | [Research and measured pilots](docs/RESEARCH.md) | [Adaptive orchestration study](docs/ADAPTIVE-ORCHESTRATION.md) |
+| [Efficiency measurements](docs/EFFICIENCY.md) | [Local model bake-off](docs/research/local-models-2026-10-04.md) · [Stress suite](docs/research/stress-2026-10-04.md) · [Auto-learning](docs/AUTO-LEARNING.md) · [Decision log](docs/DECISIONS.md) |
 | [Viewer, guard and notifications](docs/ARCHITECTURE.md) | [Legacy workflow removal](docs/LEGACY-REMOVAL.md) |
 | [Release and privacy policy](docs/RELEASE.md) | [Changelog](CHANGELOG.md) |
 

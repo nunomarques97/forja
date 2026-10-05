@@ -72,7 +72,7 @@ test('core queue add/list/remove keep FIFO order through the CLI and list shows 
   const root = repo(t);
   const ids = [];
   for (const [i, extra] of [[1, []], [2, ['--config', exitingConfig(root), '--provider', 'custom', '--max-sessions', '7']], [3, []]]) {
-    const r = forja(t, root, ['core', 'queue', 'add', '--goal-file', file(root, `g${i}.txt`, `﻿Goal number ${i} with "quotes"\nand a second line`), ...extra]);
+    const r = forja(t, root, ['core', 'queue', 'add', '--goal-file', file(root, `g${i}.txt`, `\uFEFFGoal number ${i} with "quotes"\nand a second line`), ...extra]);
     assert.equal(r.code, 0, r.err);
     const out = JSON.parse(r.out);
     assert.equal(out.position, i);

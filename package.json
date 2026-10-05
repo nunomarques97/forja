@@ -1,10 +1,10 @@
 {
   "name": "forja",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test \"test/*.test.mjs\"",
+    "test": "node --import ./test/support/hide-windows.mjs --test \"test/*.test.mjs\"",
     "check": "node tools/check.mjs",
     "release:check": "node tools/release-check.mjs",
     "fixtures": "node test/fixtures/build-fixtures.mjs",
